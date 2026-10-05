@@ -1,428 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PPL Tracker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#E7EAEC; --surface:#FFFFFF; --sunk:#F2F4F5; --ink:#1B2228; --muted:#5B6770; --line:#CBD2D7;
-  --pull:#1D5BB8; --push:#C2252D; --legs:#D9A300; --other:#2E7D4F; --legs-ink:#2A2100; --ok:#23784A; --focus:#1D5BB8;
-  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
-  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#14181C; --surface:#1E2429; --sunk:#192025; --ink:#E6EAED; --muted:#99A5AE; --line:#323B42;
-    --pull:#5E95EA; --push:#E8585F; --legs:#F0C232; --other:#4FB77C; --legs-ink:#231B00; --ok:#4FBF80; --focus:#7EAAF0;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#14181C; --surface:#1E2429; --sunk:#192025; --ink:#E6EAED; --muted:#99A5AE; --line:#323B42;
-  --pull:#5E95EA; --push:#E8585F; --legs:#F0C232; --other:#4FB77C; --legs-ink:#231B00; --ok:#4FBF80; --focus:#7EAAF0;
-  color-scheme:dark;
-}
-*,*::before,*::after{box-sizing:inherit}
-html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
-button,input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
-.wrap{max-width:680px;margin:0 auto;padding:0 16px 48px}
-
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:14px 0 0}
-.brand{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.brand h1{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:.01em;margin:0;line-height:1}
-.status{font-size:13px;color:var(--muted);text-align:right}
-nav.tabs{display:grid;grid-template-columns:repeat(4,1fr);margin-top:12px;border-bottom:2px solid var(--line)}
-nav.tabs button{background:none;border:0;padding:10px 4px 9px;font-family:var(--display);font-weight:600;font-size:18px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
-nav.tabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--ink)}
-
-/* Plate selector: the one bold element */
-.plates{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 6px}
-.plate{position:relative;border:0;border-radius:999px;aspect-ratio:1/1;cursor:pointer;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--display);box-shadow:inset 0 0 0 6px rgba(255,255,255,.14),inset 0 0 0 7px rgba(0,0,0,.18);transition:transform .15s ease}
-.plate::after{content:"";position:absolute;width:16%;aspect-ratio:1/1;border-radius:50%;background:var(--bg);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
-.plate .pn{font-size:clamp(17px,5vw,24px);font-weight:700;line-height:1;transform:translateY(-62%)}
-.plate .pt{font-size:12px;font-weight:600;opacity:.9;transform:translateY(160%)}
-.plate.pull{background:var(--pull)} .plate.push{background:var(--push)} .plate.legs{background:var(--legs);color:var(--legs-ink)} .plate.other{background:var(--other)}
-.plate.new{background:transparent;color:var(--muted);border:2px dashed var(--line);box-shadow:none;opacity:1;transform:none}
-.plate.new::after{display:none}.plate.new .pn{transform:none;font-size:18px}.plate.new .pt{transform:none}
-.plate[aria-pressed="false"]{opacity:.38;transform:scale(.9)}
-.plate[aria-pressed="true"]{transform:scale(1)}
-@media (prefers-reduced-motion:reduce){.plate{transition:none}}
-.dayline{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:14px 0 4px;flex-wrap:wrap}
-.dayline h2{font-family:var(--display);font-size:34px;font-weight:700;margin:0;line-height:1}
-.dayline label{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
-input[type=date],input[type=number],input[type=text],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:42px}
-textarea{width:100%;min-height:80px;resize:vertical}
-
-.ex{background:var(--surface);border:1px solid var(--line);border-left-width:5px;border-radius:6px 10px 10px 6px;padding:14px;margin-top:12px}
-.ex.pull{border-left-color:var(--pull)} .ex.push{border-left-color:var(--push)} .ex.legs{border-left-color:var(--legs)} .ex.other{border-left-color:var(--other)}
-.ex-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-.ex-head select{font-weight:600;flex:1;min-width:0;max-width:100%}
-.target{font-family:var(--display);font-weight:600;font-size:20px;white-space:nowrap;padding-top:6px}
-.last{font-size:14px;color:var(--muted);margin:8px 0 0}
-.hint{font-size:14px;margin:4px 0 0;color:var(--ok);font-weight:600}
-.sets{margin-top:10px;display:grid;gap:8px}
-.setrow{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;align-items:center}
-.setrow span{font-family:var(--display);font-weight:600;color:var(--muted);font-size:17px}
-.setrow input{width:100%;text-align:center;font-size:18px}
-.setrow input::placeholder{color:var(--muted);opacity:.6}
-.colhead{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
-.row-actions{display:flex;gap:8px;margin-top:10px}
-.btn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:600;min-height:42px}
-.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);width:100%;font-family:var(--display);font-size:22px;padding:12px}
-.btn.danger{color:var(--push)}
-.btn.small{padding:6px 10px;min-height:36px;font-size:14px}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.section{margin-top:22px}
-.section h3{font-family:var(--display);font-size:24px;margin:0 0 8px}
-.muted{color:var(--muted)}
-.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--muted);margin-top:16px}
-
-details.hist{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-top:10px}
-details.hist summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
-details.hist summary::-webkit-details-marker{display:none}
-.chip{font-family:var(--display);font-weight:700;font-size:15px;padding:3px 10px;border-radius:999px;color:#fff;white-space:nowrap}
-.chip.pull{background:var(--pull)} .chip.push{background:var(--push)} .chip.legs{background:var(--legs);color:var(--legs-ink)} .chip.other{background:var(--other)}
-.ex-name{flex:1;min-width:0;font-weight:600}
-.edrow{display:grid;grid-template-columns:1fr 54px 54px 54px 40px;gap:6px;align-items:center;margin-top:8px}
-.edrow input{width:100%;text-align:center;padding:8px 4px}.edrow input:first-child{text-align:left;padding:8px 10px}
-.edhead{display:grid;grid-template-columns:1fr 54px 54px 54px 40px;gap:6px;font-size:12px;color:var(--muted);margin-top:12px;text-align:center}.edhead span:first-child{text-align:left}
-.colors{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.colors label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;background:var(--surface)}
-.colors input{accent-color:var(--ink)}
-.swatch{width:14px;height:14px;border-radius:50%;display:inline-block}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;vertical-align:middle;margin-left:6px}
-.seg button{border:0;background:transparent;padding:3px 10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);min-height:28px}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
-.colhead .wcell{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2px}
-.iconbtn{border:1px solid var(--line);background:var(--sunk);border-radius:8px;min-height:40px;cursor:pointer;font-size:18px;line-height:1}
-.hist .meta{font-size:14px;color:var(--muted);text-align:right}
-.hist .body{padding:0 14px 14px;border-top:1px solid var(--line)}
-.hist table{width:100%;border-collapse:collapse;margin-top:8px;font-size:15px}
-.hist td{padding:5px 0;vertical-align:top;border-bottom:1px solid var(--line)}
-.hist td:last-child{text-align:right;color:var(--muted)}
-
-.chart{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;overflow-x:auto}
-.chart svg{display:block;width:100%;height:auto;min-width:300px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px}
-.stat b{display:block;font-family:var(--display);font-size:26px;line-height:1.1}
-.stat small{color:var(--muted);font-size:13px}
-.form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end}
-.form-row label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:3px}
-.form-row input{width:100%}
-.list{margin:10px 0 0;padding:0;list-style:none}
-.list li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);gap:8px}
-.stack{display:grid;gap:10px}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw;text-align:center}
-.toast.show{opacity:1}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-@media (max-width:380px){.setrow,.colhead{grid-template-columns:40px 1fr 1fr}.dayline h2{font-size:28px}}
-</style>
-
-<style id="vibrant-theme">
-:root{
-  --bg:#f5f7fb;
-  --surface:#ffffff;
-  --surface-2:#f0f4fa;
-  --text:#182230;
-  --muted:#667085;
-  --border:#e2e8f0;
-  --primary:#6d5dfc;
-  --primary-2:#8b5cf6;
-  --accent:#06b6d4;
-  --success:#16a34a;
-  --warning:#f59e0b;
-  --danger:#ef4444;
-  --push:#ff5c7a;
-  --pull:#5b7cfa;
-  --legs:#18b981;
-  --shadow:0 10px 30px rgba(31,41,55,.08);
-  --shadow-sm:0 4px 14px rgba(31,41,55,.07);
-  --radius:18px;
-}
-html{background:var(--bg)}
-body{
-  background:
-    radial-gradient(circle at 0% 0%,rgba(109,93,252,.10),transparent 28rem),
-    radial-gradient(circle at 100% 10%,rgba(6,182,212,.08),transparent 24rem),
-    var(--bg);
-  color:var(--text);
-}
-button,input,select,textarea{font:inherit}
-button{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}
-button:active{transform:translateY(1px)}
-.btn{
-  min-height:44px;
-  border:1px solid var(--border);
-  border-radius:13px;
-  padding:10px 15px;
-  background:var(--surface);
-  color:var(--text);
-  font-weight:700;
-  box-shadow:var(--shadow-sm);
-}
-.btn:hover{border-color:#c7d2fe;box-shadow:0 7px 18px rgba(31,41,55,.10)}
-.btn.primary{
-  border:0;
-  color:#fff;
-  background:linear-gradient(135deg,var(--primary),var(--primary-2));
-  box-shadow:0 8px 20px rgba(109,93,252,.25);
-}
-.btn.primary:hover{box-shadow:0 11px 26px rgba(109,93,252,.32)}
-.section,.card,.panel,.modal,.sheet{
-  border-color:var(--border)!important;
-  box-shadow:var(--shadow)!important;
-}
-input,select,textarea{
-  border:1px solid var(--border)!important;
-  background:var(--surface)!important;
-  color:var(--text)!important;
-  border-radius:12px!important;
-  min-height:42px;
-}
-input:focus,select:focus,textarea:focus{
-  outline:none;
-  border-color:#8b7cf6!important;
-  box-shadow:0 0 0 4px rgba(109,93,252,.12)!important;
-}
-textarea{min-height:120px}
-
-header,.topbar,.app-header{
-  background:rgba(255,255,255,.88)!important;
-  backdrop-filter:blur(16px);
-  border-bottom:1px solid rgba(226,232,240,.85)!important;
-}
-nav,.tabs{
-  gap:7px!important;
-  background:var(--surface-2)!important;
-  padding:6px!important;
-  border-radius:15px!important;
-}
-nav button,.tabs button{
-  border:0!important;
-  border-radius:11px!important;
-  min-height:42px;
-  font-weight:750;
-}
-nav button.active,.tabs button.active{
-  color:#fff!important;
-  background:linear-gradient(135deg,var(--primary),var(--primary-2))!important;
-  box-shadow:0 5px 14px rgba(109,93,252,.22);
-}
-
-h1,h2,h3{letter-spacing:-.025em}
-h1{font-weight:850}
-h2{font-weight:800}
-h3{font-weight:780}
-.muted{color:var(--muted)!important}
-
-/* Workout/day selector */
-.day-grid,.program-grid{
-  gap:12px!important;
-}
-.day-card,.program-card,[data-day]{
-  border:1px solid var(--border)!important;
-  border-radius:16px!important;
-  background:var(--surface)!important;
-  box-shadow:var(--shadow-sm)!important;
-  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
-}
-.day-card:hover,.program-card:hover,[data-day]:hover{
-  transform:translateY(-2px);
-  box-shadow:var(--shadow)!important;
-}
-.day-card.active,.program-card.active,[data-day].active{
-  border-color:rgba(109,93,252,.55)!important;
-  box-shadow:0 0 0 3px rgba(109,93,252,.10),var(--shadow)!important;
-}
-
-/* Color-code PPL sections without changing their data */
-[class*="push"] .badge,[class*="push"] .tag{background:rgba(255,92,122,.12);color:#db3153}
-[class*="pull"] .badge,[class*="pull"] .tag{background:rgba(91,124,250,.12);color:#3e5bd1}
-[class*="legs"] .badge,[class*="legs"] .tag{background:rgba(24,185,129,.12);color:#07865d}
-
-/* Exercise cards */
-.exercise,.exercise-card,.set-row{
-  background:var(--surface)!important;
-  border-color:var(--border)!important;
-}
-.exercise-card,.exercise{
-  border-radius:16px!important;
-  box-shadow:var(--shadow-sm);
-}
-.set-row{
-  border-radius:12px!important;
-}
-.set-row input{font-weight:700}
-.set-row.completed,.set-row.done{
-  background:rgba(22,163,74,.055)!important;
-  border-color:rgba(22,163,74,.22)!important;
-}
-.badge,.tag,.pill{
-  border-radius:999px!important;
-  padding:5px 10px!important;
-  font-weight:750!important;
-}
-
-/* Dashboard/stat cards */
-.stat,.stat-card,.metric,.progress-card{
-  background:linear-gradient(145deg,#fff,#f8faff)!important;
-  border:1px solid var(--border)!important;
-  border-radius:16px!important;
-  box-shadow:var(--shadow-sm)!important;
-}
-.stat-value,.metric-value{
-  font-weight:850!important;
-  letter-spacing:-.04em;
-}
-
-/* Progress bars */
-.progress-bar,.bar{
-  background:#e9eef7!important;
-  border-radius:999px!important;
-  overflow:hidden;
-}
-.progress-bar>*,.bar>*{
-  border-radius:999px!important;
-  background:linear-gradient(90deg,var(--primary),var(--accent))!important;
-}
-
-/* Toast/status */
-.toast{
-  border:0!important;
-  background:#182230!important;
-  color:#fff!important;
-  border-radius:13px!important;
-  box-shadow:0 12px 30px rgba(15,23,42,.22)!important;
-}
-
-/* Floating primary actions */
-.fab,.floating-action{
-  background:linear-gradient(135deg,var(--primary),var(--accent))!important;
-  color:#fff!important;
-  border:0!important;
-  box-shadow:0 12px 26px rgba(79,70,229,.28)!important;
-}
-
-/* Tables/history */
-table{border-collapse:separate!important;border-spacing:0 7px!important}
-thead th{
-  color:var(--muted)!important;
-  font-size:.78rem;
-  text-transform:uppercase;
-  letter-spacing:.06em;
-}
-tbody tr{background:var(--surface)!important;box-shadow:var(--shadow-sm)}
-tbody td{border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-tbody td:first-child{border-left:1px solid var(--border);border-radius:12px 0 0 12px}
-tbody td:last-child{border-right:1px solid var(--border);border-radius:0 12px 12px 0}
-
-/* Mobile usability */
-@media(max-width:700px){
-  body{font-size:15px}
-  .section,.card,.panel,.exercise-card,.exercise{border-radius:15px!important}
-  .btn{width:100%;min-height:46px}
-  nav button,.tabs button{min-height:44px}
-  input,select{min-height:46px}
-  .stack>.btn + .btn{margin-top:2px}
-}
-</style>
-
-
-<style id="vibrant-header">
-.app-title,.brand,.logo{
-  font-weight:900!important;
-  background:linear-gradient(90deg,#6d5dfc,#06b6d4);
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent!important;
-}
-</style>
-
-<meta name="description" content="PPL workout tracker with automatic browser saving and JSON backup.">
-<meta name="theme-color" content="#6d5dfc">
-</head>
-<body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <h1>PPL Tracker</h1>
-      <div class="status" id="status">Connecting storage…</div>
-    </div>
-    <nav class="tabs" aria-label="Sections">
-      <button data-tab="log" aria-current="page">Log</button>
-      <button data-tab="history">History</button>
-      <button data-tab="progress">Progress</button>
-      <button data-tab="data">Data</button>
-    </nav>
-  </header>
-  <main id="app" aria-live="polite"></main>
-</div>
-<div class="toast" id="toast" role="status"></div>
-
-<script>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#173f36"><meta name="description" content="Your personal Push Pull Legs training journal. Log your sets, track strength, and build a consistent routine."><title>PPL Tracker — Your training space</title><style>:root{--bg:#f5f5ef;--surface:#fff;--sunk:#f3f5f2;--ink:#1b2925;--muted:#68736d;--line:#dfe5dc;--pull:#276858;--push:#a8523c;--legs:#685ab3;--other:#517685;--legs-ink:#fff;--ok:#276858;--focus:#276858;--display:system-ui,-apple-system,"Segoe UI",sans-serif;--body:var(--display);color-scheme:light;font-synthesis:none}
+*,*::before,*::after{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}button,input,select,textarea{font:inherit;color:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}[hidden]{display:none!important}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}svg{width:22px;height:22px;flex-shrink:0}h1,h2,h3,p{margin:0}h1,h2,h3{line-height:1.2;letter-spacing:-.04em}h3{font-size:20px;font-weight:650}.muted{color:var(--muted)}.eyebrow{font-size:10px;letter-spacing:.15em;font-weight:750;color:var(--muted);margin-bottom:10px}code{font-size:13px;overflow-wrap:anywhere}
+.wrap{min-height:100vh;display:grid;grid-template-columns:218px minmax(0,1fr)}header.top{position:sticky;top:0;height:100dvh;background:#fff;border-right:1px solid var(--line);padding:34px 20px;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none;font-size:24px;font-weight:800;letter-spacing:-.05em;padding:0 8px}.brand-mark{display:grid;place-items:center;background:#173f36;color:#d7f58b;width:44px;height:44px;border-radius:14px}.brand-sub{font-size:9px;display:block;letter-spacing:.24em;font-weight:650;line-height:1.1}.nav-caption{font-size:10px;letter-spacing:.13em;color:var(--muted);font-weight:650;margin:52px 16px 15px}nav.tabs{display:grid;gap:8px}nav.tabs button{display:flex;align-items:center;gap:14px;border:0;background:transparent;padding:14px 16px;color:var(--muted);font-weight:600;min-height:50px;text-align:left;border-radius:12px}nav.tabs button[aria-current=page]{background:#173f36;color:#e4f5c3}nav.tabs button:hover:not([aria-current=page]){background:var(--sunk);color:var(--ink)}.rail-bottom{margin-top:auto;padding:20px 8px 0;color:var(--muted);font-size:11px}.online-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pull);margin-right:6px}.rail-bottom p{font-size:19px;line-height:1.35;color:var(--ink);letter-spacing:-.03em;margin-top:26px;font-weight:600}#app{width:100%;max-width:1270px;margin:0 auto;padding:46px 48px 80px;min-width:0}.page-intro{display:flex;justify-content:space-between;align-items:center;gap:16px}.page-intro h1{font-size:clamp(28px,3.2vw,41px);font-weight:680;letter-spacing:-.055em}.page-intro .muted{margin-top:10px}.date-pill{border:1px solid var(--line);background:#fff;border-radius:100px;padding:9px 16px;white-space:nowrap;font-size:12px;font-weight:600}.overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:30px 0 36px}.overview>div{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);padding:20px;border-radius:18px}.stat-icon{display:grid;place-items:center;background:#e6f0e9;color:var(--pull);width:45px;height:45px;border-radius:14px;flex-shrink:0}.stat-icon.lime{background:#eff5d5;color:#617e28}.stat-icon.peach{background:#f8eae3;color:var(--push)}.overview b{font-size:25px;letter-spacing:-.04em;font-weight:650;display:block;line-height:1.2}.overview p>span{font-size:11px;color:var(--muted);display:block;margin-top:4px}.program-label{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.program-label h2{font-size:20px;font-weight:650}.program-label>span{font-size:11px;color:var(--muted)}
+.plates{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:32px}.plate{--accent:var(--other);background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:15px;text-align:left;padding:13px 12px;min-width:0;min-height:98px;transition:background .16s,border-color .16s;position:relative}.plate.pull{--accent:var(--pull)}.plate.push{--accent:var(--push)}.plate.legs{--accent:var(--legs)}.plate-top{display:flex;gap:5px;align-items:center;text-transform:uppercase;letter-spacing:.08em;font-size:8px;font-weight:650;color:var(--muted)}.type-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0}.plate .pn{display:block;font-size:17px;font-weight:700;letter-spacing:-.045em;margin-top:10px}.plate .pt{display:block;font-size:9px;color:var(--muted);margin-top:3px}.plate[aria-pressed=true]{background:#173f36;border-color:#173f36;color:#fff}.plate[aria-pressed=true] .plate-top,.plate[aria-pressed=true] .pt{color:#d7f58b}.plate[aria-pressed=true] .type-dot{background:#d7f58b}.plate:hover:not([aria-pressed=true]){border-color:var(--accent);background:#fafbf7}.plate.new{border:1px dashed #b8c3b3;background:transparent}.plate.new .plate-top{font-size:8px;letter-spacing:0;text-transform:none}.workout-layout{display:grid;grid-template-columns:minmax(0,1fr) 275px;gap:24px;align-items:start}.workout-main{min-width:0}.dayline{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}.dayline .eyebrow{margin-bottom:8px}.dayline h2{font-size:29px;display:flex;gap:12px;align-items:center}.workout-tag{text-transform:uppercase;letter-spacing:.09em;font-size:9px;font-weight:700;background:#e8f0ea;color:var(--pull);border-radius:6px;padding:6px 9px}.workout-tag.push{color:var(--push);background:#f8eae3}.workout-tag.legs{color:var(--legs);background:#efedf9}.workout-tag.other{color:var(--other);background:#e8f0f3}.dayline label{font-size:10px;color:var(--muted);display:grid;gap:4px}.dayline input{max-width:160px;font-size:12px;background:transparent;min-height:38px}.workout-help{color:var(--muted);font-size:11px;line-height:1.65;margin-bottom:20px;max-width:560px}
+input[type=date],input[type=number],input[type=text],select,textarea{background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;max-width:100%;min-width:0}textarea{width:100%;min-height:110px;resize:vertical}input::placeholder,textarea::placeholder{color:#68736d;opacity:.65}select{cursor:pointer}input[type=number]{appearance:textfield}input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:19px;padding:22px;margin-bottom:14px;overflow:hidden}.ex-head{display:flex;align-items:center;gap:12px}.ex-number{color:var(--pull);background:#e8f0ea;border-radius:9px;display:grid;place-items:center;font-size:11px;font-weight:700;min-width:35px;height:35px}.ex.push .ex-number{color:var(--push);background:#f8eae3}.ex.legs .ex-number{color:var(--legs);background:#efedf9}.ex-head select{flex:1;font-weight:650;background:#fff;border-color:transparent;font-size:16px;padding-left:0;min-width:0;text-overflow:ellipsis}.ex-name{flex:1;min-width:0;font-weight:650;font-size:16px}.exercise-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0;font-size:10px}.target{color:var(--ink);font-weight:600;background:var(--sunk);padding:4px 9px;border-radius:6px;white-space:nowrap}.last{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6}.hint{font-size:11px;margin-top:5px;color:var(--ok);font-weight:600}.colhead{display:grid;grid-template-columns:48px 1fr 1fr;gap:10px;margin-top:20px;font-size:10px;color:var(--muted);text-align:center;align-items:center}.wcell{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}.sets{display:grid;gap:8px;margin-top:9px}.setrow{display:grid;grid-template-columns:48px 1fr 1fr;gap:10px;align-items:center}.setrow>span{color:var(--muted);font-size:11px;font-weight:600}.setrow input{width:100%;font-size:17px;font-weight:550;text-align:center;min-height:48px;background:#f7f9f5;border-color:#e6ebe1}.setrow input:focus{border-color:var(--pull);background:#fff}.seg{display:inline-flex;vertical-align:middle;background:#edf1e9;border-radius:7px;padding:2px;gap:1px}.seg button{border:0;background:transparent;border-radius:5px;padding:5px 8px;font-size:10px;font-weight:650;min-height:32px;color:var(--muted)}.seg button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 3px #18291d12}.row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:10px;min-height:46px;padding:11px 16px;font-weight:600;font-size:12px;transition:background .15s}.btn:hover{background:#edf2e8}.btn.primary{background:#d7f58b;border-color:#d7f58b;color:#19342b;width:100%;min-height:50px;font-size:12px;font-weight:700}.btn.primary:hover{background:#cbee70}.btn.primary svg{width:16px}.btn.small{font-size:10px;min-height:40px;padding:8px 10px;background:var(--sunk);border-color:transparent}.btn.danger{color:#aa413b}.add-exercise{width:100%;border-style:dashed;background:transparent;min-height:50px;margin-top:4px}.section{background:var(--surface);border:1px solid var(--line);padding:24px;border-radius:19px;margin-top:20px}.section h3{margin-bottom:10px}.notes-card p{font-size:11px;margin-bottom:14px}.session-sidebar{position:sticky;top:30px;padding-top:0;display:grid;gap:18px}.session-card{background:#173f36;color:#fff;border-radius:20px;padding:23px}.session-card .eyebrow{color:#c6d6ca;font-size:9px}.session-card h3{font-size:25px;margin:12px 0 8px}.session-card .muted{color:#c6d6ca;font-size:11px}.meter-track{margin-top:25px;height:5px;border-radius:10px;background:#ffffff25;overflow:hidden}.meter-track>div{height:100%;background:#d7f58b;width:0;transition:width .2s}.meter-caption{font-size:10px;margin:9px 0 23px;color:#dce8dd}.meter-caption>span:last-child{display:block;color:#aec5b9;font-size:10px;margin-top:4px}.autosave-note{font-size:9px;color:#c6d6ca;text-align:center;margin-top:12px}.guide-card{background:#eaf0de;border:1px solid #dfe7d0;border-radius:20px;padding:22px}.guide-icon{display:grid;place-items:center;background:#fff;width:35px;height:35px;border-radius:10px;color:var(--pull);margin-bottom:16px}.guide-card h3{font-size:19px;line-height:1.3;margin-bottom:12px}.guide-card ul{padding-left:16px;margin:0;display:grid;gap:12px;font-size:11px;line-height:1.7;color:#56634e}
+.empty{background:var(--surface);border:1px dashed #ccd6c6;border-radius:18px;text-align:center;color:var(--muted);padding:42px 24px;margin-top:20px;font-size:14px}.empty h2{color:var(--ink);font-size:25px;margin-bottom:12px}.load-error{max-width:580px;margin:60px auto}.load-error .file-label{margin-top:18px}.load-error p{margin-bottom:18px}.load-error .panel-icon{margin:0 auto 16px}.hist{background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-top:12px}.hist summary{list-style:none;cursor:pointer;padding:20px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;font-size:13px}.hist summary::-webkit-details-marker{display:none}.chip{background:var(--pull);color:#fff;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:650;white-space:nowrap}.chip.push{background:var(--push)}.chip.legs{background:var(--legs)}.chip.other{background:var(--other)}.hist .meta{font-size:11px;color:var(--muted);text-align:right}.hist .body{border-top:1px solid var(--line);padding:16px 20px}.hist table{width:100%;border-collapse:collapse;font-size:12px}.hist td{padding:10px 0;vertical-align:top;border-bottom:1px solid var(--line)}.hist td:last-child{text-align:right;color:var(--muted);padding-left:16px}.hist .muted{font-size:12px;margin-top:12px}.chart{background:#fafbf8;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:14px}.chart svg{display:block;width:100%;height:auto}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}.stat{background:var(--sunk);border-radius:13px;padding:18px}.stat b{display:block;font-size:28px;letter-spacing:-.05em;font-weight:650}.stat small{font-size:11px;color:var(--muted)}.form-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;align-items:end}.form-row label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted)}.form-row input{width:100%}.list{margin:16px 0 0;padding:0;list-style:none}.list li{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:12px 0;font-size:11px}.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.data-grid .section{margin:0}.stack{display:grid;gap:12px}.stack p{font-size:12px}.stack h3{margin-bottom:0}.panel-icon{background:#eaf0de;color:var(--pull);width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:4px}.file-label{display:grid;gap:8px;font-size:11px;color:var(--muted);border:1px dashed #b8c3b3;border-radius:12px;padding:15px;min-width:0}.file-label input{font-size:11px;width:100%;min-width:0}.file-label input::file-selector-button{border:0;border-radius:7px;padding:8px 12px;color:var(--ink);background:#edf2e8;font-family:inherit;margin-right:10px;cursor:pointer}.program-details{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:24px}.program-details .muted{font-size:12px;margin-top:8px}.rotation{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:18px}.rotation>span:not(.chip){font-size:11px;color:var(--muted)}.storage-footnote{text-align:center;margin-top:25px;color:var(--muted);font-size:11px}.edhead,.edrow{display:grid;grid-template-columns:minmax(80px,1fr) 52px 52px 52px 36px;gap:8px;align-items:center}.edhead{font-size:9px;color:var(--muted);margin-top:20px;text-align:center}.edhead span:first-child{text-align:left}.edrow{margin-top:10px}.edrow input{width:100%;text-align:center;padding:8px 4px;font-size:13px}.edrow input:first-child{text-align:left;padding-left:10px}.iconbtn{border:0;background:var(--sunk);border-radius:10px;min-height:44px;font-size:20px}.colors{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.colors label{display:flex;align-items:center;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:12px;cursor:pointer}.colors input{accent-color:var(--pull)}.swatch{width:10px;height:10px;border-radius:50%;display:inline-block}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:90vw;background:var(--ink);color:#fff;font-size:12px;font-weight:550;padding:14px 22px;border-radius:14px;box-shadow:0 4px 24px #0b302c20;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;text-align:center}.toast.show{opacity:1}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media(min-width:1600px){#app{padding-top:60px}.plates{gap:12px}.plate{padding:16px}}
+@media(max-width:1200px){.wrap{grid-template-columns:180px minmax(0,1fr)}header.top{padding:30px 14px}#app{padding:35px 28px 70px}.workout-layout{grid-template-columns:minmax(0,1fr) 245px;gap:18px}.plate{padding:12px 9px}.plate .pn{font-size:15px}.plate-top{font-size:7px}.plate .pt{font-size:8px}.ex{padding:18px}.session-card,.guide-card{padding:20px}.overview>div{padding:16px}}
+@media(max-width:1000px){.wrap{grid-template-columns:90px minmax(0,1fr)}header.top{padding:30px 12px}.brand{padding:0;justify-content:center}.brand>span:last-child,.nav-caption,.rail-bottom{display:none}nav.tabs{margin-top:40px}nav.tabs button{display:flex;flex-direction:column;gap:6px;font-size:9px;padding:12px 2px}.overview>div{gap:10px;padding:14px}.overview{gap:10px}.workout-layout{grid-template-columns:minmax(0,1fr) 230px;gap:16px}.ex-head select{font-size:14px}.exercise-meta .muted{font-size:8px}.dayline h2{font-size:25px}.dayline input{max-width:142px}.dayline{flex-wrap:wrap}.program-details{grid-template-columns:1fr}.program-details>div:last-child{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}.program-details .file-label{margin-top:0!important}.ex-number{min-width:30px;height:30px}.ex-head{gap:8px}}
+@media(max-width:780px){.workout-layout{display:flex;flex-direction:column}.workout-main{width:100%}.session-sidebar{position:static;display:grid;grid-template-columns:1fr 1fr;width:100%;gap:16px}.session-card .btn{font-size:11px}.guide-card ul{font-size:10px}.data-grid{grid-template-columns:1fr}.overview b{font-size:23px}.stat-icon{width:36px;height:36px;border-radius:10px}.plates{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.plate{padding:14px;min-height:100px}.plate-top{font-size:8px}.plate .pn{font-size:19px}.plate .pt{font-size:10px}}
+@media(max-width:600px){body{font-size:14px}.wrap{display:block}header.top{position:relative;height:auto;background:transparent;border:0;padding:24px 20px 0;padding-top:calc(24px + env(safe-area-inset-top));display:flex;flex-direction:row;align-items:center;justify-content:space-between}.brand{gap:9px}.brand>span:last-child{display:block;font-size:20px}.brand-mark{width:37px;height:37px;border-radius:11px}.brand-sub{font-size:7px}.rail-bottom{display:block;margin:0;padding:0;font-size:9px;max-width:125px;text-align:right}.rail-bottom p{display:none}nav.tabs{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:0;background:#ffffffee;backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:20}nav.tabs button{min-height:53px;border-radius:12px;font-size:10px;gap:5px;padding:7px 3px}nav.tabs button[aria-current=page]{background:#eaf0de;color:#173f36}nav.tabs svg{width:21px;height:21px}#app{padding:30px 20px calc(110px + env(safe-area-inset-bottom));max-width:100%}.page-intro{align-items:flex-start}.page-intro .eyebrow{font-size:8px;letter-spacing:.13em}.page-intro h1{font-size:29px;max-width:320px}.page-intro .muted{font-size:12px;margin-top:9px}.date-pill{display:none}.overview{margin:25px 0 28px;gap:8px}.overview>div{display:block;padding:13px 11px;border-radius:14px}.stat-icon{width:28px;height:28px;border-radius:8px;margin-bottom:12px}.stat-icon svg{width:16px;height:16px}.overview b{font-size:22px}.overview p>span{font-size:9px}.program-label h2{font-size:18px}.program-label>span{font-size:10px}.plates{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:26px}.plate{padding:13px;min-height:99px;border-radius:13px}.plate-top{font-size:8px}.plate .pn{font-size:18px}.plate .pt{font-size:9px}.plate.new{min-height:62px;grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:13px}.plate.new .plate-top{display:none}.plate.new .pn{margin:0;font-size:13px;letter-spacing:0}.plate.new .pt{font-size:10px;margin:0}.dayline{flex-wrap:nowrap;gap:8px}.dayline h2{font-size:26px;gap:8px}.dayline .eyebrow{font-size:8px}.dayline label{font-size:9px}.dayline input{width:135px;font-size:12px;padding:8px;min-height:38px}.workout-tag{font-size:7px;padding:5px 6px}.workout-help{font-size:10px;line-height:1.7}.ex{padding:17px;border-radius:17px;margin-bottom:13px}.ex-head select{font-size:16px;padding:9px 0;min-height:44px}.ex-number{min-width:30px;height:30px;font-size:10px}.exercise-meta{font-size:9px}.exercise-meta .muted{font-size:8px}.colhead,.setrow{grid-template-columns:40px minmax(0,1fr) minmax(0,1fr);gap:8px}.setrow input{min-height:48px;font-size:17px}.colhead{margin-top:17px}.seg button{min-height:35px;padding:5px 8px}.row-actions{gap:6px;margin-top:13px}.btn.small{min-height:42px;font-size:10px}.session-sidebar{display:flex;flex-direction:column;gap:14px;margin-top:5px}.session-card{padding:24px}.session-card .btn{font-size:13px;min-height:52px}.guide-card{padding:22px}.guide-card ul{font-size:11px}.section{padding:20px;border-radius:17px}.section h3{font-size:20px}.form-row{grid-template-columns:1fr 1fr;gap:12px}.form-row label:first-child{grid-column:1/-1}.form-row input,.form-row select,textarea{font-size:16px}.stats{gap:8px}.stat{padding:12px}.stat b{font-size:24px}.stat small{font-size:9px;line-height:1.4;display:block;margin-top:4px}.hist summary{padding:16px 12px;gap:8px;font-size:11px}.hist .meta{font-size:9px}.hist .body{padding:14px}.chip{font-size:9px;padding:5px 8px}.hist td{font-size:11px}.list li{flex-wrap:wrap}.program-details>div:last-child{display:flex;flex-direction:column;align-items:stretch}.program-details .file-label{margin-top:12px!important}.edhead,.edrow{grid-template-columns:minmax(50px,1fr) 38px 38px 38px 30px;gap:5px}.edhead{font-size:7px}.edrow input{font-size:16px;padding:8px 3px}.edrow input:first-child{padding-left:6px}.iconbtn{min-height:44px}.colors label{font-size:11px}.toast{bottom:calc(87px + env(safe-area-inset-bottom));font-size:12px;border-radius:12px;width:max-content;max-width:90vw}.empty{font-size:12px;padding:30px 20px}.load-error{margin-top:20px}.chart{padding:5px}.storage-footnote{font-size:10px}}
+@media(max-width:360px){#app{padding-left:14px;padding-right:14px}header.top{padding-left:14px;padding-right:14px}.dayline h2{font-size:24px}.dayline input{width:120px}.exercise-meta>.muted{display:none}.plate{padding:11px}.overview b{font-size:20px}.ex{padding:14px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
+</style></head>
+<body><div class="wrap"><header class="top"><a class="brand" href="./" aria-label="PPL Tracker home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 17 7-12 7 12M8 13h8"/></svg></span><span>PPL<span class="brand-sub">TRACKER</span></span></a><p class="nav-caption">YOUR SPACE</p><nav class="tabs" aria-label="Sections"><button data-tab="log" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6v12M3 9v6M18 6v12M21 9v6M6 12h12"/></svg><span>Train</span></button><button data-tab="history" aria-current="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-4v6l4 2"/></svg><span>History</span></button><button data-tab="progress" aria-current="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4m0 16h16M8 15l4-5 4 2 4-7"/></svg><span>Progress</span></button><button data-tab="data" aria-current="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6l2 3h8v12H4Z"/></svg><span>Data</span></button></nav><div class="rail-bottom"><span class="online-dot"></span><span id="status" role="status">Loading program…</span><p>Small steps.<br>Stronger every day.</p></div></header><main id="app"><div class="empty">Loading your workout program…</div></main></div><div class="toast" id="toast" role="status"></div><script>
 (() => {
 "use strict";
+function icon(name){
+  const paths = {activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>', calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/>', arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>', spark:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>', download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/>', upload:'<path d="M12 15V3m-5 5 5-5 5 5M4 16v4h16v-4"/>', log:'<path d="M6 6v12M3 9v6M18 6v12M21 9v6M6 12h12"/>', history:'<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-4v6l4 2"/>', progress:'<path d="M4 20V4m0 16h16M8 15l4-5 4 2 4-7"/>', data:'<path d="M4 5h6l2 3h8v12H4Z"/>', brand:'<path d="m5 17 7-12 7 12M8 13h8"/>'};
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.log}</svg>`;
+}
 
-const PROGRAM = [
-  {id:"pullA",name:"Pull A",type:"pull",ex:[
-    {n:"Lat pulldown",s:3,lo:6,hi:10,alt:["Pull-ups","Assisted pull-up machine","Neutral-grip pulldown"]},
-    {n:"Barbell row",s:3,lo:6,hi:8,alt:["T-bar row","Chest-supported row"]},
-    {n:"Seated cable row",s:3,lo:10,hi:12,alt:["Machine row","Single-arm dumbbell row"]},
-    {n:"Rear delt fly",s:3,lo:12,hi:15,alt:["Reverse pec deck","Face pull"]},
-    {n:"EZ-bar curl",s:3,lo:8,hi:12,alt:["Dumbbell curl","Cable curl"]}]},
-  {id:"pushA",name:"Push A",type:"push",ex:[
-    {n:"Barbell bench press",s:3,lo:6,hi:8,alt:["Dumbbell bench press","Machine chest press"]},
-    {n:"Seated dumbbell shoulder press",s:3,lo:8,hi:10,alt:["Machine shoulder press","Standing overhead press"]},
-    {n:"Incline dumbbell press",s:3,lo:8,hi:12,alt:["Incline machine press","Incline barbell press"]},
-    {n:"Lateral raise",s:3,lo:12,hi:15,alt:["Cable lateral raise","Machine lateral raise"]},
-    {n:"Triceps pushdown",s:3,lo:10,hi:12,alt:["Rope pushdown","Dips"]}]},
-  {id:"legsA",name:"Legs A",type:"legs",ex:[
-    {n:"Back squat",s:3,lo:6,hi:8,alt:["Hack squat","Goblet squat"]},
-    {n:"Leg press",s:3,lo:10,hi:12,alt:["Hack squat","Smith machine squat"]},
-    {n:"Leg extension",s:3,lo:12,hi:15,alt:["Single-leg extension","Step-ups"]},
-    {n:"Lying leg curl",s:3,lo:10,hi:12,alt:["Seated leg curl","Stability ball leg curl"]},
-    {n:"Standing calf raise",s:3,lo:12,hi:15,alt:["Leg press calf raise","Smith machine calf raise"]},
-    {n:"Hanging knee raise",s:3,lo:10,hi:15,alt:["Captain's chair knee raise","Reverse crunch"]}]},
-  {id:"pullB",name:"Pull B",type:"pull",ex:[
-    {n:"Chest-supported dumbbell row",s:3,lo:8,hi:10,alt:["Single-arm dumbbell row","Seated machine row","T-bar row"]},
-    {n:"Close-grip pulldown",s:3,lo:10,hi:12,alt:["Neutral-grip pulldown","Assisted chin-up","Single-arm cable pulldown"]},
-    {n:"Straight-arm cable pulldown",s:2,lo:12,hi:15,alt:["Dumbbell pullover","Machine pullover"]},
-    {n:"Face pull",s:3,lo:12,hi:15,alt:["Reverse pec deck","Band pull-apart"]},
-    {n:"Incline dumbbell curl",s:2,lo:10,hi:12,alt:["Bayesian cable curl","Preacher curl"]},
-    {n:"Hammer curl",s:2,lo:10,hi:12,alt:["Rope cable hammer curl","Cross-body curl"]}]},
-  {id:"pushB",name:"Push B",type:"push",ex:[
-    {n:"Incline barbell press",s:3,lo:8,hi:10,alt:["Incline machine press","Smith machine incline press","Incline dumbbell press"]},
-    {n:"Dumbbell bench press",s:3,lo:8,hi:12,alt:["Machine chest press","Weighted push-ups"]},
-    {n:"Cable chest fly",s:3,lo:12,hi:15,alt:["Pec deck","Dumbbell fly"]},
-    {n:"Cable lateral raise",s:3,lo:12,hi:15,alt:["Dumbbell lateral raise","Machine lateral raise"]},
-    {n:"Overhead triceps extension",s:3,lo:10,hi:12,alt:["EZ-bar skull crusher","Single-arm cable overhead extension"]}]},
-  {id:"legsB",name:"Legs B",type:"legs",ex:[
-    {n:"Romanian deadlift",s:3,lo:8,hi:10,alt:["Dumbbell RDL","45° back extension"]},
-    {n:"Bulgarian split squat",s:3,lo:8,hi:10,alt:["Walking lunge","Reverse lunge"]},
-    {n:"Hip thrust",s:3,lo:10,hi:12,alt:["Glute bridge","Machine hip thrust"]},
-    {n:"Seated leg curl",s:3,lo:10,hi:12,alt:["Lying leg curl","Stability ball leg curl"]},
-    {n:"Seated calf raise",s:3,lo:12,hi:15,alt:["Leg press calf raise","Standing calf raise"]},
-    {n:"Cable crunch",s:3,lo:12,hi:15,alt:["Machine crunch","Decline crunch"]}]}
-];
-const BASE_DAY = Object.fromEntries(PROGRAM.map(d => [d.id, d]));
+
+let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
+let programSource = "JSON file";
 const TYPES = [["pull","Pull"],["push","Push"],["legs","Legs"],["other","Other"]];
-const DEFAULT_UNIT = "lb";
+const PROGRAM_CACHE = "ppl-tracker-program-v2";
+
+function parseProgram(j){
+  if (!j || !Array.isArray(j.workouts) || !j.workouts.length || !Array.isArray(j.rotation)) throw new Error("Missing workouts or rotation");
+  const ids = new Set();
+  const workouts = j.workouts.map(w => {
+    if (!w || typeof w.id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(w.id) || ids.has(w.id) || typeof w.name !== "string" || !w.name.trim() || !["pull","push","legs","other"].includes(w.type) || !Array.isArray(w.exercises) || !w.exercises.length) throw new Error("Invalid workout");
+    ids.add(w.id);
+    return {id:w.id, name:w.name, type:w.type, unit:j.defaultUnit === "kg" ? "kg" : "lb", ex:w.exercises.map(e => {
+      if (!e || typeof e.name !== "string" || !e.name.trim() || !Number.isInteger(e.sets) || e.sets < 1 || e.sets > 30 || !Number.isInteger(e.repsMin) || !Number.isInteger(e.repsMax) || e.repsMin < 1 || e.repsMax < e.repsMin || e.repsMax > 100 || (e.alternatives != null && (!Array.isArray(e.alternatives) || e.alternatives.some(a => typeof a !== "string")))) throw new Error("Invalid exercise");
+      return {n:e.name, s:e.sets, lo:e.repsMin, hi:e.repsMax, alt:e.alternatives || []};
+    })};
+  });
+  if (!j.rotation.length || j.rotation.some(id => !ids.has(id)) || new Set(j.rotation).size !== j.rotation.length || j.rotation.length !== workouts.length) throw new Error("Invalid rotation");
+  return {workouts, order:j.rotation.slice(), unit:j.defaultUnit === "kg" ? "kg" : "lb", notes:Array.isArray(j.notes) ? j.notes.filter(n => typeof n === "string") : []};
+}
+function applyProgram(j){
+  const p = parseProgram(j);
+  PROGRAM = p.order.map(id => p.workouts.find(w => w.id === id));
+  BASE_DAY = Object.fromEntries(PROGRAM.map(d => [d.id,d])); ORDER = p.order;
+  DEFAULT_UNIT = p.unit; PROGRAM_NOTES = p.notes;
+}
+async function loadProgram(){
+  try {
+    const response = await fetch(new URL("./ppl-default-workouts.json", document.baseURI), {cache:"no-store"});
+    if (!response.ok) throw new Error("Program file unavailable");
+    const j = await response.json(); applyProgram(j);
+    try { localStorage.setItem(PROGRAM_CACHE, JSON.stringify(j)); } catch {}
+    programSource = "JSON file"; return true;
+  } catch {
+    try { const cached = JSON.parse(localStorage.getItem(PROGRAM_CACHE) || "null"); applyProgram(cached); programSource = "Saved program · file unavailable"; return true; } catch {}
+    return false;
+  }
+}
 const KG_PER_LB = 0.45359237;
 const conv = (w, from, to) => { const n = num(w); if (n == null) return null; if (from === to) return n; return to === "kg" ? n * KG_PER_LB : n / KG_PER_LB; };
 const tidy = (n, unit) => n == null ? "" : (unit === "kg" ? Math.round(n*2)/2 : Math.round(n));
 const exUnit = (e, s) => e.unit || (s && s.unit) || DEFAULT_UNIT;
-const ORDER = PROGRAM.map(d => d.id);
 const LOCAL_KEY = "ppl-tracker-v1";
 const DRAFT_KEY = "ppl-tracker-drafts-v1";
 
@@ -444,58 +85,30 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 const sortSessions = arr => arr.slice().sort((a,b) => (b.date||"").localeCompare(a.date||"") || (b.createdAt||0)-(a.createdAt||0));
 const sortBody = arr => arr.slice().sort((a,b) => (a.date||"").localeCompare(b.date||""));
 
-/* ---------- storage ---------- */
-let sessionsCol = null, bodyCol = null, profileDoc = null;
-let jsonFileHandle = null;
-let jsonFileName = "ppl-tracker-data.json";
-function readLocal(){ try { const j = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}"); return { sessions: Array.isArray(j.sessions)?j.sessions:[], body: Array.isArray(j.body)?j.body:[], custom: Array.isArray(j.custom)?j.custom:[] }; } catch { return {sessions:[],body:[],custom:[]}; } }
+/* ---------- browser storage ---------- */
+function readLocal(){ try { const j = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}"); return { sessions: Array.isArray(j.sessions)?j.sessions:[], body: Array.isArray(j.body)?j.body:[], custom: Array.isArray(j.custom)?j.custom:[] }; } catch { toast("Stored data could not be read. Restore a JSON backup."); return {sessions:[],body:[],custom:[]}; } }
 function writeLocal(){ try { localStorage.setItem(LOCAL_KEY, JSON.stringify({sessions:S.sessions, body:S.body, custom:S.custom})); return true; } catch { return false; } }
-function storagePayload(){ return { app:"ppl-tracker", version:1, updatedAt:new Date().toISOString(), sessions:S.sessions, body:S.body, custom:S.custom }; }
-function applyPayload(j){ S.sessions = sortSessions(Array.isArray(j.sessions)?j.sessions:[]); S.body = sortBody(Array.isArray(j.body)?j.body:[]); S.custom = Array.isArray(j.custom)?j.custom:[]; }
-
-function saveGitHubPagesData(){
-  try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify({
-      app:"ppl-tracker",
-      version:1,
-      updatedAt:new Date().toISOString(),
-      sessions:S.sessions,
-      body:S.body,
-      custom:S.custom
-    }));
-    return true;
-  } catch { return false; }
-}
-
-function loadDrafts(){ try { S.drafts = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}") || {}; } catch { S.drafts = {}; } }
+function loadDrafts(){ try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}"); S.drafts = d && typeof d === "object" && !Array.isArray(d) ? d : {}; } catch { S.drafts = {}; } }
 let draftTimer;
-function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(()=>{ try { localStorage.setItem(DRAFT_KEY, JSON.stringify(S.drafts)); } catch {} }, 400); }
-
+function flushDrafts(){ try { localStorage.setItem(DRAFT_KEY, JSON.stringify(S.drafts)); } catch { toast("Browser storage is full or unavailable. Download a backup."); } }
+function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushDrafts(); });
+window.addEventListener("pagehide", flushDrafts);
+function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
-  const l = readLocal();
-  S.sessions = sortSessions(l.sessions);
-  S.body = sortBody(l.body);
-  S.custom = l.custom;
-  S.ready = true;
-  setStatus("Saved automatically on this device");
-  afterLoad();
+  const l = readLocal(); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
+  setStatus("Saved on this device"); S.dayId = nextDayId(); render();
 }
-function setStatus(t){ $("#status").textContent = t; }
-let firstLoad = true;
-function afterLoad(){
-  if (firstLoad && S.ready) { firstLoad = false; S.dayId = nextDayId(); }
-  render();
+async function persist(field, value){
+  const previous = S[field]; S[field] = value;
+  if (!writeLocal()) { S[field] = previous; throw new Error("Browser storage unavailable"); }
 }
-
-async function persistJsonOrLocal(){
-  if (!saveGitHubPagesData()) throw new Error("storage");
-}
-async function putSession(s){ S.sessions = sortSessions([s, ...S.sessions.filter(x => x.id !== s.id)]); await persistJsonOrLocal(); }
-async function removeSession(id){ S.sessions = S.sessions.filter(x => x.id !== id); await persistJsonOrLocal(); }
-async function putBody(b){ S.body = sortBody([b, ...S.body.filter(x => x.id !== b.id)]); await persistJsonOrLocal(); }
-async function removeBody(id){ S.body = S.body.filter(x => x.id !== id); await persistJsonOrLocal(); }
-async function putCustom(list){ S.custom = list; await persistJsonOrLocal(); }
+async function putSession(s){ await persist("sessions", sortSessions([s, ...S.sessions.filter(x => x.id !== s.id)])); }
+async function removeSession(id){ await persist("sessions", S.sessions.filter(x => x.id !== id)); }
+async function putBody(b){ await persist("body", sortBody([b, ...S.body.filter(x => x.id !== b.id)])); }
+async function removeBody(id){ await persist("body", S.body.filter(x => x.id !== id)); }
+async function putCustom(list){ await persist("custom", list); }
 /* ---------- logic ---------- */
 function nextDayId(){
   const last = S.sessions.find(s => ORDER.includes(s.dayId));
@@ -530,7 +143,12 @@ function render(){
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
-  app.innerHTML = S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "progress" ? viewProgress() : viewData();
+  const intro = {log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
+  const weekStart = new Date(today()+"T00:00:00"); weekStart.setDate(weekStart.getDate() - (weekStart.getDay()+6)%7);
+  const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
+  app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${intro[0]}</p><h1>${intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
+    <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(getDay(nextDayId()).name)}</b><span>Next in rotation</span></p></div></div>` + (S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "progress" ? viewProgress() : viewData());
+  updateSessionMeter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
 }
 
@@ -562,15 +180,15 @@ function viewLog(){
   const isCustom = !BASE_DAY[day.id];
   const plates = allDays().map(p => `
     <button class="plate ${esc(p.type)}" data-act="day" data-id="${esc(p.id)}" aria-pressed="${p.id===day.id}">
-      <span class="pn">${esc(p.name)}</span><span class="pt">${p.id===next ? "Next up" : (S.drafts[p.id] && draftHasData(S.drafts[p.id]) ? "In progress" : (BASE_DAY[p.id] ? "" : "Custom"))}</span>
-    </button>`).join("") + `<button class="plate new" data-act="newworkout"><span class="pn">+ New</span><span class="pt">Custom workout</span></button>`;
+      <span class="plate-top"><span class="type-dot"></span>${esc(p.type)}</span><span class="pn">${esc(p.name)}</span><span class="pt">${p.id===next ? "Next up" : (S.drafts[p.id] && draftHasData(S.drafts[p.id]) ? "In progress" : (BASE_DAY[p.id] ? `${p.ex.length} exercises` : "Custom"))}</span>
+    </button>`).join("") + `<button class="plate new" data-act="newworkout"><span class="plate-top">Build your own</span><span class="pn">+ Custom</span><span class="pt">New workout</span></button>`;
   const cards = day.ex.map((e, i) => {
     const de = d.ex[i];
     const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
     const lb = lastBlock(de.name, e, de.unit);
     const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
     return `<section class="ex ${esc(day.type)}">
-      <div class="ex-head">${head}<span class="target">${e.s} × ${e.lo}–${e.hi}</span></div>
+      <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
       <div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
@@ -588,15 +206,24 @@ function viewLog(){
     </section>`;
   }).join("");
   return `
+    <div class="program-label"><h2>Your program</h2><span>Pull / Push / Legs</span></div>
     <div class="plates" role="group" aria-label="Choose workout">${plates}</div>
-    <div class="dayline"><div><h2>${esc(day.name)}</h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
-      <label>Date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
-    <p class="muted" style="margin:4px 0 0;font-size:14px">Switch kg or lb on each exercise; it remembers your choice. Grey numbers are last session's. Rest 2–3 min on the first lifts, 60–90 s on the rest.</p>
-    ${cards}${extras}
-    <div class="row-actions" style="margin-top:12px"><button class="btn" data-act="addextra">Add an extra exercise to this session</button></div>
-    <div class="section"><label for="notes"><h3>Notes</h3></label>
-      <textarea id="notes" data-f="notes" data-key="notes" placeholder="Sleep, energy, anything that hurt…">${esc(d.notes)}</textarea></div>
-    <div class="section"><button class="btn primary" data-act="save">Save session</button></div>`;
+    <div class="workout-layout"><div class="workout-main">
+      <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
+      <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
+      <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
+      ${cards}${extras}
+      <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
+      <div class="section notes-card"><label for="notes"><h3>Session notes</h3></label><p class="muted">How did you feel today?</p>
+        <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></div>
+    </div><aside class="session-sidebar">
+      <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
+        <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
+        <button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note">Draft saved automatically on this device</p>
+      </div>
+      <div class="guide-card"><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
+    </aside></div>`;
+
 }
 
 function viewEditor(){
@@ -613,14 +240,14 @@ function viewEditor(){
     <h3>${isNew ? "New workout" : "Edit workout"}</h3>
     <label class="muted" style="font-size:14px;display:block">Name
       <input type="text" style="width:100%;margin-top:3px" data-ed="name" data-key="ed-name" placeholder="e.g. Arms + abs, Upper body, Home workout" value="${esc(w.name)}"></label>
-    <p class="muted" style="font-size:14px;margin:12px 0 0">Plate color</p>
-    <div class="colors" role="radiogroup" aria-label="Plate color">${colors}</div>
+    <p class="muted" style="font-size:14px;margin:12px 0 0">Workout category</p>
+    <div class="colors" role="radiogroup" aria-label="Workout category">${colors}</div>
     <p class="muted" style="font-size:14px;margin:12px 0 0">Default weight unit</p>
     <div class="colors" role="radiogroup" aria-label="Default weight unit">${["lb","kg"].map(u => `<label><input type="radio" name="edunit" data-ed="unit" value="${u}" ${(w.unit||DEFAULT_UNIT)===u?"checked":""}>${u}</label>`).join("")}</div>
     <div class="edhead"><span>Exercise</span><span>Sets</span><span>Min reps</span><span>Max reps</span><span></span></div>
     ${rows}
     <div class="row-actions"><button class="btn small" data-act="edaddex">Add exercise</button></div>
-    <p class="muted" style="font-size:13px">Custom workouts sit outside the push/pull/legs rotation, so they won't change which day is marked next up.</p>
+    <p class="muted" style="font-size:13px">Custom workouts sit outside your program rotation, so they won't change which day is marked next up.</p>
     <div class="stack" style="margin-top:14px">
       <button class="btn primary" data-act="edsave">Save workout</button>
       <button class="btn" data-act="edcancel">Cancel</button>
@@ -704,47 +331,39 @@ function viewProgress(){
 }
 
 function viewData(){
-  return `<div class="section stack">
-    <h3>Storage</h3>
-    <p class="muted" style="margin:0">
-      This GitHub Pages version saves your workouts automatically in this browser.
-      Your data stays on this device and is not uploaded to GitHub.
-    </p>
-    <div class="grid2">
-      <div class="stat-card">
-        <strong>${S.sessions.length}</strong>
-        <span class="muted">Workouts</span>
-      </div>
-      <div class="stat-card">
-        <strong>${S.body.length}</strong>
-        <span class="muted">Body entries</span>
-      </div>
-    </div>
-    <button class="btn primary" data-act="export">Download JSON backup</button>
-  </div>
-  <div class="section stack">
-    <h3>Restore / transfer</h3>
-    <p class="muted" style="margin:0">
-      Use a JSON backup to move your data to another phone, browser, or computer.
-      Importing does not require GitHub or a server.
-    </p>
-    <input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup">
-    <textarea id="importText" placeholder='Or paste your JSON backup here…' aria-label="Paste JSON"></textarea>
-    <button class="btn" data-act="import">Import JSON backup</button>
-  </div>
-  <div class="section stack">
-    <h3>GitHub Pages note</h3>
-    <p class="muted" style="margin:0">
-      GitHub Pages hosts the app itself as a static website. It cannot write workout
-      changes back into the repository, so the app uses browser storage for automatic
-      saving and JSON files for backup/transfer.
-    </p>
-  </div>`;
+  return `<div class="data-grid"><div class="section stack"><span class="panel-icon">${icon("download")}</span><h3>Back up your training</h3><p class="muted">${S.sessions.length} sessions · ${S.body.length} body entries · ${S.custom.length} custom workouts</p>
+    <p class="muted">Your log saves automatically in this browser. Download a backup to keep a copy or move your progress to another device.</p><button class="btn primary" data-act="export">Download JSON backup</button>
+    <textarea id="exportOut" readonly hidden aria-label="Exported JSON"></textarea><button class="btn" data-act="copyexport" id="copyBtn" hidden>Copy JSON instead</button></div>
+    <div class="section stack"><span class="panel-icon">${icon("upload")}</span><h3>Restore a backup</h3><p class="muted">Choose a backup or paste its JSON. Matching IDs are updated; other entries are kept.</p><label class="file-label">Choose backup file<input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup"></label>
+    <textarea id="importText" placeholder='Paste your backup JSON here…' aria-label="Paste JSON backup"></textarea><button class="btn" data-act="import">Import backup</button></div></div>
+    <div class="section program-details"><div><p class="eyebrow">DEFAULT PROGRAM</p><h3>Your workouts, one simple file.</h3><p class="muted">Loaded from <code>ppl-default-workouts.json</code> · ${esc(programSource)}</p><p class="muted">Edit that file to change exercises, sets, rep ranges, alternatives or rotation. Your workout log stays separate.</p><div class="rotation">${ORDER.map(id=>`<span class="chip ${BASE_DAY[id].type}">${esc(BASE_DAY[id].name)}</span>`).join('<span aria-hidden="true">→</span>')}</div></div><div><button class="btn" data-act="reloadprogram">Reload program</button><label class="file-label" style="margin-top:12px">Load program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Load default workout program"></label></div></div>
+    <p class="storage-footnote">Saved on this device and browser. Use a JSON backup to transfer data; clearing browser data removes your log.</p>`;
+}
+function updateSessionMeter(){
+  if (S.tab !== "log" || S.editing || !S.ready) return;
+  const d = getDraft(S.dayId), sets = [...d.ex,...d.extra].flatMap(e=>e.sets), filled = sets.filter(s=>num(s.r)>0).length;
+  const caption = $("#loggedSets"), meter = $("#setMeter");
+  if (caption) caption.textContent = filled;
+  if (meter) meter.style.width = (sets.length ? filled/sets.length*100 : 0) + "%";
+}
+function programError(){
+  setStatus("Program file needed");
+  $("#app").innerHTML = `<div class="empty load-error"><span class="panel-icon">${icon("activity")}</span><h2>Let’s load your program.</h2><p>Place <code>ppl-default-workouts.json</code> next to <code>index.html</code> on GitHub Pages. If you opened this HTML directly, choose the program file below.</p><button class="btn" data-act="retryprogram">Try again</button><label class="file-label">Choose program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Choose default workout program"></label></div>`;
+}
+async function initApp(){ if (await loadProgram()) { loadDrafts(); await initStore(); } else programError(); }
+async function useProgramFile(file){
+  try {
+    const j = JSON.parse(await file.text()); applyProgram(j); programSource = "Selected JSON file";
+    try { localStorage.setItem(PROGRAM_CACHE, JSON.stringify(j)); } catch {}
+    if (!S.ready) { loadDrafts(); await initStore(); } else { S.dayId = nextDayId(); render(); }
+    toast("Program loaded");
+  } catch { toast("That file is not a valid workout program."); }
 }
 
 /* ---------- events ---------- */
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
+  if (!S.ready) return;
   S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
 });
 
@@ -763,11 +382,12 @@ $("#app").addEventListener("input", e => {
   else if (f === "xname") d.extra[+t.dataset.i].name = t.value;
   else if (f === "notes") d.notes = t.value;
   else if (f === "date") d.date = t.value;
-  saveDrafts();
+  saveDrafts(); updateSessionMeter();
 });
 
 $("#app").addEventListener("change", e => {
   const t = e.target;
+  if (t.id === "programFile" && t.files?.[0]) { useProgramFile(t.files[0]); return; }
   if (t.dataset.ed === "type" && S.editing) { S.editing.type = t.value; return; }
   if (t.dataset.act === "variant") { const de = getDraft(S.dayId).ex[+t.dataset.i]; de.name = t.value; de.unit = unitFor(t.value, getDay(S.dayId)); saveDrafts(); render(); }
   if (t.id === "bUnit") { S.bodyUnit = t.value; return; }
@@ -778,6 +398,8 @@ $("#app").addEventListener("change", e => {
 $("#app").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if (act === "retryprogram") { await initApp(); return; }
+  if (act === "reloadprogram") { if (await loadProgram()) { S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { S.dayId = b.dataset.id; render(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
@@ -822,11 +444,10 @@ async function saveSession(btn){
   btn.disabled = true; btn.textContent = "Saving…";
   try {
     await putSession(s);
-    delete S.drafts[day.id]; saveDrafts();
-    if (S.mode === "db") S.sessions = sortSessions([s, ...S.sessions.filter(x=>x.id!==s.id)]);
+    delete S.drafts[day.id]; clearTimeout(draftTimer); flushDrafts();
     S.dayId = nextDayId(); S.tab = "history"; render(); window.scrollTo({top:0});
     toast("Session saved");
-  } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Check your connection and try again."); }
+  } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); }
 }
 
 async function saveWorkout(btn){
@@ -853,47 +474,39 @@ async function addBody(){
   const date = $("#bDate").value, weight = num($("#bWeight").value), waist = num($("#bWaist").value), unit = $("#bUnit").value === "lb" ? "lb" : "kg"; S.bodyUnit = unit;
   if (!date || (!weight && !waist)) { toast("Add a weight or waist measurement."); return; }
   const b = { id: "b" + date, date, weight: weight ?? null, waist: waist ?? null, unit, createdAt: Date.now() };
-  try { await putBody(b); if (S.mode === "db") S.body = sortBody([b, ...S.body.filter(x=>x.id!==b.id)]); render(); toast("Entry added"); }
+  try { await putBody(b); render(); toast("Entry added"); }
   catch { toast("Couldn't save. Try again."); }
 }
 
 async function exportJSON(){
-  const json = JSON.stringify(storagePayload(), null, 2);
-  const filename = `ppl-tracker-${today()}.json`;
-  const blob = new Blob([json], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-  toast("JSON backup downloaded");
+  const json = JSON.stringify({app:"ppl-tracker", version:1, exportedAt:new Date().toISOString(), sessions:S.sessions, body:S.body, custom:S.custom},null,2);
+  const ta = $("#exportOut"); ta.hidden = false; ta.value = json; $("#copyBtn").hidden = false;
+  const url = URL.createObjectURL(new Blob([json], {type:"application/json"}));
+  const a = document.createElement("a"); a.href = url; a.download = `ppl-tracker-${today()}.json`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000); toast("Backup download started");
 }
 
 async function importJSON(){
   let j;
   try { j = JSON.parse($("#importText").value); } catch { toast("That isn't valid JSON."); return; }
-  const sessions = Array.isArray(j.sessions) ? j.sessions : [], body = Array.isArray(j.body) ? j.body : [];
-  const okS = sessions.filter(s => s && typeof s.id === "string" && /^[A-Za-z0-9_\-.~:@+]{1,190}$/.test(s.id) && typeof s.date === "string" && Array.isArray(s.exercises));
-  const okB = body.filter(b => b && typeof b.id === "string" && /^[A-Za-z0-9_\-.~:@+]{1,190}$/.test(b.id) && typeof b.date === "string");
-  const okC = (Array.isArray(j.custom) ? j.custom : []).filter(c => c && typeof c.id === "string" && typeof c.name === "string" && Array.isArray(c.ex) && !BASE_DAY[c.id]);
+  if (!j || typeof j !== "object") { toast("That isn't a tracker backup."); return; }
+  const validId = id => typeof id === "string" && /^[A-Za-z0-9_\-.~:@+]{1,190}$/.test(id);
+  const validDate = date => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date+"T12:00:00Z")) && new Date(date+"T12:00:00Z").toISOString().slice(0,10) === date;
+  const validUnit = unit => unit == null || ["kg","lb"].includes(unit);
+  const validSet = s => s && Number.isFinite(Number(s.r)) && Number(s.r)>0 && Number.isInteger(Number(s.r)) && (s.w == null || Number.isFinite(Number(s.w)) && Number(s.w)>=0);
+  const okS = (Array.isArray(j.sessions) ? j.sessions : []).filter(s => s && validId(s.id) && validDate(s.date) && validUnit(s.unit) && Array.isArray(s.exercises) && s.exercises.length && s.exercises.every(e => e && typeof e.name === "string" && e.name.trim() && validUnit(e.unit) && Array.isArray(e.sets) && e.sets.length && e.sets.every(validSet)));
+  const okB = (Array.isArray(j.body) ? j.body : []).filter(b => b && validId(b.id) && validDate(b.date) && validUnit(b.unit) && [b.weight,b.waist].every(v => v == null || Number.isFinite(Number(v)) && Number(v)>0));
+  const okC = (Array.isArray(j.custom) ? j.custom : []).filter(c => c && validId(c.id) && typeof c.name === "string" && c.name.trim() && !BASE_DAY[c.id] && validUnit(c.unit) && TYPES.some(([t])=>t===c.type) && Array.isArray(c.ex) && c.ex.length && c.ex.every(e => e && typeof e.n === "string" && e.n.trim() && Number.isInteger(e.s) && e.s>0 && e.s<=30 && Number.isInteger(e.lo) && Number.isInteger(e.hi) && e.lo>0 && e.hi>=e.lo && e.hi<=100 && (e.alt == null || Array.isArray(e.alt) && e.alt.every(a=>typeof a === "string"))));
   if (!okS.length && !okB.length && !okC.length) { toast("Nothing to import was found in that JSON."); return; }
   let done = 0;
   try {
     if (okC.length) { await putCustom([...S.custom.filter(c => !okC.some(o => o.id === c.id)), ...okC]); done += okC.length; }
     for (const s of okS) { await putSession(s); done++; }
     for (const b of okB) { await putBody(b); done++; }
-    if (S.mode !== "db") await persistJsonOrLocal();
     toast(`Imported ${done} entries`); render();
   } catch { toast(`Stopped after ${done} entries. Try importing again.`); render(); }
 }
 
-loadDrafts();
-render();
-initStore();
+initApp();
 })();
-</script>
-</body>
-</html>
+</script></body></html>

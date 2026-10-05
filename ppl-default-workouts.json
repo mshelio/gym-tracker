@@ -1,0 +1,396 @@
+{
+  "program": "Push/Pull/Legs (pull → push → legs order)",
+  "rotation": [
+    "pullA",
+    "pushA",
+    "legsA",
+    "pullB",
+    "pushB",
+    "legsB"
+  ],
+  "defaultUnit": "lb",
+  "notes": [
+    "Repeat the rotation; take a rest day after Legs A and/or Legs B",
+    "Double progression: when every set hits the top of the rep range, add the smallest weight jump and restart at the bottom",
+    "Leave 1–3 reps in reserve on compound lifts; rest 2–3 min on compounds, 60–90 s on isolation",
+    "Deload every 8–10 weeks: same weights, half the sets"
+  ],
+  "workouts": [
+    {
+      "id": "pullA",
+      "name": "Pull A",
+      "type": "pull",
+      "exercises": [
+        {
+          "name": "Lat pulldown",
+          "sets": 3,
+          "repsMin": 6,
+          "repsMax": 10,
+          "alternatives": [
+            "Pull-ups",
+            "Assisted pull-up machine",
+            "Neutral-grip pulldown"
+          ]
+        },
+        {
+          "name": "Barbell row",
+          "sets": 3,
+          "repsMin": 6,
+          "repsMax": 8,
+          "alternatives": [
+            "T-bar row",
+            "Chest-supported row"
+          ]
+        },
+        {
+          "name": "Seated cable row",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Machine row",
+            "Single-arm dumbbell row"
+          ]
+        },
+        {
+          "name": "Rear delt fly",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Reverse pec deck",
+            "Face pull"
+          ]
+        },
+        {
+          "name": "EZ-bar curl",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "alternatives": [
+            "Dumbbell curl",
+            "Cable curl"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pushA",
+      "name": "Push A",
+      "type": "push",
+      "exercises": [
+        {
+          "name": "Barbell bench press",
+          "sets": 3,
+          "repsMin": 6,
+          "repsMax": 8,
+          "alternatives": [
+            "Dumbbell bench press",
+            "Machine chest press"
+          ]
+        },
+        {
+          "name": "Seated dumbbell shoulder press",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 10,
+          "alternatives": [
+            "Machine shoulder press",
+            "Standing overhead press"
+          ]
+        },
+        {
+          "name": "Incline dumbbell press",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "alternatives": [
+            "Incline machine press",
+            "Incline barbell press"
+          ]
+        },
+        {
+          "name": "Lateral raise",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Cable lateral raise",
+            "Machine lateral raise"
+          ]
+        },
+        {
+          "name": "Triceps pushdown",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Rope pushdown",
+            "Dips"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "legsA",
+      "name": "Legs A",
+      "type": "legs",
+      "exercises": [
+        {
+          "name": "Back squat",
+          "sets": 3,
+          "repsMin": 6,
+          "repsMax": 8,
+          "alternatives": [
+            "Hack squat",
+            "Goblet squat"
+          ]
+        },
+        {
+          "name": "Leg press",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Hack squat",
+            "Smith machine squat"
+          ]
+        },
+        {
+          "name": "Leg extension",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Single-leg extension",
+            "Step-ups"
+          ]
+        },
+        {
+          "name": "Lying leg curl",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Seated leg curl",
+            "Stability ball leg curl"
+          ]
+        },
+        {
+          "name": "Standing calf raise",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Leg press calf raise",
+            "Smith machine calf raise"
+          ]
+        },
+        {
+          "name": "Hanging knee raise",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 15,
+          "alternatives": [
+            "Captain's chair knee raise",
+            "Reverse crunch"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pullB",
+      "name": "Pull B",
+      "type": "pull",
+      "exercises": [
+        {
+          "name": "Chest-supported dumbbell row",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 10,
+          "alternatives": [
+            "Single-arm dumbbell row",
+            "Seated machine row",
+            "T-bar row"
+          ]
+        },
+        {
+          "name": "Close-grip pulldown",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Neutral-grip pulldown",
+            "Assisted chin-up",
+            "Single-arm cable pulldown"
+          ]
+        },
+        {
+          "name": "Straight-arm cable pulldown",
+          "sets": 2,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Dumbbell pullover",
+            "Machine pullover"
+          ]
+        },
+        {
+          "name": "Face pull",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Reverse pec deck",
+            "Band pull-apart"
+          ]
+        },
+        {
+          "name": "Incline dumbbell curl",
+          "sets": 2,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Bayesian cable curl",
+            "Preacher curl"
+          ]
+        },
+        {
+          "name": "Hammer curl",
+          "sets": 2,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Rope cable hammer curl",
+            "Cross-body curl"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pushB",
+      "name": "Push B",
+      "type": "push",
+      "exercises": [
+        {
+          "name": "Incline barbell press",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 10,
+          "alternatives": [
+            "Incline machine press",
+            "Smith machine incline press",
+            "Incline dumbbell press"
+          ]
+        },
+        {
+          "name": "Dumbbell bench press",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "alternatives": [
+            "Machine chest press",
+            "Weighted push-ups"
+          ]
+        },
+        {
+          "name": "Cable chest fly",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Pec deck",
+            "Dumbbell fly"
+          ]
+        },
+        {
+          "name": "Cable lateral raise",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Dumbbell lateral raise",
+            "Machine lateral raise"
+          ]
+        },
+        {
+          "name": "Overhead triceps extension",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "EZ-bar skull crusher",
+            "Single-arm cable overhead extension"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "legsB",
+      "name": "Legs B",
+      "type": "legs",
+      "exercises": [
+        {
+          "name": "Romanian deadlift",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 10,
+          "alternatives": [
+            "Dumbbell RDL",
+            "45° back extension"
+          ]
+        },
+        {
+          "name": "Bulgarian split squat",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 10,
+          "alternatives": [
+            "Walking lunge",
+            "Reverse lunge"
+          ]
+        },
+        {
+          "name": "Hip thrust",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Glute bridge",
+            "Machine hip thrust"
+          ]
+        },
+        {
+          "name": "Seated leg curl",
+          "sets": 3,
+          "repsMin": 10,
+          "repsMax": 12,
+          "alternatives": [
+            "Lying leg curl",
+            "Stability ball leg curl"
+          ]
+        },
+        {
+          "name": "Seated calf raise",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Leg press calf raise",
+            "Standing calf raise"
+          ]
+        },
+        {
+          "name": "Cable crunch",
+          "sets": 3,
+          "repsMin": 12,
+          "repsMax": 15,
+          "alternatives": [
+            "Machine crunch",
+            "Decline crunch"
+          ]
+        }
+      ]
+    }
+  ]
+}
