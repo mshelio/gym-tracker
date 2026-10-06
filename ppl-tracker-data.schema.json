@@ -1,35 +1,63 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "PPL Tracker app data",
-  "description": "Version 2 app backup. Default workout definitions remain in ppl-default-workouts.json. IDs must be unique within each collection; custom rep maximum must be at least the minimum.",
+  "title": "Gym Tracker app data",
+  "description": "Version 3 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.",
   "type": "object",
   "properties": {
-    "app": { "const": "ppl-tracker" },
-    "version": { "const": 2 },
+    "app": {
+      "const": "ppl-tracker"
+    },
+    "version": {
+      "const": 3
+    },
     "exportedAt": {
       "anyOf": [
-        { "type": "string", "format": "date-time" },
-        { "type": "null" }
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "sessions": {
       "type": "array",
-      "items": { "$ref": "#/$defs/session" }
+      "items": {
+        "$ref": "#/$defs/session"
+      }
     },
     "body": {
       "type": "array",
-      "items": { "$ref": "#/$defs/body" }
+      "items": {
+        "$ref": "#/$defs/body"
+      }
     },
     "custom": {
       "type": "array",
-      "items": { "$ref": "#/$defs/custom" }
+      "items": {
+        "$ref": "#/$defs/custom"
+      }
     },
     "drafts": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/id" },
-      "additionalProperties": { "$ref": "#/$defs/draft" }
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/draft"
+      }
     },
-    "preferences": { "$ref": "#/$defs/preferences" }
+    "preferences": {
+      "$ref": "#/$defs/preferences"
+    },
+    "schedules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/schedule"
+      }
+    }
   },
   "required": [
     "app",
@@ -39,7 +67,8 @@
     "body",
     "custom",
     "drafts",
-    "preferences"
+    "preferences",
+    "schedules"
   ],
   "additionalProperties": false,
   "$defs": {
@@ -49,7 +78,10 @@
     },
     "unit": {
       "type": "string",
-      "enum": ["kg", "lb"]
+      "enum": [
+        "kg",
+        "lb"
+      ]
     },
     "date": {
       "type": "string",
@@ -58,44 +90,89 @@
     "set": {
       "type": "object",
       "properties": {
-        "w": { "type": "number", "minimum": 0 },
-        "r": { "type": "integer", "minimum": 1 }
+        "w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "r": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
-      "required": ["w", "r"],
+      "required": [
+        "w",
+        "r"
+      ],
       "additionalProperties": false
     },
     "exercise": {
       "type": "object",
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "unit": { "type": "string", "enum": ["kg", "lb"] },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
         "sets": {
           "type": "array",
-          "items": { "$ref": "#/$defs/set" },
+          "items": {
+            "$ref": "#/$defs/set"
+          },
           "minItems": 1
         }
       },
-      "required": ["name", "unit", "sets"],
+      "required": [
+        "name",
+        "unit",
+        "sets"
+      ],
       "additionalProperties": false
     },
     "session": {
       "type": "object",
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "dayId": { "$ref": "#/$defs/id" },
-        "dayName": { "type": "string" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "dayId": {
+          "$ref": "#/$defs/id"
+        },
+        "dayName": {
+          "type": "string"
+        },
         "type": {
           "type": "string",
-          "enum": ["pull", "push", "legs", "other"]
+          "enum": [
+            "pull",
+            "push",
+            "legs",
+            "other"
+          ]
         },
-        "date": { "type": "string", "format": "date" },
-        "notes": { "type": "string" },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "notes": {
+          "type": "string"
+        },
         "exercises": {
           "type": "array",
-          "items": { "$ref": "#/$defs/exercise" },
+          "items": {
+            "$ref": "#/$defs/exercise"
+          },
           "minItems": 1
         },
-        "createdAt": { "type": "integer", "minimum": 0 }
+        "createdAt": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "required": [
         "id",
@@ -112,22 +189,46 @@
     "body": {
       "type": "object",
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "date": { "type": "string", "format": "date" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
         "weight": {
           "anyOf": [
-            { "type": "number", "exclusiveMinimum": 0 },
-            { "type": "null" }
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "waist": {
           "anyOf": [
-            { "type": "number", "exclusiveMinimum": 0 },
-            { "type": "null" }
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "unit": { "type": "string", "enum": ["kg", "lb"] },
-        "createdAt": { "type": "integer", "minimum": 0 }
+        "unit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "required": [
         "id",
@@ -142,106 +243,267 @@
     "customExercise": {
       "type": "object",
       "properties": {
-        "n": { "type": "string", "minLength": 1 },
-        "s": { "type": "integer", "minimum": 1, "maximum": 30 },
-        "lo": { "type": "integer", "minimum": 1, "maximum": 100 },
-        "hi": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "n": {
+          "type": "string",
+          "minLength": 1
+        },
+        "s": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "lo": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "hi": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
         "alt": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       },
-      "required": ["n", "s", "lo", "hi", "alt"],
+      "required": [
+        "n",
+        "s",
+        "lo",
+        "hi",
+        "alt"
+      ],
       "additionalProperties": false
     },
     "custom": {
       "type": "object",
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "type": "string", "minLength": 1 },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
         "type": {
           "type": "string",
-          "enum": ["pull", "push", "legs", "other"]
+          "enum": [
+            "pull",
+            "push",
+            "legs",
+            "other"
+          ]
         },
-        "unit": { "type": "string", "enum": ["kg", "lb"] },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
         "ex": {
           "type": "array",
-          "items": { "$ref": "#/$defs/customExercise" },
+          "items": {
+            "$ref": "#/$defs/customExercise"
+          },
           "minItems": 1
         }
       },
-      "required": ["id", "name", "type", "unit", "ex"],
+      "required": [
+        "id",
+        "name",
+        "type",
+        "unit",
+        "ex"
+      ],
       "additionalProperties": false
     },
     "draftValue": {
       "anyOf": [
-        { "type": "string" },
-        { "type": "number" }
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
       ]
     },
     "draftSet": {
       "type": "object",
       "properties": {
-        "w": { "$ref": "#/$defs/draftValue" },
-        "r": { "$ref": "#/$defs/draftValue" }
+        "w": {
+          "$ref": "#/$defs/draftValue"
+        },
+        "r": {
+          "$ref": "#/$defs/draftValue"
+        }
       },
-      "required": ["w", "r"],
+      "required": [
+        "w",
+        "r"
+      ],
       "additionalProperties": false
     },
     "draftExercise": {
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "unit": { "type": "string", "enum": ["kg", "lb"] },
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
         "sets": {
           "type": "array",
-          "items": { "$ref": "#/$defs/draftSet" },
+          "items": {
+            "$ref": "#/$defs/draftSet"
+          },
           "minItems": 1
         }
       },
-      "required": ["name", "unit", "sets"],
+      "required": [
+        "name",
+        "unit",
+        "sets"
+      ],
       "additionalProperties": false
     },
     "draft": {
       "type": "object",
       "properties": {
-        "sig": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "notes": { "type": "string" },
+        "sig": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "notes": {
+          "type": "string"
+        },
         "ex": {
           "type": "array",
-          "items": { "$ref": "#/$defs/draftExercise" },
+          "items": {
+            "$ref": "#/$defs/draftExercise"
+          },
           "minItems": 1
         },
         "extra": {
           "type": "array",
-          "items": { "$ref": "#/$defs/draftExercise" }
+          "items": {
+            "$ref": "#/$defs/draftExercise"
+          }
         }
       },
-      "required": ["sig", "date", "notes", "ex", "extra"],
+      "required": [
+        "sig",
+        "date",
+        "notes",
+        "ex",
+        "extra"
+      ],
       "additionalProperties": false
     },
     "preferences": {
       "type": "object",
       "properties": {
-        "bodyUnit": { "type": "string", "enum": ["kg", "lb"] },
+        "bodyUnit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
         "selectedWorkoutId": {
           "anyOf": [
-            { "$ref": "#/$defs/id" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "progressExercise": {
           "anyOf": [
-            { "type": "string" },
-            { "type": "null" }
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activeScheduleId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },
       "required": [
         "bodyUnit",
         "selectedWorkoutId",
-        "progressExercise"
+        "progressExercise",
+        "activeScheduleId"
+      ],
+      "additionalProperties": false
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "cycle",
+            "weekly"
+          ]
+        },
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 28,
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "mode",
+        "days",
+        "cursor"
       ],
       "additionalProperties": false
     }

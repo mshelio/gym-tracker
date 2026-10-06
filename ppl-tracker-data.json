@@ -1,8 +1,31 @@
 {
   "app": "ppl-tracker",
-  "version": 1,
-  "updatedAt": null,
+  "version": 3,
+  "exportedAt": null,
   "sessions": [],
   "body": [],
-  "custom": []
+  "custom": [],
+  "drafts": {},
+  "schedules": [
+    {
+      "id": "starter-ppl",
+      "name": "PPL starter",
+      "mode": "cycle",
+      "days": [
+        "pullA",
+        "pushA",
+        "legsA",
+        "pullB",
+        "pushB",
+        "legsB"
+      ],
+      "cursor": 0
+    }
+  ],
+  "preferences": {
+    "bodyUnit": "kg",
+    "selectedWorkoutId": null,
+    "progressExercise": null,
+    "activeScheduleId": "starter-ppl"
+  }
 }
