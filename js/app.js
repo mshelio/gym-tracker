@@ -217,7 +217,7 @@ function updateTimers(){
  if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
  if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
 }
-timerTicker=setInterval(updateTimers,1000);
+if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
 document.addEventListener("visibilitychange",updateTimers);
 function setRows(i, prefix, name, sets, last, lo, hi, unit){
   return sets.map((s, j) => {
