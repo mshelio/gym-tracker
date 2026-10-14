@@ -23,6 +23,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
+      - run: node tests/version-sw.cjs --check
       - run: npx playwright install --with-deps chromium
       - name: Verify deployed Pages and start application
         env:
