@@ -61,3 +61,9 @@ Run `node tests/schedules.test.cjs`. Checks cover custom and default workouts, r
 `js/app.js` composes independent modules: `state.js` (initial state), `storage.js` (legacy localStorage adapter), `workouts.js` (workout calculations and utilities), `schedules.js` (schedule index), and `render.js` (presentation primitives). Core controller/view routines remain in `app.js` and can be migrated in follow-up refactors without changing the persistence contract.
 
 Run `node tests/schedules.test.cjs` for regression checks. Run `npm install`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Current localStorage keys and v3 backups remain unchanged, so rolling back the code does not require data migration.
+
+## IndexedDB persistence (GT-02)
+
+On supported browsers, the app copies the existing `ppl-tracker-v1` snapshot (including drafts and schedule cursors) to the `gym-tracker` IndexedDB database in one atomic first-run transaction. Subsequent reads/writes use the IndexedDB `snapshots/primary` record; legacy localStorage is retained untouched for rollback and recovery. If IndexedDB is unavailable, the app falls back to legacy localStorage and displays a warning. If migration encounters malformed source JSON, it fails instead of replacing historical data. Existing v1–v3 backup import/export semantics are unchanged.
+
+**Caution:** After migration, localStorage is a *historical recovery copy*, not a live mirror; reverting to a pre-migration build can show older data. Export an up-to-date JSON backup before any rollback. Browser storage and private browsing remain device-local; clearing site data can remove IndexedDB too. The migration suite runs in Playwright against a genuine browser IndexedDB implementation.
