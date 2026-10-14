@@ -30,7 +30,7 @@ const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -145,6 +145,13 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.normalizeExerciseSetting({restSeconds:135}).restSeconds,135);
   assert.equal(a.convertIncrement(2.20462262,"lb","kg"),1);
   assert.equal(a.convertIncrement(1,"kg","lb"),2.2);
+  assert.equal(a.resolveRestSeconds({set:{restSeconds:45},exercise:{restSeconds:90},defaults:{restSeconds:120},draft:{restSeconds:180}}),45);
+  assert.equal(a.resolveRestSeconds({set:{restSeconds:999},exercise:{restSeconds:80},defaults:{restSeconds:120},draft:{restSeconds:180}}),80);
+  assert.equal(a.resolveRestSeconds({defaults:{restSeconds:120},draft:{restSeconds:180}}),120);
+  assert.equal(a.resolveRestSeconds({draft:{restSeconds:180}}),180);
+  assert.equal(a.resolveRestSeconds({set:{restSeconds:0}}),90);
+  assert.notEqual(a.exerciseKey("Row","row-id-1"),a.exerciseKey("Row","row-id-2"));
+
 
   assert(a.viewHistory().includes('hard sets') || a.S.sessions.length===0);
   assert(a.viewLog().includes('data-act="timerpause"'));
