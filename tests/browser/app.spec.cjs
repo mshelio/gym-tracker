@@ -161,6 +161,26 @@ test('global rest default persists and restores for future drafts', async ({page
  expect(snapshot.preferences.globalRestSeconds).toBe(120);
 });
 
+test('exercise defaults stay isolated for same-name rows in a custom workout', async ({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.locator('[data-act="newworkout"]').click();
+ await page.locator('[data-ed="name"]').fill('Two same names');
+ await page.getByLabel('Exercise 1 name').fill('Row');
+ await page.locator('[data-act="edaddex"]').click();
+ await page.getByLabel('Exercise 2 name').fill('Row');
+ await page.locator('[data-act="edsave"]').click();
+ await expect(page.locator('.workout-main')).toContainText('Two same names');
+ await page.locator('[data-f="exrest"]').nth(0).fill('180');
+ await page.locator('[data-act="savedefault"]').nth(0).click();
+ await expect(page.getByText('Exercise defaults saved')).toBeVisible();
+ await page.locator('[data-f="exrest"]').nth(1).fill('75');
+ await page.locator('[data-act="savedefault"]').nth(1).click();
+ await expect(page.getByText('Exercise defaults saved')).toBeVisible();
+ await page.reload();
+ await expect(page.locator('[data-f="exrest"]').nth(0)).toHaveValue('180');
+ await expect(page.locator('[data-f="exrest"]').nth(1)).toHaveValue('75');
+});
+
 test('second tab refuses stale draft overwrite', async ({browser})=>{
  const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
  await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
