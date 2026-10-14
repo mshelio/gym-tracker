@@ -89,3 +89,7 @@ Each set has a type (working, warmup or drop) and optional RIR (integer 0–10; 
 Choose exercise rest and optional load increment, then Save default to reuse settings on future drafts. Defaults are stored alongside preferences in IndexedDB and v4 backups. Historical untyped completed sets count as working hard sets; warm-up and drop sets are excluded. This metric is separate from all-set volume totals. Existing sessions and schedule progress are unchanged.
 
 The default editor now supports built-in and extra exercises, explicitly shows increment units and converted increments, and offers Reset default to return to the global fallback. Drop sets are excluded from the initial hard-set metric (along with warm-up sets); legacy sets lacking a type count when reps are positive and completion is not false.
+
+## Recovery and multiple tabs (GT-08)
+
+Draft edits remain debounced and committed with the entire IndexedDB snapshot. Every write now checks the snapshot revision in the same read/write transaction. If another tab has saved since the current tab loaded, the stale tab refuses to overwrite newer data and shows a warning to export a backup and reload. Previous sets are only copied to a draft when the user explicitly selects Copy last sets; copied weight values convert into the active unit. Program changes no longer silently discard an incompatible draft; the app flags it for recovery. Existing v4 backups remain unchanged.
