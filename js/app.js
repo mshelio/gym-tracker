@@ -202,14 +202,14 @@ function getDraft(dayId){
   const day = getDay(dayId);
   const sig = day.ex.map(e => e.n).join("|");
   if (!d || !Array.isArray(d.ex)) {
-    d = { sig, date: today(), notes:"", extra:[], ex: day.ex.map(e => ({ name:e.n, sets: Array.from({length:e.s}, () => ({w:"",r:""})) })) };
+    d = { sig, date: today(), notes:"", extra:[], ex: day.ex.map(e => ({ name:e.n, ...(e.exerciseId ? {exerciseId:e.exerciseId} : {}), sets: Array.from({length:e.s}, () => ({w:"",r:""})) })) };
     S.drafts[dayId] = d;
   }
   if (!Array.isArray(d.extra)) d.extra = [];
   if(d.sig!==sig || d.ex.length!==day.ex.length)d.recoveryWarning=true;
   if(!Number.isFinite(d.startedAt))d.startedAt=Date.now();
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=90;
-  d.ex.forEach(e => { if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=S.exerciseDefaults[exerciseKey(e.name,e.exerciseId)]?.restSeconds; });
+  d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=S.exerciseDefaults[exerciseKey(e.name,e.exerciseId)]?.restSeconds; });
   d.extra.forEach(e => { if (!e.unit) e.unit = day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=S.exerciseDefaults[exerciseKey(e.name,e.exerciseId)]?.restSeconds; });
   return d;
 }
