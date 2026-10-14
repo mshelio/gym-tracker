@@ -117,3 +117,7 @@ Replace imports use the backup's exercise defaults and progression toggle; optio
 ### Analytics filter scope (#44)
 
 Date (inclusive), workout and exercise filters apply together to the same set of sessions. With an exercise selected, the volume and personal-record session-volume values count **only that exercise** within matching sessions, not unrelated lifts. PR strength trends use the same selected exercise and kg/lb display unit; warm-up sets and explicitly incomplete sets are excluded. Drop sets are included in volume but not hard-set totals. Without an exercise filter, weekly volume and hard-set summaries cover all exercises in matching sessions. No stored sessions, IndexedDB metadata, or backup format changes are required.
+
+### Autosave recovery (#45)
+
+Workout drafts show pending, confirmed saved, storage error, or concurrent-tab conflict status. A conflict does not overwrite the newer tab's IndexedDB snapshot. If saving fails, keep the tab open and use **Export unsaved backup** before reloading, then restore from JSON if needed. Draft changes are flushed on tab visibility changes and on in-app navigation. The browser cannot guarantee completion of asynchronous IndexedDB transactions after a page is terminated; for important changes, confirm the Saved status before closing the tab. No IndexedDB version or v4 backup format changes.
