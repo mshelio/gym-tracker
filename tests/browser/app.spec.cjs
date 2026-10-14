@@ -453,10 +453,30 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await expect(a.getByText('Session updated')).toBeVisible();
   await b.getByRole('button',{name:'Save changes'}).click();
   await expect(b.getByText(/Could not save changes/)).toBeVisible();
+  // Read the persisted snapshot after the accepted write, rather than
+  // inferring persistence from a transient toast in either tab.
+  const persisted=async()=>b.evaluate(async()=>new Promise((resolve,reject)=>{
+    const open=indexedDB.open('gym-tracker',1);
+    open.onerror=()=>reject(open.error);
+    open.onsuccess=()=>{
+      const db=open.result,tx=db.transaction('snapshots','readonly');
+      const request=tx.objectStore('snapshots').get('primary');
+      request.onsuccess=()=>{const result=request.result;db.close();resolve(result);};
+      request.onerror=()=>reject(request.error);
+    };
+  }));
+  await expect.poll(async()=>{
+    const saved=await persisted();
+    return saved?.sessions?.[0]?.exercises?.[0]?.sets?.[0]?.r;
+  }).toBe(12);
   await b.reload();
+  // Firefox may complete navigation before async IndexedDB hydration. Verify
+  // a completed app render before looking for the historical session.
+  await expect(b.locator('.overview')).toBeVisible();
   await b.getByRole('button',{name:/history/i}).first().click();
+  await expect(b.locator('details.hist')).toHaveCount(1);
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
- await b.getByRole('button',{name:'Edit session'}).click();
+  await b.getByRole('button',{name:'Edit session'}).click();
   await expect(b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
  }finally{await context.close();}
 });
