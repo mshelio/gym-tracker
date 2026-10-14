@@ -2,6 +2,11 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
+const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+assert.match(workerSource,/gt-shell-v1/);
+assert.match(workerSource,/ppl-default-workouts.json/);
+assert.match(workerSource,/SKIP_WAITING/);
+assert(!workerSource.includes('indexedDB.deleteDatabase'));
 const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workouts.json'),'utf8'));
 
 const pwaManifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'));
