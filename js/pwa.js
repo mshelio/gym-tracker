@@ -15,7 +15,7 @@ const connectivity=()=>{if(!navigator.onLine)message('Offline — workouts remai
 window.addEventListener('online',connectivity);
 window.addEventListener('offline',connectivity);
 connectivity();
-if('serviceWorker' in navigator&&location.protocol==='https:'||('serviceWorker' in navigator&&location.hostname==='localhost')){
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
  let applying=false;
  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(applying)location.reload();});
  navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(reg=>{
