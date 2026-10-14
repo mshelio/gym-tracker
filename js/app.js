@@ -384,15 +384,39 @@ function viewHistory(){
   }).join("") + `</div>`;
 }
 
+// Bound chart DOM without changing the underlying exact analytics or PR totals.
+function sampleChartPoints(points,maxPoints=240){
+ if(points.length<=maxPoints)return points;
+ const selected=new Set([0,points.length-1]);
+ const buckets=Math.max(1,Math.floor((maxPoints-2)/2));
+ for(let i=0;i<buckets;i++){
+  const start=1+Math.floor((points.length-2)*i/buckets),end=1+Math.floor((points.length-2)*(i+1)/buckets);
+  let low=start,high=start;
+  for(let j=start+1;j<end;j++){if(points[j].y<points[low].y)low=j;if(points[j].y>points[high].y)high=j;}
+  selected.add(low);selected.add(high);
+ }
+ return [...selected].sort((a,b)=>a-b).slice(0,maxPoints).map(i=>points[i]);
+}
+const analyticsCache={sessions:null,key:null,value:null};
+function cachedAnalytics(sessions,filter){
+ const key=JSON.stringify(filter);
+ if(analyticsCache.sessions!==sessions||analyticsCache.key!==key){
+  const filtered=analyticsRange(sessions,filter);
+  analyticsCache.sessions=sessions;analyticsCache.key=key;
+  analyticsCache.value={filtered,summary:analyticsSummary(filtered,{...filter,from:"",to:"",workout:"",exercise:filter.exercise,unit:filter.unit})};
+ }
+ return analyticsCache.value;
+}
 function chartSVG(points, color, unit){
   if (points.length < 2) return `<div class="empty" style="margin-top:10px">Log this at least twice to see a trend line.</div>`;
+  const displayed=sampleChartPoints(points);
   const W=600,H=230,P={l:44,r:14,t:16,b:30};
   const xs=points.map(p=>p.x), ys=points.map(p=>p.y);
   const x0=Math.min(...xs), x1=Math.max(...xs); let y0=Math.min(...ys), y1=Math.max(...ys);
   const pad=(y1-y0)*0.12 || 2; y0-=pad; y1+=pad;
   const X=x=>P.l+((x-x0)/((x1-x0)||1))*(W-P.l-P.r), Y=y=>H-P.b-((y-y0)/((y1-y0)||1))*(H-P.t-P.b);
-  const path=points.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
-  const dots=points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
+  const path=displayed.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
+  const dots=displayed.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
   const grid=[0,0.5,1].map(t=>{const v=y0+(y1-y0)*t;const y=Y(v);return `<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${P.l-6}" y="${y+4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v)}</text>`;}).join("");
   const d0=new Date(x0).toLocaleDateString(undefined,{day:"numeric",month:"short"}), d1=new Date(x1).toLocaleDateString(undefined,{day:"numeric",month:"short"});
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="Trend chart: ${esc(unit)} with ${points.length} points, from ${esc(d0)} to ${esc(d1)}">${grid}
@@ -402,8 +426,7 @@ function chartSVG(points, color, unit){
 
 function viewProgress(){
   const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
-  const filtered=analyticsRange(S.sessions,filter);
-  const summary=analyticsSummary(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
+  const {filtered,summary}=cachedAnalytics(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
   const workoutOptions=[...new Map(S.sessions.map(s=>[s.dayId,s.dayName||s.dayId])).entries()];
   const analyticsControls=`<div class="analytics-controls" aria-label="Analytics filters"><label>From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label>To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label>Workout <select data-analytics="workout"><option value="">All workouts</option>${workoutOptions.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label>Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div>`;
   const weekPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.volume}));

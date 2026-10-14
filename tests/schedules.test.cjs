@@ -8,7 +8,7 @@ const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,recommendProgression,calculateRecords,analyticsSummary,analyticsRange};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -58,6 +58,17 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
   assert(a.viewLog().includes('data-act="completeset"'));
+  const big=Array.from({length:10000},(_,i)=>({id:String(i),date:"2026-10-12",dayId:"pullA",exercises:[{name:"Lat pulldown",unit:"kg",sets:[{w:50+i%20,r:10}]}]}));
+  const start=Date.now();const metrics=a.analyticsSummary(big,{unit:"kg"});
+  assert.equal(metrics.sessions,10000);assert.equal(metrics.hardSets,10000);
+  assert.equal(metrics.weekly.length,1);
+  const largePR=a.calculateRecords(big,"Lat pulldown","kg");assert.equal(largePR.heaviest.value,69);
+  assert.equal(largePR.sampleCount,10000);
+  const points=Array.from({length:10000},(_,i)=>({x:i,y:i%127}));
+  const reduced=a.sampleChartPoints(points);
+  assert(reduced.length<=240);assert.equal(reduced[0].x,0);assert.equal(reduced[reduced.length-1].x,9999);
+  assert(a.chartSVG(points,"red","kg").match(/<circle/g).length<=240);
+  assert(Date.now()-start<12000,"Large dataset regression exceeded 12 seconds");
   assert(a.viewLog().includes('data-save-status'));
   assert(a.viewLog().includes('data-act="recoverbackup"'));
   assert(a.viewLog().includes('Draft saved on this device'));
