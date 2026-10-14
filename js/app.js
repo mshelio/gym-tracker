@@ -671,7 +671,9 @@ function migrateLegacy(j){
     drafts:normalizeDrafts(j.drafts),schedules:j.schedules || [starterSchedule(j.sessions || [])],preferences:{...preferences(),...(j.preferences || {}),activeScheduleId:j.preferences?.activeScheduleId || j.schedules?.[0]?.id || "starter-ppl"}};
 }
 function buildAppData(){
-  return validateAppData(JSON.parse(JSON.stringify({app:"ppl-tracker",version:4,exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,schedules:S.schedules,preferences:preferences()})));
+  const normalized=migrateLegacy({exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,custom:S.custom,drafts:{},schedules:S.schedules,preferences:preferences()});
+  normalized.drafts=JSON.parse(JSON.stringify(S.drafts));
+  return validateAppData(normalized);
 }
 function importFeedback(message, failed=false){
   const el = $("#importResult"); if(el){el.hidden=false;el.textContent=message;el.style.color=failed ? "#aa413b" : "var(--ok)";}
