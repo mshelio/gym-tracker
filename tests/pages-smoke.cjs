@@ -48,7 +48,7 @@ async function verify(){
   // scheduled runs can legitimately point to different source revisions.
   const deployedWorker=await (await page.request.get(new URL('sw.js',base).href,{headers:{'Cache-Control':'no-cache'}})).text();
   const actualRevision=(deployedWorker.match(/const VERSION='(gt-shell-[a-f0-9]+)'/)||[])[1];
-  if(!actualRevision)throw Error('Deployed service worker has no valid cache revision');
+  if(!actualRevision)throw Error('Deployed service worker has no valid cache revision; response begins: '+JSON.stringify(deployedWorker.slice(0,180)));
   console.log('Deployed service-worker revision:',actualRevision,'repository revision:',expectedRevision);
   if(process.env.REQUIRE_RELEASE_MATCH==='true'&&actualRevision!==expectedRevision)
    throw Error('Deployed service worker is stale: '+actualRevision+' (expected '+expectedRevision+')');
