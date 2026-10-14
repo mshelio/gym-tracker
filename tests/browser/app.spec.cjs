@@ -246,3 +246,16 @@ test('autosave displays confirmed state and offers recovery on cross-tab conflic
  await expect(b.locator('#exportOut')).not.toBeEmpty();
  await context.close();
 });
+
+test('large history renders bounded accessible chart elements',async({page})=>{
+ const fixture={sessions:Array.from({length:1200},(_,i)=>({id:'large-'+i,dayId:'pullA',dayName:'Pull A',type:'pull',date:'2026-10-12',createdAt:i,exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50+i%20,r:10}]}]})),body:[],custom:[],drafts:{},preferences:{},schedules:[]};
+ await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
+ await page.goto('/gym-tracker/');
+ const started=Date.now();
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.getByText('Training analytics')).toBeVisible();
+ const count=await page.locator('.chart circle').count();
+ expect(count).toBeLessThanOrEqual(720);
+ await expect(page.locator('.chart svg').first()).toHaveAttribute('tabindex','0');
+ expect(Date.now()-started).toBeLessThan(15000);
+});
