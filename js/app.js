@@ -6,6 +6,7 @@ import { icon } from "./render.js";
 import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
 import { recommendProgression } from "./progression.js";
+import { calculateRecords } from "./records.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 
@@ -384,6 +385,8 @@ function viewProgress(){
   if (!names.length) exHtml = `<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
   else {
     if (!names.includes(S.progressEx)) S.progressEx = names[0];
+    const records=calculateRecords(S.sessions,S.progressEx,S.bodyUnit||"kg");
+    const recordHTML=`<div class="pr-summary" aria-label="Personal records"><h3>Personal records</h3><div class="pr-grid"><span>Heaviest <strong>${records.heaviest?records.heaviest.value+" "+records.unit:"—"}</strong></span><span>Most reps <strong>${records.mostReps?records.mostReps.value:"—"}</strong></span><span>Best estimated 1RM <strong>${records.estimated1RM?records.estimated1RM.value+" "+records.unit:"—"}</strong></span><span>Best session volume <strong>${records.sessionVolume?records.sessionVolume.value+" "+records.unit+"·reps":"—"}</strong></span></div><p class="muted">Calculated from saved sessions. Warm-up sets are excluded. Ties share the record; estimated 1RM is calculated, not measured.</p></div>`;
     const pts = [], dayType = (()=>{ for (const d of allDays()) if (d.ex.some(e=>e.n===S.progressEx||(e.alt||[]).includes(S.progressEx))) return d.type; return "other"; })();
     let best=0, heaviest=0;
     const pu = (lastFor(S.progressEx) || {}).unit || DEFAULT_UNIT;
@@ -397,7 +400,7 @@ function viewProgress(){
       <div class="stats"><div class="stat"><b>${round1(best)}</b><small>Best est. 1RM (${pu})</small></div>
       <div class="stat"><b>${round1(heaviest)}</b><small>Heaviest set (${pu})</small></div>
       <div class="stat"><b>${change>0?"+":""}${change}%</b><small>Since first log</small></div></div>
-      ${chartSVG(pts, `var(--${dayType})`, pu + " est. 1RM")}
+      ${recordHTML}${chartSVG(pts, `var(--${dayType})`, pu + " est. 1RM")}
       <p class="muted" style="font-size:13px">Estimated 1RM uses the Epley formula on your best set each session, so heavier weights and extra reps both count as progress. Sessions logged in a different unit are converted.</p>`;
   }
   const bu = S.body.length ? (S.body[S.body.length-1].unit || DEFAULT_UNIT) : (S.bodyUnit || "kg");
