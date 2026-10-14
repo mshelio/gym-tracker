@@ -2,7 +2,7 @@
 const EVENT_TYPES=new Set(["planned","rest","skipped","completed"]);
 const ID=/^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_.~:@+-]{1,190}$/;
 export function isLocalDate(date){
- if(typeof date!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return false;
+ if(typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return false;
  const stamp=new Date(date+"T12:00:00Z");
  return !Number.isNaN(stamp.getTime())&&stamp.toISOString().slice(0,10)===date;
 }
@@ -15,7 +15,7 @@ export function validateCalendarEvents(events){
   if(!isLocalDate(e.date)||!EVENT_TYPES.has(e.type))throw Error("Invalid calendar event date or type");
   if(e.workoutId!=null&&!ID.test(e.workoutId))throw Error("Invalid calendar workout ID");
   if(e.sessionId!=null&&!ID.test(e.sessionId))throw Error("Invalid calendar session ID");
-  if(typeof e.updatedAt!=="string"||!Number.isFinite(Date.parse(e.updatedAt))||!/(Z|[+-]\\d{2}:\\d{2})$/.test(e.updatedAt))throw Error("Invalid calendar event timestamp");
+  if(typeof e.updatedAt!=="string"||!Number.isFinite(Date.parse(e.updatedAt))||!/(Z|[+-]\d{2}:\d{2})$/.test(e.updatedAt))throw Error("Invalid calendar event timestamp");
   if(e.type==="completed"&&!e.sessionId)throw Error("Completed event must link to a session");
  }
  return events;
