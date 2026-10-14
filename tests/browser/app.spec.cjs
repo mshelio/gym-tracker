@@ -329,9 +329,11 @@ test('edit completed workout atomically without advancing schedule or losing met
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
   return await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots');const r=tx.objectStore('snapshots').get('primary');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
  });
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
  await page.getByRole('button',{name:'Cancel'}).click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
@@ -341,6 +343,7 @@ test('edit completed workout atomically without advancing schedule or losing met
  await expect(page.getByText('Corrected session')).toBeVisible();
  await page.reload();
  await page.getByRole('button',{name:/history/i}).first().click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
  const after=await page.evaluate(async()=>{
@@ -366,9 +369,11 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   const b=await context.newPage();
   await b.goto('/gym-tracker/');
   await b.getByRole('button',{name:/history/i}).first().click();
-  await b.getByRole('button',{name:'Edit session'}).click();
+  await b.locator('details.hist').first().evaluate(el=>el.open=true);
+ await b.getByRole('button',{name:'Edit session'}).click();
   await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
-  await a.getByRole('button',{name:'Edit session'}).click();
+  await a.locator('details.hist').first().evaluate(el=>el.open=true);
+ await a.getByRole('button',{name:'Edit session'}).click();
   await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
   await a.getByRole('button',{name:'Save changes'}).click();
   await expect(a.getByText('Session updated')).toBeVisible();
@@ -376,7 +381,8 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await expect(b.getByText(/Could not save changes/)).toBeVisible();
   await b.reload();
   await b.getByRole('button',{name:/history/i}).first().click();
-  await b.getByRole('button',{name:'Edit session'}).click();
+  await b.locator('details.hist').first().evaluate(el=>el.open=true);
+ await b.getByRole('button',{name:'Edit session'}).click();
   await expect(b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
  }finally{await context.close();}
 });
