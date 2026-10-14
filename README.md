@@ -71,3 +71,7 @@ On supported browsers, the app copies the existing `ppl-tracker-v1` snapshot (in
 ## Version 4 backup compatibility (GT-03)
 
 Backups now export as `version: 4` while retaining `app: "ppl-tracker"`. Imports accept v1–v4: v1/v2 retain their historical normalization and schedule-merge behavior; v3 data is upgraded into v4; v4 is validated directly. The v4 schema adds optional stable exercise IDs and set-level fields (`id`, `type`, `completed`, `completedAt`, `rir`, `restSeconds`) without inventing unknown historical data. IndexedDB storage records and localStorage recovery keys remain unchanged. Keep a current JSON export before reverting to an older app, which may not recognize v4 backups.
+
+## Set completion (GT-05)
+
+Each training set has a Done toggle. Toggling it saves its completion timestamp in the workout draft and survives reload. Editing a completed set clears its completion state. Saved sets contain v4 completion metadata; legacy draft entries without explicit status remain compatible. Saving is guarded against duplicate clicks. A follow-up can enforce explicit completion for all newly created sets, which requires corresponding changes to the historical regression assumptions.

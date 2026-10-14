@@ -62,3 +62,22 @@ test('malformed localStorage prevents automatic migration rather than overwritin
   expect(errors.join(' ')).toContain('Legacy data is malformed');
   expect(await page.evaluate(()=>localStorage.getItem('ppl-tracker-v1'))).toBe('{malformed');
 });
+
+test('set completion survives reload and retains metadata when saved', async ({page})=>{
+  await page.goto('/gym-tracker/');
+  const weight=page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).first();
+  const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first();
+  await weight.fill('70');await reps.fill('10');
+  const done=page.getByRole('button',{name:/Lat pulldown set 1 mark complete/});
+  await done.click();
+  await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
+  await page.waitForTimeout(500); // Allow debounced draft write to commit before reload.
+  await page.reload();
+  await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:/Finish & save session/}).click();
+  await expect(page.getByText('The work adds up.')).toBeVisible();
+  const data=await page.evaluate(async()=>{const q=indexedDB.open('gym-tracker',1);return await new Promise((ok,no)=>{q.onsuccess=()=>{const t=q.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');t.onsuccess=()=>ok(t.result);t.onerror=()=>no(t.error);};q.onerror=()=>no(q.error);});});
+  expect(data.sessions).toHaveLength(1);
+  expect(data.sessions[0].exercises[0].sets[0].completed).toBe(true);
+  expect(data.sessions[0].exercises[0].sets[0].completedAt).toBeTruthy();
+});
