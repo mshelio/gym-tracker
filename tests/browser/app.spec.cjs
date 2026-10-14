@@ -71,6 +71,7 @@ test('set completion survives reload and retains metadata when saved', async ({p
   const done=page.getByRole('button',{name:/Lat pulldown set 1 mark complete/});
   await done.click();
   await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
+  await page.waitForTimeout(500); // Allow debounced draft write to commit before reload.
   await page.reload();
   await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:/Finish & save session/}).click();
