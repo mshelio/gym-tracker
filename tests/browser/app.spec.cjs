@@ -95,7 +95,7 @@ test('rest and workout timers recover from reload and support controls',async({p
  await page.getByRole('button',{name:'Resume'}).click();
  await page.locator('[data-act="timerskip"]').click();
  await expect(page.locator('[data-timer="rest"]')).toHaveText('—');
- await page.getByRole('button',{name:'Reset'}).click();
+ await page.locator('[data-act="timerreset"]').click();
  await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
 });
 
