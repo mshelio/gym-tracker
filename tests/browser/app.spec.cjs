@@ -175,7 +175,19 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
  await expect(page.getByText('Exercise defaults saved')).toBeVisible();
  await page.locator('[data-f="exrest"]').nth(1).fill('75');
  await page.locator('[data-act="savedefault"]').nth(1).click();
- await expect(page.getByText('Exercise defaults saved')).toBeVisible();
+ // The previous success toast may still be visible. Wait for BOTH saved
+ // identities to reach the same durable IndexedDB snapshot before reloading.
+ await expect.poll(async()=>page.evaluate(async()=>{
+   const open=indexedDB.open('gym-tracker',1);
+   return await new Promise((resolve,reject)=>{
+     open.onsuccess=()=>{
+       const db=open.result,req=db.transaction('snapshots','readonly').objectStore('snapshots').get('primary');
+       req.onsuccess=()=>{const values=Object.values(req.result?.preferences?.exerciseDefaults||{}).map(e=>e.restSeconds);db.close();resolve([values.includes(180),values.includes(75)]);};
+       req.onerror=()=>reject(req.error);
+     };
+     open.onerror=()=>reject(open.error);
+   });
+ })).toEqual([true,true]);
  await page.reload();
  await expect(page.locator('[data-f="exrest"]').nth(0)).toHaveValue('180');
  await expect(page.locator('[data-f="exrest"]').nth(1)).toHaveValue('75');
