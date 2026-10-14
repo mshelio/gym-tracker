@@ -36,3 +36,14 @@ test('mobile session completion and IndexedDB cleanup survive reload',async({pag
   expect(record.sessions).toHaveLength(1);
   expect(record.drafts.pullA).toBeUndefined();
 });
+
+test('mobile exercise search keeps filtering accessible and non-destructive',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const search=page.getByRole('searchbox',{name:'Search exercises'});
+ await search.fill('pulldown');
+ await expect(page.locator('[data-exercise-search-count]')).toContainText('of');
+ await search.fill('impossible exercise name');
+ await expect(page.locator('[data-exercise-search-empty]')).toBeVisible();
+ await page.getByRole('button',{name:'Clear search'}).click();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toBeVisible();
+});
