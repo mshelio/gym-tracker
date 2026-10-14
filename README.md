@@ -121,3 +121,7 @@ Date (inclusive), workout and exercise filters apply together to the same set of
 ### Autosave recovery (#45)
 
 Workout drafts show pending, confirmed saved, storage error, or concurrent-tab conflict status. A conflict does not overwrite the newer tab's IndexedDB snapshot. If saving fails, keep the tab open and use **Export unsaved backup** before reloading, then restore from JSON if needed. Draft changes are flushed on tab visibility changes and on in-app navigation. The browser cannot guarantee completion of asynchronous IndexedDB transactions after a page is terminated; for important changes, confirm the Saved status before closing the tab. No IndexedDB version or v4 backup format changes.
+
+### Large history performance (#46)
+
+The progress dashboard caches filtered analytics by session-array identity and filter values, computes record ties with linear passes, and draws no more than 240 SVG markers per chart using bucketed extrema sampling. All unmodified sessions remain included in precise totals and personal-record calculations; the chart is only a bounded visual overview. Filters and data changes invalidate the cached calculation. Chart SVGs remain keyboard focusable, and data tables retain exact weekly values. No IndexedDB or backup migration is necessary.
