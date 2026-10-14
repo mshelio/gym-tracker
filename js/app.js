@@ -55,21 +55,21 @@ let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 /* ---------- browser storage ---------- */
 const preferences = () => ({bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null});
-const {readLocal, writeLocal, loadDrafts} = createLocalStorage({state:S, preferences, toast});
+const {initialize:initializeStorage, readLocal, loadDrafts, commit:commitStorage} = createLocalStorage({state:S, preferences, toast});
 let draftTimer;
-function flushDrafts(){if(!S.ready)return;if(!writeLocal()){toast("Browser storage unavailable. Export a backup.");return;}try{localStorage.setItem(DRAFT_KEY,JSON.stringify(S.drafts));}catch{}}
+function flushDrafts(){if(!S.ready)return;commitStorage().catch(()=>toast("Browser storage unavailable. Export a backup."));}
 function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushDrafts(); });
 window.addEventListener("pagehide", flushDrafts);
 function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
-  const l = readLocal(); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
+  const l = await initializeStorage(); S.drafts = l.drafts || {}; S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
   S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;setStatus("Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
 }
 async function persist(field, value){
   const previous = S[field]; S[field] = value;
-  if (!writeLocal()) { S[field] = previous; throw new Error("Browser storage unavailable"); }
+  try { await commitStorage(); } catch { S[field] = previous; throw new Error("Browser storage unavailable"); }
 }
 async function putSession(s,advance=false){
   const previous=S.schedules,active=activeSchedule();
@@ -114,7 +114,7 @@ async function saveScheduleList(list,activeId=S.activeScheduleId){
   validateSchedules(list);
   const previous={schedules:S.schedules,activeScheduleId:S.activeScheduleId,dayId:S.dayId};
   S.schedules=list;S.activeScheduleId=activeId;S.dayId=nextDayId();
-  if(!writeLocal()){Object.assign(S,previous);throw new Error("Browser storage is full or unavailable");}
+  try { await commitStorage(); } catch { Object.assign(S,previous); throw new Error("Browser storage is full or unavailable"); }
 }
 async function useSchedule(id){
   if(!S.schedules.some(s=>s.id===id))return;
@@ -642,7 +642,7 @@ async function importJSON(){
     S.bodyUnit=incoming.preferences.bodyUnit;S.progressEx=incoming.preferences.progressExercise;
     S.dayId=getDay(incoming.preferences.selectedWorkoutId)?.id || nextDayId();
     // All collections and drafts commit together in one atomic localStorage write.
-    if(!writeLocal())throw new Error("Browser storage is full or unavailable");
+    await commitStorage();
     clearTimeout(draftTimer);
     try {localStorage.setItem(DRAFT_KEY,JSON.stringify(S.drafts));}catch{}
     S.editing=null;S.scheduleEditing=null;S.manageSchedules=false;S.armedDelete=null;render();
