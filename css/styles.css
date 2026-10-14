@@ -27,3 +27,5 @@ input[type=date],input[type=number],input[type=text],select,textarea{background:
 
 /* Exercise-specific preference editor */
 .exercise-default-controls{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:10px 0}.exercise-default-controls label{display:flex;flex-direction:column;gap:4px;font-size:12px}.exercise-default-controls input{width:90px;max-width:100%}.exercise-default-controls .btn{min-height:38px}.exercise-default-controls .muted{font-size:11px}@media(max-width:520px){.exercise-default-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.exercise-default-controls input{width:100%}}
+
+.progression-hint{font-size:12px;line-height:1.5;padding:8px 10px;background:var(--surface,#f5f7f4);border-radius:9px}.progression-toggle{display:flex;gap:8px;align-items:center;margin:12px 0;font-size:13px}
