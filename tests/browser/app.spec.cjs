@@ -232,3 +232,17 @@ test('date, workout and exercise filters scope both PR and volume metrics',async
  await page.locator('[data-analytics="exercise"]').selectOption('');
  await expect(page.locator('.analytics-dashboard')).toContainText('1500');
 });
+
+test('autosave displays confirmed state and offers recovery on cross-tab conflict',async({browser})=>{
+ const context=await browser.newContext();
+ const a=await context.newPage(), b=await context.newPage();
+ await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
+ await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
+ await expect(b.locator('[data-save-status]')).toHaveAttribute('data-state','conflict');
+ await expect(b.locator('[data-act="recoverbackup"]')).toBeVisible();
+ await b.locator('[data-act="recoverbackup"]').click();
+ await expect(b.locator('#exportOut')).not.toBeEmpty();
+ await context.close();
+});
