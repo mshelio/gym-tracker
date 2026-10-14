@@ -217,3 +217,18 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
  await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('145');
 });
+
+test('date, workout and exercise filters scope both PR and volume metrics',async({page})=>{
+ const fixture={sessions:[{id:'mixed',dayId:'pushA',dayName:'Push A',type:'push',date:'2026-10-12',createdAt:1,notes:'',exercises:[{name:'Bench',unit:'kg',sets:[{w:50,r:10,type:'working',completed:true}]},{name:'Row',unit:'kg',sets:[{w:100,r:10,type:'working',completed:true}]}]},{id:'old',dayId:'pullA',dayName:'Pull A',type:'pull',date:'2026-09-01',createdAt:2,notes:'',exercises:[{name:'Bench',unit:'kg',sets:[{w:200,r:10,type:'working',completed:true}]}]}],body:[],custom:[],drafts:{},schedules:[],preferences:{}};
+ await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.locator('[data-analytics="from"]').fill('2026-10-01');
+ await page.locator('[data-analytics="workout"]').selectOption('pushA');
+ await page.locator('[data-analytics="exercise"]').selectOption('Bench');
+ await expect(page.locator('.analytics-dashboard')).toContainText('500');
+ await expect(page.locator('.pr-summary')).toContainText('500');
+ await expect(page.locator('.pr-summary')).not.toContainText('1000');
+ await page.locator('[data-analytics="exercise"]').selectOption('');
+ await expect(page.locator('.analytics-dashboard')).toContainText('1500');
+});
