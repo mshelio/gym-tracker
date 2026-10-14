@@ -157,3 +157,13 @@ test('copying previous sets requires explicit action',async ({page})=>{
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('100');
 });
+
+test('progression hints can be disabled without changing draft',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('.progression-hint').first()).toContainText('No completed working sets');
+ const toggle=page.locator('[data-act="progressiontoggle"]');
+ await toggle.uncheck();
+ await expect(page.locator('.progression-hint').first()).toContainText('disabled');
+ await page.waitForTimeout(500);await page.reload();
+ await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
+});
