@@ -329,7 +329,22 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await page.getByRole('button',{name:/Finish & save session/}).click();
  await expect(page.getByText('Session saved')).toBeVisible();
+ // Confirm the atomic IndexedDB snapshot, rather than assuming a toast also
+ // guarantees the newly opened page has hydrated the same persisted revision.
+ const readSnapshot=()=>page.evaluate(async()=>new Promise((resolve,reject)=>{
+   const open=indexedDB.open('gym-tracker',1);
+   open.onsuccess=()=>{const db=open.result,tx=db.transaction('snapshots','readonly');
+     const request=tx.objectStore('snapshots').get('primary');
+     request.onsuccess=()=>{const value=request.result;db.close();resolve(value);};
+     request.onerror=()=>reject(request.error);
+   };
+   open.onerror=()=>reject(open.error);
+ }));
+ await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
+ const saved=await readSnapshot();
+ expect(saved.drafts?.pullA).toBeUndefined();
  await page.reload();
+ await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
  await page.getByRole('button',{name:/history/i}).first().click();
  await expect(page.locator('details.hist')).toHaveCount(1);
  await page.getByRole('button',{name:/train/i}).first().click();
