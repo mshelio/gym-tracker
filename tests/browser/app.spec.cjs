@@ -147,6 +147,20 @@ test('invalid exercise increment cannot replace a saved default', async ({page})
  await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
 });
 
+test('global rest default persists and restores for future drafts', async ({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('combobox',{name:'Rest duration'}).selectOption('120');
+ await page.getByRole('button',{name:'Save global rest default'}).click();
+ await expect(page.getByText('Global rest default saved')).toBeVisible();
+ await page.reload();
+ const snapshot=await page.evaluate(async()=>new Promise((resolve,reject)=>{
+  const open=indexedDB.open('gym-tracker',1);
+  open.onsuccess=()=>{const req=open.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);};
+  open.onerror=()=>reject(open.error);
+ }));
+ expect(snapshot.preferences.globalRestSeconds).toBe(120);
+});
+
 test('second tab refuses stale draft overwrite', async ({browser})=>{
  const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
  await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
