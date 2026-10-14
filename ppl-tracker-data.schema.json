@@ -530,6 +530,9 @@
             },
             "additionalProperties": false
           }
+        },
+        "progressionEnabled": {
+          "type": "boolean"
         }
       },
       "required": [
