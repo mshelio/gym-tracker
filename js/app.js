@@ -850,7 +850,7 @@ async function importJSON(){
     legacy=j.version<3;incoming=validateAppData(j.version<4 ? migrateLegacy(j) : j);
   } catch(err){importFeedback("Import cancelled: "+err.message,true);return;}
   const replace=$("#importMode")?.value==="replace";
-  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,progressionEnabled:S.progressionEnabled};
+  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,globalRestSeconds:S.globalRestSeconds,progressionEnabled:S.progressionEnabled};
   const merge=(current,added)=>[...new Map([...current,...added].map(x=>[x.id,x])).values()];
   try {
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
