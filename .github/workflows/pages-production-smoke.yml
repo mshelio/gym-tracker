@@ -28,6 +28,7 @@ jobs:
       - name: Verify deployed Pages and start application
         env:
           PAGES_URL: https://mshelio.github.io/gym-tracker/
+          REQUIRE_RELEASE_MATCH: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && 'true' || 'false' }}
         run: node tests/pages-smoke.cjs
       - name: Record observed deployment status and source ref
         if: always()
@@ -44,6 +45,8 @@ jobs:
             echo "- Workflow source SHA: $REF_SHA"
             echo "- Trigger: $EVENT"
             if [ -n "$DEPLOYED_SHA" ]; then echo "- Reported deployment SHA: $DEPLOYED_SHA"; fi
+            echo '- Deployment SHA provenance is sourced from the GitHub deployment event when available.'
+            echo '- Source SHA equality is not inferred for PR, schedule, or pre-deployment push runs.'
             echo '- Note: workflow SHA is not proof of deployed Pages content.'
             echo '- GitHub Pages configuration:'
             gh api "repos/$REPO/pages" --jq '{url, status, build_type, source}' || echo 'Pages API unavailable: verify repository Settings > Pages.'
