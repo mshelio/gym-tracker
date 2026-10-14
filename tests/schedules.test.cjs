@@ -132,6 +132,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const identityDraft=a.getDraft('identity-test');
   assert.equal(identityDraft.ex[0].exerciseId,'unique-row-1');
   assert.equal(identityDraft.ex[1].exerciseId,'unique-row-2');
+  assert.equal(a.getDraft('identity-test').ex[0].exerciseId,'unique-row-1');
   assert.equal(identityDraft.ex[0].restSeconds,180);
   assert.equal(identityDraft.ex[1].restSeconds,75);
   delete identityDraft.ex[1].exerciseId; // Older v4 draft: recover ID from unchanged definition.
