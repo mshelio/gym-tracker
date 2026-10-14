@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-assert.match(workerSource,/gt-shell-95304dcd/);
+assert.match(workerSource,/gt-shell-45d33d3f/);
 assert.match(workerSource,/ppl-default-workouts.json/);
 assert.match(workerSource,/SKIP_WAITING/);
 assert(!workerSource.includes('indexedDB.deleteDatabase'));
@@ -25,12 +25,12 @@ for(const icon of pwaManifest.icons){
 }
 assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
 
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','analytics.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','analytics.js','calendar.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -47,6 +47,40 @@ function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
 async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
 (async()=>{
   const c=setup(); await settle(); const {api:a,node}=c;
+  assert.equal(a.isLocalDate("2026-03-29"),true);
+  assert.equal(a.isLocalDate("2026-02-30"),false);
+  const calendarWeekPlan={mode:"weekly",days:["pullA",null,"pushA",null,"legsA",null,null],cursor:0};
+  const projections=a.projectWeeklyCalendar(calendarWeekPlan,"2026-03-28","2026-04-04");
+  assert.equal(projections.length,8);
+  assert.equal(projections.find(x=>x.date==="2026-03-30").workoutId,"pullA");
+  assert.equal(projections.find(x=>x.date==="2026-03-29").type,"rest");
+  assert.equal(a.projectWeeklyCalendar({mode:"cycle",days:["pullA"],cursor:0},"2026-03-28","2026-04-04").length,0);
+  const skipped={id:"event-1",date:"2026-03-30",type:"skipped",workoutId:"pullA",updatedAt:"2026-03-30T15:00:00Z"};
+  assert.equal(a.projectWeeklyCalendar(calendarWeekPlan,"2026-03-30","2026-03-30",[skipped]).length,0);
+  assert.equal(a.upsertCalendarEvent([],skipped).length,1);
+  assert.equal(a.removeCalendarEvent([skipped],"event-1").length,0);
+  assert.throws(()=>a.validateCalendarEvents([skipped,skipped]),/unique/);
+  assert.throws(()=>a.validateCalendarEvents([{...skipped,type:"completed"}]),/session/);
+  // V4 round trip carries optional events, while older backups remain valid.
+  a.S.calendarEvents=[skipped];
+  const calendarBackup=a.buildAppData();
+  assert.equal(calendarBackup.version,4);
+  assert.equal(calendarBackup.calendarEvents[0].id,"event-1");
+  const olderV4=JSON.parse(JSON.stringify(calendarBackup));
+  delete olderV4.calendarEvents;
+  assert.doesNotThrow(()=>a.validateAppData(olderV4));
+  const malformed=JSON.parse(JSON.stringify(calendarBackup));
+  malformed.calendarEvents=[{...skipped,date:"2026-02-30"}];
+  assert.throws(()=>a.validateAppData(malformed),/calendarEvents/);
+  a.S.calendarEvents=[];
+  await a.saveCalendarEvent(skipped);
+  assert.equal(a.S.calendarEvents.length,1);
+  c.setRejectWrites(true);
+  await assert.rejects(()=>a.deleteCalendarEvent("event-1"),/storage/);
+  c.setRejectWrites(false);
+  assert.equal(a.S.calendarEvents.length,1);
+  await a.deleteCalendarEvent("event-1");
+  assert.equal(a.S.calendarEvents.length,0);
   assert.equal(a.S.ready,true); assert.equal(c.requested(),'https://user.github.io/ppl-tracker/ppl-default-workouts.json');
   assert.equal(a.nextDayId(),'pullA');
   // Import preference contract: merge overlays keys, replace clears missing keys.

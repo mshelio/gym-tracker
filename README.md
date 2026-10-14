@@ -174,3 +174,10 @@ The Train screen and custom workout editor have a local **Search exercises** fie
 ### v1.1.0 final exercise-default compatibility
 
 New exercise defaults for ID-less workout rows are scoped to their workout and row rather than shared solely by exercise name. Old name-based defaults remain readable as a fallback without rewriting or deleting older v4 backups. Saving a new row-specific default isolates that row, and resetting a row default prevents an inherited name-based value from reappearing. A persistent **Global rest default** can be saved from the workout timer's rest picker and is stored as optional `preferences.globalRestSeconds` in v4 JSON and IndexedDB. When absent, the preference defaults to 90 seconds. Existing in-progress drafts retain their chosen rest intervals. No schema version change or destructive migration is required.
+
+
+### Calendar event data model (v1.2 groundwork)
+
+The optional `calendarEvents` array is saved atomically alongside sessions in IndexedDB and exported in the existing **version 4** JSON backup format. Older v1–v4 backups without this array remain accepted and import as an empty collection. Event entries have a unique `id`, local `YYYY-MM-DD` `date`, `type` (`planned`, `rest`, `skipped`, or `completed`), and ISO-8601 `updatedAt`; `workoutId` and `sessionId` are optional. Completed events require a session reference. Invalid imports are rejected before mutating stored data, and failed writes roll back changes.
+
+Calendar projections are **not** written as events: weekly schedules can project weekdays and rest days from the schedule's fixed seven-day plan. Repeating cycle schedules have no inherently meaningful calendar dates, so no dates are inferred from their cursor. A day without a log is never automatically marked skipped or missed. This establishes a data model for the future calendar interface (issue #17), not a finished calendar UI. Preserve a JSON backup before changing devices or clearing browser storage.
