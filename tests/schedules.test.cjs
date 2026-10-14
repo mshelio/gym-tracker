@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workouts.json'),'utf8'));
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
@@ -32,6 +32,8 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
   assert(a.viewLog().includes('data-act="completeset"'));
+  assert(a.viewLog().includes('data-act="savedefault"'));
+  assert(a.viewHistory().includes('hard sets') || a.S.sessions.length===0);
   assert(a.viewLog().includes('data-act="timerpause"'));
   assert(a.viewLog().includes('data-act="settype"'));
   assert(a.viewLog().includes('data-f="rir"'));
