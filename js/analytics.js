@@ -5,6 +5,7 @@ export function analyticsRange(sessions=[],{from="",to="",workout="",exercise=""
 }
 export function analyticsSummary(sessions=[],options={}){
  const filtered=analyticsRange(sessions,options),unit=options.unit==="lb"?"lb":"kg",weeks=new Map(),exercisePoints=[];
+ const collectPoints=options.includeExercisePoints!==false;
  let hardSets=0,totalVolume=0;
  const display=(v,u)=>u===unit?v:u==="lb"?v*KG:v/KG;
  for(const session of filtered){
@@ -27,13 +28,13 @@ export function analyticsSummary(sessions=[],options={}){
     const converted=display(w,from),volume=converted*r;
     row.volume+=volume;totalVolume+=volume;
     if(set.type!=="drop"){row.hardSets++;hardSets++;}
-    if(ex.name===options.exercise||!options.exercise){
+    if(collectPoints && (ex.name===options.exercise||!options.exercise)){
       exercisePoints.push({date,exercise:ex.name,weight:converted,estimated1RM:converted*(1+r/30),reps:r,createdAt:session.createdAt||0});
     }
    }
   }
  }
  const weekly=[...weeks.values()].sort((a,b)=>a.week.localeCompare(b.week)).map(w=>({...w,volume:Math.round(w.volume*100)/100}));
- exercisePoints.sort((a,b)=>a.date.localeCompare(b.date)||a.createdAt-b.createdAt);
+ if(collectPoints)exercisePoints.sort((a,b)=>a.date.localeCompare(b.date)||a.createdAt-b.createdAt);
  return {unit,sessions:filtered.length,hardSets,volume:Math.round(totalVolume*100)/100,weekly,exercisePoints};
 }
