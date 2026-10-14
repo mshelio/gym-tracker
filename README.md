@@ -4,12 +4,22 @@ A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter s
 
 ## Files and setup
 
-Keep `index.html` and `ppl-default-workouts.json` together in your GitHub Pages source. No build step, server or database is required.
+Keep `index.html`, `ppl-default-workouts.json`, `css/` and `js/` together in your GitHub Pages source. No build step, server or database is required. Serve the app over HTTP(S) (for local testing: `python -m http.server 8000`); ES modules do not load reliably from `file://`.
 
 - `ppl-default-workouts.json`: starter workout definitions, units, exercises, rep ranges, alternatives and notes.
 - `ppl-tracker-data.json`: empty version 3 app-data template with the starter schedule.
 - `ppl-tracker-data.schema.json`: JSON Schema for version 3 app-data backups.
 - `tests/schedules.test.cjs`: dependency-free functional checks; run `node tests/schedules.test.cjs`.
+
+## Code layout
+
+- `index.html`: markup and entry-point references.
+- `css/styles.css`: existing application styles.
+- `js/app.js`: original application behavior, extracted without a functional rewrite.
+- `js/config.js`: existing persistent storage key constants.
+- `tests/schedules.test.cjs`: dependency-free regression tests, now loading the extracted module source.
+
+This change does not modify stored data or backup formats. To roll back, revert the asset extraction commit; all existing browser data remains under the same storage keys.
 
 ## Flexible workout schedules
 

@@ -3,7 +3,11 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workouts.json'),'utf8'));
-const code = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\ninitApp();\n})();');
+const moduleCode = fs.readFileSync(path.join(root,'js/app.js'),'utf8');
+const configSource = fs.readFileSync(path.join(root,'js/config.js'),'utf8');
+const config = configSource.replace(/export /g, '');
+assert.match(html, /type="module" src="\.\/js\/app\.js"/);
+const code = (config + '\n' + moduleCode.replace(/^\s*import\s+\{[^}]+\}\s+from\s+["']\.\/config\.js["'];\s*/, '')).replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -78,6 +82,6 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   for(const version of [1,2]){target.node('#importMode').value='replace';target.node('#importText').value=JSON.stringify(packageData);await target.api.importJSON();const oldBackup=JSON.parse(backup);oldBackup.version=version;delete oldBackup.schedules;delete oldBackup.preferences.activeScheduleId;target.node('#importMode').value='merge';target.node('#importText').value=JSON.stringify(oldBackup);await target.api.importJSON();assert.equal(target.api.activeSchedule().id,'own');target.node('#importMode').value='replace';await target.api.importJSON();assert.equal(target.api.activeSchedule().id,'starter-ppl');assert.equal(target.api.nextSlot(),'pushA');}
   const legacyLocal=setup({storage:{'ppl-tracker-v1':JSON.stringify({sessions:JSON.parse(backup).sessions,custom:[],body:[]})}});await settle();assert.equal(legacyLocal.api.nextSlot(),'pushA');
   const broken=JSON.parse(JSON.stringify(packageData));broken.schedules[0].days=['missing'];const stable=JSON.stringify(target.api.S);target.node('#importText').value=JSON.stringify(broken);await target.api.importJSON();assert.equal(JSON.stringify(target.api.S),stable);
-  assert.deepEqual(JSON.parse(html.match(/const DATA_SCHEMA = ([^\n]+);/)[1]),JSON.parse(fs.readFileSync(path.join(root,'ppl-tracker-data.schema.json'),'utf8')));
+  assert.deepEqual(JSON.parse(moduleCode.match(/const DATA_SCHEMA = ([^\n]+);/)[1]),JSON.parse(fs.readFileSync(path.join(root,'ppl-tracker-data.schema.json'),'utf8')));
   console.log('PASS: flexible repeating/weekly schedules, reorder, rest, independent progress, v1/v2 migration, v3 round trips, rollback;  JSON schema and exact defaults, project-relative URL, sessions, rotation, units, progress, custom workouts, body log, persistence, backup download/import/deduplication, cached program, missing-file recovery, storage-failure rollback and modified program.');
 })().catch(e=>{console.error(e);process.exitCode=1});
