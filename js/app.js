@@ -234,6 +234,7 @@ function render(){
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${intro[0]}</p><h1>${intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
     <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "progress" ? viewProgress() : viewData());
   updateSessionMeter();
+  applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
 }
 
@@ -285,6 +286,34 @@ function progressionHint(e,definition){
  const result=recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false});
  return `<p class="progression-hint" role="status"><strong>Next workout:</strong> ${esc(result.weight==null?"No load suggestion":result.weight+" "+result.unit)} — ${esc(result.reason)}</p>`;
 }
+let exerciseQuery="";
+function exerciseNameSuggestions(){
+ const names=[...new Set(allDays().flatMap(day=>(day.ex||[]).flatMap(e=>[e.n,...(e.alt||[])]).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
+ return `<datalist id="exercise-name-suggestions">${names.map(n=>`<option value="${esc(n)}"></option>`).join("")}</datalist>`;
+}
+function exerciseSearchBox(){
+ return `<div class="section"><label for="exercise-search">Search exercises</label>
+ <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Filter exercises by name" value="${esc(exerciseQuery)}" autocomplete="off">
+ <button class="btn small" type="button" data-act="clearexercisesearch">Clear search</button>
+ <p id="exercise-search-count" class="muted" data-exercise-search-count role="status"></p>
+ <p class="muted" data-exercise-search-empty hidden>No matching exercises. Clear search to show all.</p></div>`;
+}
+function applyExerciseFilter(){
+ const input=document.querySelector('[data-exercise-search]');
+ if(!input)return;
+ const needle=input.value.trim().toLocaleLowerCase();
+ const items=[...document.querySelectorAll('[data-exercise-search-item]')];
+ let shown=0;
+ for(const item of items){
+  const match=(item.dataset.exerciseSearchItem||"").toLocaleLowerCase().includes(needle);
+  item.hidden=!match;
+  if(match)shown++;
+ }
+ const count=document.querySelector('[data-exercise-search-count]');
+ if(count)count.textContent=shown+' of '+items.length+' exercises shown';
+ const empty=document.querySelector('[data-exercise-search-empty]');
+ if(empty)empty.hidden=shown!==0;
+}
 function viewLog(){
   if(S.scheduleEditing)return viewScheduleEditor();
   if(S.manageSchedules)return viewScheduleManager();
@@ -303,7 +332,7 @@ function viewLog(){
     const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
     const lb = lastBlock(de.name, e, de.unit);
     const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
-    return `<section class="ex ${esc(day.type)}">
+    return `<section class="ex ${esc(day.type)}" data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
       <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
@@ -314,8 +343,8 @@ function viewLog(){
   }).join("");
   const extras = d.extra.map((x, i) => {
     const lb = lastBlock(x.name.trim(), null, x.unit);
-    return `<section class="ex other">
-      <div class="ex-head"><input type="text" class="ex-name" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
+    return `<section class="ex other" data-exercise-search-item="${esc(x.name)}">
+      <div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(x,i,"x",d)}
@@ -331,7 +360,7 @@ function viewLog(){
       <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
       <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
       ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
-      ${cards}${extras}
+      ${exerciseSearchBox()}${exerciseNameSuggestions()}${cards}${extras}
       <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
       <div class="section notes-card"><label for="notes"><h3>Session notes</h3></label><p class="muted">How did you feel today?</p>
         <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></div>
@@ -348,8 +377,8 @@ function viewLog(){
 function viewEditor(){
   const w = S.editing, isNew = !S.custom.some(c => c.id === w.id);
   const colors = TYPES.map(([t,label]) => `<label><input type="radio" name="edtype" data-ed="type" value="${t}" ${w.type===t?"checked":""}><span class="swatch" style="background:var(--${t})"></span>${label}</label>`).join("");
-  const rows = w.ex.map((e, i) => `<div class="edrow">
-      <input type="text" aria-label="Exercise ${i+1} name" placeholder="Exercise name" data-ef="n" data-i="${i}" data-key="ed-n-${i}" value="${esc(e.n)}">
+  const rows = w.ex.map((e, i) => `<div class="edrow" data-exercise-search-item="${esc(e.n)}">
+      <input type="text" aria-label="Exercise ${i+1} name" list="exercise-name-suggestions" placeholder="Exercise name" data-ef="n" data-i="${i}" data-key="ed-n-${i}" value="${esc(e.n)}">
       <input type="number" inputmode="numeric" min="1" max="10" aria-label="Sets" data-ef="s" data-i="${i}" data-key="ed-s-${i}" value="${esc(e.s)}">
       <input type="number" inputmode="numeric" min="1" max="50" aria-label="Minimum reps" data-ef="lo" data-i="${i}" data-key="ed-lo-${i}" value="${esc(e.lo)}">
       <input type="number" inputmode="numeric" min="1" max="50" aria-label="Maximum reps" data-ef="hi" data-i="${i}" data-key="ed-hi-${i}" value="${esc(e.hi)}">
@@ -363,7 +392,7 @@ function viewEditor(){
     <div class="colors" role="radiogroup" aria-label="Workout category">${colors}</div>
     <p class="muted" style="font-size:14px;margin:12px 0 0">Default weight unit</p>
     <div class="colors" role="radiogroup" aria-label="Default weight unit">${["lb","kg"].map(u => `<label><input type="radio" name="edunit" data-ed="unit" value="${u}" ${(w.unit||DEFAULT_UNIT)===u?"checked":""}>${u}</label>`).join("")}</div>
-    <div class="edhead"><span>Exercise</span><span>Sets</span><span>Min reps</span><span>Max reps</span><span></span></div>
+    ${exerciseSearchBox()}${exerciseNameSuggestions()}<div class="edhead"><span>Exercise</span><span>Sets</span><span>Min reps</span><span>Max reps</span><span></span></div>
     ${rows}
     <div class="row-actions"><button class="btn small" data-act="edaddex">Add exercise</button></div>
     <p class="muted" style="font-size:13px">Add this workout to any repeating or weekly schedule using Manage schedules.</p>
@@ -539,6 +568,8 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
 
 $("#app").addEventListener("input", e => {
   const t = e.target;
+  if(t.matches("[data-exercise-search]")){exerciseQuery=t.value;applyExerciseFilter();return;}
+  if(t.dataset.ef==="n" && S.editing){S.editing.ex[+t.dataset.i].n=t.value;const row=t.closest("[data-exercise-search-item]");if(row)row.dataset.exerciseSearchItem=t.value;return;}
   if(savedSessionEdit && t.dataset.historyField){savedSessionEdit[t.dataset.historyField]=t.value;return;}
   if(savedSessionEdit && t.dataset.historySet){savedSessionEdit.exercises[+t.dataset.i].sets[+t.dataset.j][t.dataset.historySet]=t.value;return;}
   if(t.hasAttribute?.("data-schedule-name") && S.scheduleEditing){S.scheduleEditing.name=t.value;return;}
@@ -613,6 +644,7 @@ $("#app").addEventListener("click", async e => {
     catch { toast("Couldn't delete. Try again."); }
     return;
   }
+  if(act==="clearexercisesearch"){exerciseQuery="";const input=document.querySelector("[data-exercise-search]");if(input){input.value="";applyExerciseFilter();input.focus();}return;}
   if(act==="historyedit"){
     const original=S.sessions.find(x=>x.id===b.dataset.id);
     if(original){savedSessionEdit=structuredClone(original);render();window.scrollTo({top:0});}
