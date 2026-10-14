@@ -3,12 +3,12 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workouts.json'),'utf8'));
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','analytics.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,recommendProgression,calculateRecords};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, hardSetCount,normalizeExerciseSetting,convertIncrement,recommendProgression,calculateRecords,analyticsSummary,analyticsRange};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -32,6 +32,12 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
   assert(a.viewLog().includes('data-act="completeset"'));
+  const analyticsFixture=[{id:"one",dayId:"pullA",date:"2026-10-12",exercises:[{name:"Row",unit:"kg",sets:[{w:50,r:10,type:"working"},{w:20,r:15,type:"warmup"},{w:30,r:8,type:"drop"}]}]},{id:"two",dayId:"pushA",date:"2026-10-13",exercises:[{name:"Press",unit:"lb",sets:[{w:100,r:8}]}]}];
+  assert.equal(a.analyticsSummary(analyticsFixture,{workout:"pullA"}).hardSets,1);
+  assert.equal(a.analyticsSummary(analyticsFixture,{workout:"pullA"}).volume,740);
+  assert.equal(a.analyticsSummary(analyticsFixture,{from:"2026-10-14"}).sessions,0);
+  assert.equal(a.analyticsSummary(analyticsFixture,{exercise:"Row"}).weekly.length,1);
+  assert.equal(a.analyticsSummary([]).weekly.length,0);
   const samplePR={id:"r1",date:"2026-10-01",exercises:[{name:"Bench",unit:"lb",sets:[{w:100,r:8},{w:200,r:20,type:"warmup"}]}]};
   const pr=a.calculateRecords([samplePR], "Bench","kg");
   assert.equal(pr.heaviest.value,45.36);
