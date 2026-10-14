@@ -700,7 +700,7 @@ async function importJSON(){
     legacy=j.version<3;incoming=validateAppData(j.version<4 ? migrateLegacy(j) : j);
   } catch(err){importFeedback("Import cancelled: "+err.message,true);return;}
   const replace=$("#importMode")?.value==="replace";
-  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId};
+  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,progressionEnabled:S.progressionEnabled};
   const merge=(current,added)=>[...new Map([...current,...added].map(x=>[x.id,x])).values()];
   try {
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
@@ -711,6 +711,11 @@ async function importJSON(){
     S.activeScheduleId=legacy && !replace ? S.activeScheduleId : incoming.preferences.activeScheduleId || S.schedules[0].id;
     S.drafts=replace ? incoming.drafts : {...S.drafts,...incoming.drafts};
     S.bodyUnit=incoming.preferences.bodyUnit;S.progressEx=incoming.preferences.progressExercise;
+    // Replace takes backed-up settings (defaults for older backups); merge
+    // preserves current keys absent from incoming and prefers incoming keys.
+    const p=incoming.preferences;
+    S.exerciseDefaults=replace ? {...(p.exerciseDefaults||{})} : {...(S.exerciseDefaults||{}),...(p.exerciseDefaults||{})};
+    S.progressionEnabled=replace ? p.progressionEnabled!==false : (p.progressionEnabled===undefined ? S.progressionEnabled!==false : p.progressionEnabled);
     S.dayId=getDay(incoming.preferences.selectedWorkoutId)?.id || nextDayId();
     // All collections and drafts commit together in one atomic localStorage write.
     if(!await writeLocal())throw new Error("Browser storage is full or unavailable");
