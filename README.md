@@ -151,3 +151,7 @@ After a successful first online visit, a service worker caches the GitHub Pages 
 ## PWA lifecycle verification (GT-14 / #15)
 
 The automated suite checks PWA manifest and icon metadata, scoped shell-cache contents, cold offline reload after online installation, offline workout logging and completed-session persistence, IndexedDB draft recovery, and behavior when workout program requests fail. Tests also verify that an existing worker and its shell cache survive reloads. Chromium exercises service-worker scenarios; separate mobile projects cover touch and mobile navigation. An actual deployment version bump and waiting-worker activation must be confirmed before claiming full update-cycle coverage. Run the browser suite with `npm run test:browser`. Offline behavior requires one successful online visit to populate the cache, and clearing site data also clears workout history unless exported.
+
+### Release-safe PWA updates (#61)
+
+Any change to an app-shell asset requires regenerating `sw.js` with `node tests/version-sw.cjs`; the release cache name is derived from the Git blob hashes of all precached files. CI runs `node tests/version-sw.cjs --check` to reject a stale worker revision. Commit the regenerated `sw.js` **with** app changes so browsers discover a new service worker and offer a controlled update. An update cannot silently replace a pending workout draft. Failed installation keeps the previous active worker and its cache. Export a JSON backup before clearing website data during recovery.
