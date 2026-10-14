@@ -8,7 +8,7 @@ import { createLocalStorage } from "./storage.js";
 import { recommendProgression } from "./progression.js";
 import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
-import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement } from "./exercise-settings.js";
+import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 
 (() => {
@@ -619,10 +619,14 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
-  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(exercise.restSeconds??d.restSeconds);}saveDrafts();render();return; }
+  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:S.exerciseDefaults[exerciseKey(exercise.name,exercise.exerciseId)]}));}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
-  if(act==="resetdefault"){const e=grp(),key=exerciseKey(e.name,e.exerciseId),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;Object.assign(e,before);toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
-  if(act==="savedefault"){const e=grp();const key=exerciseKey(e.name,e.exerciseId);const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:Number(e.loadIncrement||S.exerciseDefaults?.[key]?.loadIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||"kg"});const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else {render();toast("Exercise defaults saved");}return;}
+  if(act==="resetdefault"){const e=grp(),key=exerciseKey(e.name,e.exerciseId),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;for(const field of ["restSeconds","loadIncrement","incrementUnit"]){if(before[field]===undefined)delete e[field];else e[field]=before[field];}toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
+  if(act==="savedefault"){const e=grp();const key=exerciseKey(e.name,e.exerciseId);const rawIncrement=e.loadIncrement==null||e.loadIncrement===""?S.exerciseDefaults?.[key]?.loadIncrement:e.loadIncrement;
+   if(rawIncrement!=null && rawIncrement!=="" && (!Number.isFinite(Number(rawIncrement))||Number(rawIncrement)<=0||Number(rawIncrement)>100)){e.loadIncrement=S.exerciseDefaults?.[key]?.loadIncrement??"";saveDrafts();if(!await flushDrafts()){toast("Could not restore saved increment; export a backup before reloading.");return;}toast("Load increment must be greater than 0 and no more than 100.");return;}
+   const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:rawIncrement==null||rawIncrement===""?undefined:Number(rawIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||e.unit||"kg"});
+   if(e.restSeconds!=null&&!Object.hasOwn(value,"restSeconds")){toast("Rest interval must be 15–600 seconds.");return;}
+   const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else {render();toast("Exercise defaults saved");}return;}
   if(act==="copyforward"){const e=grp(),prev=lastFor(e.name);if(!prev){toast("No previous sets available");return;}const converted=prev.sets.map(x=>({w:String(tidy(conv(x.w||0,prev.unit,e.unit),e.unit)),r:String(x.r||"")}));if(!converted.length)return;e.sets=converted;saveDrafts();render();toast("Previous sets copied to draft");return;}
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
@@ -717,11 +721,12 @@ async function saveSession(btn){
 async function saveWorkout(btn){
   const w = S.editing;
   const name = (w.name||"").trim();
-  const ex = w.ex.map(e => {
+  const previousDefinition=S.custom.find(c=>c.id===w.id);
+  const ex = w.ex.map((e,i) => {
     const s = Math.min(10, Math.max(1, Math.round(num(e.s) || 3)));
     let lo = Math.min(50, Math.max(1, Math.round(num(e.lo) || 8))), hi = Math.min(50, Math.max(1, Math.round(num(e.hi) || lo)));
     if (lo > hi) [lo, hi] = [hi, lo];
-    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [] };
+    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [], ...(e.exerciseId||(!previousDefinition||!previousDefinition.ex?.[i]||previousDefinition.ex[i].n!==e.n)?{exerciseId:e.exerciseId||uid("ex")}:{}) };
   }).filter(e => e.n);
   if (!name) { toast("Give the workout a name."); return; }
   if (!ex.length) { toast("Add at least one exercise."); return; }

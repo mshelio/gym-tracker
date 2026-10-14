@@ -19,3 +19,12 @@ export function convertIncrement(value,from,to){
  if(!Number.isFinite(value)||value<=0||!["kg","lb"].includes(from)||!["kg","lb"].includes(to))return null;
  return Math.round((from===to?value:(to==="kg"?value*0.45359237:value/0.45359237))*100)/100;
 }
+
+/** A set may override rest without changing the exercise's saved preference. */
+export function resolveRestSeconds({set,exercise,draft,defaults,globalRestSeconds=90}={}){
+ const valid=n=>Number.isInteger(n)&&n>=15&&n<=600;
+ for(const n of [set?.restSeconds,exercise?.restSeconds,defaults?.restSeconds,draft?.restSeconds,globalRestSeconds,90]){
+  if(valid(n))return n;
+ }
+ return 90;
+}
