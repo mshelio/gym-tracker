@@ -375,7 +375,7 @@ function chartSVG(points, color, unit){
   const dots=points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
   const grid=[0,0.5,1].map(t=>{const v=y0+(y1-y0)*t;const y=Y(v);return `<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${P.l-6}" y="${y+4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v)}</text>`;}).join("");
   const d0=new Date(x0).toLocaleDateString(undefined,{day:"numeric",month:"short"}), d1=new Date(x1).toLocaleDateString(undefined,{day:"numeric",month:"short"});
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="${esc(unit)} trend chart with ${points.length} points, from ${esc(d0)} to ${esc(d1)}">${grid}
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="Trend chart: ${esc(unit)} with ${points.length} points, from ${esc(d0)} to ${esc(d1)}">${grid}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${dots}
     <text x="${P.l}" y="${H-8}" font-size="12" fill="var(--muted)">${d0}</text><text x="${W-P.r}" y="${H-8}" font-size="12" text-anchor="end" fill="var(--muted)">${d1}</text></svg></div>`;
 }
