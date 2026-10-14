@@ -175,3 +175,12 @@ test('historical personal records appear without modifying sessions',async({page
  await expect(page.getByText('Personal records')).toBeVisible();
  await expect(page.locator('.pr-summary')).toContainText('Heaviest');
 });
+
+test('dashboard filters training data and displays empty states',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.getByText('Training analytics')).toBeVisible();
+ await expect(page.getByText('No training sessions match these filters.')).toBeVisible();
+ await page.locator('[data-analytics="from"]').fill('2026-10-01');
+ await expect(page.locator('[data-analytics="from"]')).toHaveValue('2026-10-01');
+});

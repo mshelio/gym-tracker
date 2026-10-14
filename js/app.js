@@ -7,6 +7,7 @@ import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
 import { recommendProgression } from "./progression.js";
 import { calculateRecords } from "./records.js";
+import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 
@@ -374,23 +375,32 @@ function chartSVG(points, color, unit){
   const dots=points.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
   const grid=[0,0.5,1].map(t=>{const v=y0+(y1-y0)*t;const y=Y(v);return `<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${P.l-6}" y="${y+4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v)}</text>`;}).join("");
   const d0=new Date(x0).toLocaleDateString(undefined,{day:"numeric",month:"short"}), d1=new Date(x1).toLocaleDateString(undefined,{day:"numeric",month:"short"});
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trend chart">${grid}
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="Trend chart: ${esc(unit)} with ${points.length} points, from ${esc(d0)} to ${esc(d1)}">${grid}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${dots}
     <text x="${P.l}" y="${H-8}" font-size="12" fill="var(--muted)">${d0}</text><text x="${W-P.r}" y="${H-8}" font-size="12" text-anchor="end" fill="var(--muted)">${d1}</text></svg></div>`;
 }
 
 function viewProgress(){
-  const names = [...new Set(S.sessions.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
+  const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
+  const filtered=analyticsRange(S.sessions,filter);
+  const summary=analyticsSummary(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
+  const workoutOptions=[...new Map(S.sessions.map(s=>[s.dayId,s.dayName||s.dayId])).entries()];
+  const analyticsControls=`<div class="analytics-controls" aria-label="Analytics filters"><label>From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label>To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label>Workout <select data-analytics="workout"><option value="">All workouts</option>${workoutOptions.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label>Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div>`;
+  const weekPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.volume}));
+  const hardPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.hardSets}));
+  const analyticsHTML=`<section class="section analytics-dashboard"><h3>Training analytics</h3>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>Volume (${summary.unit}·reps)</small></div></div><h4>Weekly volume</h4>${weekPts.length?chartSVG(weekPts,"var(--push)",summary.unit+"·reps"):'<p class="empty">No training sessions match these filters.</p>'}<h4>Weekly hard sets</h4>${hardPts.length?chartSVG(hardPts,"var(--pull)","hard sets"):'<p class="empty">No hard-set trend available.</p>'}${summary.weekly.length?`<details><summary>Weekly data table</summary><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></details>`:""}</section>`;
+
+  const names = [...new Set(filtered.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
   let exHtml;
   if (!names.length) exHtml = `<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
   else {
     if (!names.includes(S.progressEx)) S.progressEx = names[0];
-    const records=calculateRecords(S.sessions,S.progressEx,S.bodyUnit||"kg");
+    const records=calculateRecords(filtered,S.progressEx,S.bodyUnit||"kg");
     const recordHTML=`<div class="pr-summary" aria-label="Personal records"><h3>Personal records</h3><div class="pr-grid"><span>Heaviest <strong>${records.heaviest?records.heaviest.value+" "+records.unit:"—"}</strong></span><span>Most reps <strong>${records.mostReps?records.mostReps.value:"—"}</strong></span><span>Best estimated 1RM <strong>${records.estimated1RM?records.estimated1RM.value+" "+records.unit:"—"}</strong></span><span>Best session volume <strong>${records.sessionVolume?records.sessionVolume.value+" "+records.unit+"·reps":"—"}</strong></span></div><p class="muted">Calculated from saved sessions. Warm-up sets are excluded. Ties share the record; estimated 1RM is calculated, not measured.</p></div>`;
     const pts = [], dayType = (()=>{ for (const d of allDays()) if (d.ex.some(e=>e.n===S.progressEx||(e.alt||[]).includes(S.progressEx))) return d.type; return "other"; })();
     let best=0, heaviest=0;
     const pu = (lastFor(S.progressEx) || {}).unit || DEFAULT_UNIT;
-    sortSessions(S.sessions).reverse().forEach(s => { const e=(s.exercises||[]).find(x=>x.name===S.progressEx); if(!e) return;
+    sortSessions(filtered).reverse().forEach(s => { const e=(s.exercises||[]).find(x=>x.name===S.progressEx); if(!e) return;
       const eu = exUnit(e, s);
       let top=0; e.sets.forEach(x=>{const w=conv(x.w||0, eu, pu)||0,r=num(x.r)||0; top=Math.max(top,e1rm(w,r)); heaviest=Math.max(heaviest,w);});
       if (top>0){ pts.push({x:new Date(s.date+"T12:00:00").getTime(), y:top}); best=Math.max(best,top);} });
@@ -404,11 +414,12 @@ function viewProgress(){
       <p class="muted" style="font-size:13px">Estimated 1RM uses the Epley formula on your best set each session, so heavier weights and extra reps both count as progress. Sessions logged in a different unit are converted.</p>`;
   }
   const bu = S.body.length ? (S.body[S.body.length-1].unit || DEFAULT_UNIT) : (S.bodyUnit || "kg");
-  const bpts = S.body.filter(b=>num(b.weight)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:conv(b.weight, b.unit||DEFAULT_UNIT, bu)}));
-  const wpts = S.body.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
-  const recent = S.body.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
+  const visibleBody=S.body.filter(b=>(!filter.from||b.date>=filter.from)&&(!filter.to||b.date<=filter.to));
+  const bpts = visibleBody.filter(b=>num(b.weight)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:conv(b.weight, b.unit||DEFAULT_UNIT, bu)}));
+  const wpts = visibleBody.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
+  const recent = visibleBody.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
     <button class="btn small danger" data-act="delbody" data-id="${esc(b.id)}">${S.armedDelete===b.id?"Tap again":"Delete"}</button></li>`).join("");
-  return `<div class="section"><h3>Lifts</h3>${exHtml}</div>
+  return `${analyticsHTML}<div class="section"><h3>Lifts</h3>${exHtml}</div>
     <div class="section"><h3>Body</h3>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
@@ -482,6 +493,7 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", e => {
+  if(e.target.dataset.analytics){S.analyticsFilter={...(S.analyticsFilter||{}),[e.target.dataset.analytics]:e.target.value};render();return;}
   if(e.target.dataset.act==="progressiontoggle"){S.progressionEnabled=e.target.checked;saveDrafts();render();return;}
   if(e.target.dataset.act==="incrementunit"){const t=e.target;(t.dataset.g==="x"?getDraft(S.dayId).extra:getDraft(S.dayId).ex)[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="settype"){const t=e.target;const d=getDraft(S.dayId);(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].type=t.value;saveDrafts();return;}

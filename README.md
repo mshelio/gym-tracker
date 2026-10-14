@@ -101,3 +101,7 @@ When enabled, each exercise displays a non-editing suggestion based on the most 
 ## Personal records (GT-10)
 
 The Progress tab computes personal records directly from saved sessions, including historical data: heaviest weight, most repetitions, estimated 1RM (Epley), rep-at-load records, and best session volume. Units are converted into the chosen display unit; warm-up and incomplete sets are excluded. Ties use the earliest saved record and record a tie count. PRs are derived rather than stored, so deletions and imports automatically recalculate them. No IndexedDB migration or v4 backup change is needed.
+
+## Training analytics (GT-11)
+
+The Progress tab includes a read-only dashboard with inclusive date, workout and exercise filters, weekly volume, weekly hard sets and exercise progress. Workouts are grouped into Monday-starting ISO-style weeks. Warm-up sets and incomplete entries do not contribute to volume; drop sets contribute to volume but not hard sets. Weight is converted to the chosen kg/lb display unit. Filtered PRs recalculate from matching sessions, and no IndexedDB or v4 backup migration is required. Empty views display explanatory messages. Undo a filter selection to restore results; nothing is written to stored workouts.
