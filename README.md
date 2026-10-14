@@ -109,3 +109,7 @@ The Progress tab includes a read-only dashboard with inclusive date, workout and
 ### Version 4 draft backup recovery (#42)
 
 Backups now preserve paused/rest timer deadlines, workout start time, exercise-specific rest and increment settings, and set completion/type/RIR metadata. Older v4 backups remain valid because fields are optional. v1–v3 backups still use the existing migration normalization. If a backup fails validation, the import is rejected without replacing saved data. Export an additional copy before testing restore on another device.
+
+### JSON import preferences (#43)
+
+Replace imports use the backup's exercise defaults and progression toggle; optional fields absent in older backups reset to empty defaults and enabled progression. Merge imports combine exercise settings by stable exercise key, with incoming settings overriding matching keys and current-only keys retained. The progression toggle changes on merge only when explicitly included. Failed storage writes restore all in-memory imported collections and preferences. These changes do not alter IndexedDB structure or v4 backup format.
