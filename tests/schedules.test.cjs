@@ -27,6 +27,32 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const c=setup(); await settle(); const {api:a,node}=c;
   assert.equal(a.S.ready,true); assert.equal(c.requested(),'https://user.github.io/ppl-tracker/ppl-default-workouts.json');
   assert.equal(a.nextDayId(),'pullA');
+  // Import preference contract: merge overlays keys, replace clears missing keys.
+  const fixture=a.buildAppData();
+  fixture.preferences.exerciseDefaults={"name:bench":{restSeconds:150,loadIncrement:2.5,incrementUnit:"kg"}};
+  fixture.preferences.progressionEnabled=false;
+  a.S.exerciseDefaults={"name:row":{restSeconds:90}};a.S.progressionEnabled=true;
+  node('#importText').value=JSON.stringify(fixture);node('#importMode').value="merge";
+  await a.importJSON();
+  assert.equal(a.S.exerciseDefaults["name:bench"].restSeconds,150);
+  assert.equal(a.S.exerciseDefaults["name:row"].restSeconds,90);
+  assert.equal(a.S.progressionEnabled,false);
+  const beforeFailed=a.S.exerciseDefaults,enabledBefore=a.S.progressionEnabled;
+  const failing=JSON.parse(JSON.stringify(fixture));failing.preferences.exerciseDefaults={"name:bench":{restSeconds:300}};
+  node('#importText').value=JSON.stringify(failing);
+  c.setRejectWrites(true);await a.importJSON();c.setRejectWrites(false);
+  assert.equal(a.S.exerciseDefaults,beforeFailed);
+  assert.equal(a.S.progressionEnabled,enabledBefore);
+  node('#importMode').value="replace";
+  await a.importJSON();
+  assert.equal(a.S.exerciseDefaults["name:row"],undefined);
+  assert.equal(a.S.exerciseDefaults["name:bench"].restSeconds,300);
+  assert.equal(a.S.progressionEnabled,false);
+  const withoutOptional=JSON.parse(JSON.stringify(fixture));delete withoutOptional.preferences.exerciseDefaults;delete withoutOptional.preferences.progressionEnabled;
+  node('#importText').value=JSON.stringify(withoutOptional);node('#importMode').value="replace";await a.importJSON();
+  assert.equal(Object.keys(a.S.exerciseDefaults).length,0);
+  assert.equal(a.S.progressionEnabled,true);
+
   for(const w of canonical.workouts){
     const mapped=a.getDay(w.id);assert.equal(mapped.name,w.name);assert.equal(mapped.type,w.type);
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
