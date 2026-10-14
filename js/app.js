@@ -10,6 +10,7 @@ import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
+import { validateCalendarEvents } from "./calendar.js";
 
 (() => {
 "use strict";
@@ -96,7 +97,7 @@ window.addEventListener("pagehide",()=>{void flushDrafts();});
 function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
-  const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
+  const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
   S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
 }
 async function persist(field, value){
@@ -808,6 +809,7 @@ function validateAppData(value){
     }
   }
   check(value,DATA_SCHEMA,"data");
+  validateCalendarEvents(value.calendarEvents||[]);
   for (const key of ["sessions","body","custom","schedules"]) {
     if (new Set(value[key].map(x=>x.id)).size !== value[key].length) throw new Error("data."+key+": duplicate IDs");
   }
@@ -825,7 +827,7 @@ function normalizeDrafts(drafts){
 function migrateLegacy(j){
   const normalizeUnit = u => u == null ? DEFAULT_UNIT : u;
   return {app:"ppl-tracker",version:4,exportedAt:j.exportedAt || null,
-    sessions:(j.sessions || []).map(s=>({id:s.id,dayId:s.dayId || "legacy",dayName:s.dayName || "Workout",type:s.type || "other",date:s.date,notes:s.notes || "",createdAt:s.createdAt ?? 0,exercises:(s.exercises || []).map(e=>({name:e.name,...(e.exerciseId ? {exerciseId:e.exerciseId} : {}),unit:normalizeUnit(e.unit || s.unit),sets:Array.isArray(e.sets) ? e.sets.map(x=>({...Object.fromEntries(["id","type","completed","completedAt","rir","restSeconds"].filter(k=>x[k]!==undefined).map(k=>[k,x[k]])),w:x.w == null ? 0 : Number(x.w),r:Number(x.r)})) : e.sets}))})),
+    calendarEvents:j.calendarEvents||[],sessions:(j.sessions || []).map(s=>({id:s.id,dayId:s.dayId || "legacy",dayName:s.dayName || "Workout",type:s.type || "other",date:s.date,notes:s.notes || "",createdAt:s.createdAt ?? 0,exercises:(s.exercises || []).map(e=>({name:e.name,...(e.exerciseId ? {exerciseId:e.exerciseId} : {}),unit:normalizeUnit(e.unit || s.unit),sets:Array.isArray(e.sets) ? e.sets.map(x=>({...Object.fromEntries(["id","type","completed","completedAt","rir","restSeconds"].filter(k=>x[k]!==undefined).map(k=>[k,x[k]])),w:x.w == null ? 0 : Number(x.w),r:Number(x.r)})) : e.sets}))})),
     body:(j.body || []).map(b=>({id:b.id,date:b.date,weight:b.weight == null ? null : Number(b.weight),waist:b.waist == null ? null : Number(b.waist),unit:normalizeUnit(b.unit),createdAt:b.createdAt ?? 0})),
     custom:(j.custom || []).map(c=>({id:c.id,name:c.name,type:c.type || "other",unit:normalizeUnit(c.unit),ex:(c.ex || []).map(e=>({n:e.n,s:e.s,lo:e.lo,hi:e.hi,alt:e.alt || [],...(e.exerciseId ? {exerciseId:e.exerciseId} : {})}))})),
     drafts:normalizeDrafts(j.drafts),schedules:j.schedules || [starterSchedule(j.sessions || [])],preferences:{...preferences(),...(j.preferences || {}),activeScheduleId:j.preferences?.activeScheduleId || j.schedules?.[0]?.id || "starter-ppl"}};
@@ -833,6 +835,7 @@ function migrateLegacy(j){
 function buildAppData(){
   const normalized=migrateLegacy({exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,custom:S.custom,drafts:{},schedules:S.schedules,preferences:preferences()});
   normalized.drafts=JSON.parse(JSON.stringify(S.drafts));
+  normalized.calendarEvents=JSON.parse(JSON.stringify(S.calendarEvents));
   return validateAppData(normalized);
 }
 function importFeedback(message, failed=false){
@@ -861,11 +864,12 @@ async function importJSON(){
     legacy=j.version<3;incoming=validateAppData(j.version<4 ? migrateLegacy(j) : j);
   } catch(err){importFeedback("Import cancelled: "+err.message,true);return;}
   const replace=$("#importMode")?.value==="replace";
-  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,globalRestSeconds:S.globalRestSeconds,progressionEnabled:S.progressionEnabled};
+  const previous={sessions:S.sessions,calendarEvents:S.calendarEvents,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,globalRestSeconds:S.globalRestSeconds,progressionEnabled:S.progressionEnabled};
   const merge=(current,added)=>[...new Map([...current,...added].map(x=>[x.id,x])).values()];
   try {
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
     S.body=sortBody(replace ? incoming.body : merge(S.body,incoming.body));
+    S.calendarEvents=validateCalendarEvents(replace ? (incoming.calendarEvents||[]) : merge(S.calendarEvents,incoming.calendarEvents||[]));
     S.custom=replace ? incoming.custom : merge(S.custom,incoming.custom);
     S.schedules=replace ? incoming.schedules : legacy ? S.schedules : merge(S.schedules,incoming.schedules);
     validateSchedules(S.schedules,S.custom);
