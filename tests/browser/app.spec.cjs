@@ -404,7 +404,7 @@ test('exercise search filters default workouts without modifying saved drafts',a
 });
 test('workout editor supports searchable rows and exercise suggestions',async({page})=>{
  await page.goto('/gym-tracker/');
- await page.getByRole('button',{name:'+ Custom'}).click();
+ await page.locator('[data-act="newworkout"]').click();
  const exercise=page.getByRole('textbox',{name:'Exercise 1 name'});
  await exercise.fill('Lat pulldown');
  const matches=await page.locator('#exercise-name-suggestions option').evaluateAll(opts=>opts.map(o=>o.value));
