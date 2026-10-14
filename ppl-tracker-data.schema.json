@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Gym Tracker app data",
-  "description": "Version 3 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.",
+  "description": "Version 4 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.",
   "type": "object",
   "properties": {
     "app": {
       "const": "ppl-tracker"
     },
     "version": {
-      "const": 3
+      "const": 4
     },
     "exportedAt": {
       "anyOf": [
@@ -97,6 +97,48 @@
         "r": {
           "type": "integer",
           "minimum": 1
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "working",
+            "warmup",
+            "drop"
+          ]
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "completedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rir": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "restSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
         }
       },
       "required": [
@@ -125,6 +167,9 @@
             "$ref": "#/$defs/set"
           },
           "minItems": 1
+        },
+        "exerciseId": {
+          "$ref": "#/$defs/id"
         }
       },
       "required": [
@@ -267,6 +312,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "exerciseId": {
+          "$ref": "#/$defs/id"
         }
       },
       "required": [

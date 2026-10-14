@@ -48,7 +48,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const offline=setup({fetchFail:true,storage:c.storage});await settle();assert.equal(offline.api.S.ready,true);assert(offline.api.viewData().includes('file unavailable'));
   const missing=setup({fetchFail:true});await settle();assert.equal(missing.api.S.ready,false);assert(missing.node('#app').innerHTML.includes('Choose program JSON'));
   await missing.api.useProgramFile({text:async()=>JSON.stringify(canonical)});assert.equal(missing.api.S.ready,true);
-  const transfer=setup();await settle();transfer.api.S.dayId='pushA';const td=transfer.api.getDraft('pushA');td.ex[0].sets[0]={w:'60.5',r:'7'};td.notes='Unfinished session';transfer.api.S.bodyUnit='lb';transfer.api.S.progressEx='Barbell bench press';const complete=transfer.api.buildAppData();assert.equal(complete.version,3);assert.equal(complete.drafts.pushA.notes,'Unfinished session');
+  const transfer=setup();await settle();transfer.api.S.dayId='pushA';const td=transfer.api.getDraft('pushA');td.ex[0].sets[0]={w:'60.5',r:'7'};td.notes='Unfinished session';transfer.api.S.bodyUnit='lb';transfer.api.S.progressEx='Barbell bench press';const complete=transfer.api.buildAppData();assert.equal(complete.version,4);assert.equal(complete.drafts.pushA.notes,'Unfinished session');
   const receiver=setup();await settle();receiver.node('#importText').value=JSON.stringify(complete);await receiver.api.importJSON();assert.equal(receiver.api.getDraft('pushA').ex[0].sets[0].w,'60.5');assert.equal(receiver.api.S.dayId,'pushA');assert.equal(receiver.api.S.bodyUnit,'lb');
   const afterImportReload=setup({storage:receiver.storage});await settle();assert.equal(afterImportReload.api.S.dayId,'pushA');assert.equal(afterImportReload.api.getDraft('pushA').notes,'Unfinished session');
   const starter=JSON.parse(fs.readFileSync(path.join(root,'ppl-tracker-data.json'),'utf8'));receiver.api.validateAppData(starter);
@@ -83,6 +83,17 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   for(const version of [1,2]){target.node('#importMode').value='replace';target.node('#importText').value=JSON.stringify(packageData);await target.api.importJSON();const oldBackup=JSON.parse(backup);oldBackup.version=version;delete oldBackup.schedules;delete oldBackup.preferences.activeScheduleId;target.node('#importMode').value='merge';target.node('#importText').value=JSON.stringify(oldBackup);await target.api.importJSON();assert.equal(target.api.activeSchedule().id,'own');target.node('#importMode').value='replace';await target.api.importJSON();assert.equal(target.api.activeSchedule().id,'starter-ppl');assert.equal(target.api.nextSlot(),'pushA');}
   const legacyLocal=setup({storage:{'ppl-tracker-v1':JSON.stringify({sessions:JSON.parse(backup).sessions,custom:[],body:[]})}});await settle();assert.equal(legacyLocal.api.nextSlot(),'pushA');
   const broken=JSON.parse(JSON.stringify(packageData));broken.schedules[0].days=['missing'];const stable=JSON.stringify(target.api.S);target.node('#importText').value=JSON.stringify(broken);await target.api.importJSON();assert.equal(JSON.stringify(target.api.S),stable);
+  // Version 3 backups must migrate to v4 without losing sessions or schedules.
+  const v3=JSON.parse(JSON.stringify(packageData));v3.version=3;
+  const v3Target=setup();await settle();v3Target.node('#importText').value=JSON.stringify(v3);await v3Target.api.importJSON();
+  assert.equal(v3Target.api.S.sessions.length,packageData.sessions.length);
+  assert.equal(v3Target.api.activeSchedule().id,packageData.preferences.activeScheduleId);
+  assert.equal(v3Target.api.buildAppData().version,4);
+  // Explicit v4 optional fields must survive backup normalization.
+  const meta=JSON.parse(JSON.stringify(packageData));meta.sessions[0].exercises[0].sets[0].rir=2;
+  meta.sessions[0].exercises[0].sets[0].type='working';
+  const metaTarget=setup();await settle();metaTarget.node('#importText').value=JSON.stringify(meta);await metaTarget.api.importJSON();
+  assert.equal(metaTarget.api.buildAppData().sessions.find(x=>x.id===meta.sessions[0].id).exercises[0].sets[0].rir,2);
   assert.deepEqual(JSON.parse(moduleCode.match(/const DATA_SCHEMA = ([^\n]+);/)[1]),JSON.parse(fs.readFileSync(path.join(root,'ppl-tracker-data.schema.json'),'utf8')));
-  console.log('PASS: flexible repeating/weekly schedules, reorder, rest, independent progress, v1/v2 migration, v3 round trips, rollback;  JSON schema and exact defaults, project-relative URL, sessions, rotation, units, progress, custom workouts, body log, persistence, backup download/import/deduplication, cached program, missing-file recovery, storage-failure rollback and modified program.');
+  console.log('PASS: flexible repeating/weekly schedules, reorder, rest, independent progress, v1/v2 migration, v4 round trips, rollback;  JSON schema and exact defaults, project-relative URL, sessions, rotation, units, progress, custom workouts, body log, persistence, backup download/import/deduplication, cached program, missing-file recovery, storage-failure rollback and modified program.');
 })().catch(e=>{console.error(e);process.exitCode=1});
