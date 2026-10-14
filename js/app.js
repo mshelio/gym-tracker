@@ -59,9 +59,9 @@ let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 /* ---------- browser storage ---------- */
 const preferences = () => ({bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
-const {initialize, readLocal, writeLocal, loadDrafts, getMode} = createLocalStorage({state:S, preferences, toast});
+const {initialize, readLocal, writeLocal, loadDrafts, getMode, hasConflict} = createLocalStorage({state:S, preferences, toast});
 let draftTimer;
-async function flushDrafts(){if(!S.ready)return;if(!await writeLocal())toast("Browser storage unavailable. Export a backup.");}
+async function flushDrafts(){if(!S.ready)return;if(!await writeLocal())toast(hasConflict()?"Another tab changed your data. Export a backup and reload before editing.":"Browser storage unavailable. Export a backup.");}
 function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushDrafts(); });
 window.addEventListener("pagehide", flushDrafts);
@@ -176,6 +176,7 @@ function getDraft(dayId){
     S.drafts[dayId] = d;
   }
   if (!Array.isArray(d.extra)) d.extra = [];
+  if(d.sig!==sig)d.recoveryWarning=true;
   if(!Number.isFinite(d.startedAt))d.startedAt=Date.now();
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=90;
   d.ex.forEach(e => { if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=S.exerciseDefaults[exerciseKey(e.name,e.exerciseId)]?.restSeconds; });
@@ -273,7 +274,7 @@ function viewLog(){
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(de,i,"",d)}
       <div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
-      <div class="row-actions"><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
+      <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
   }).join("");
   const extras = d.extra.map((x, i) => {
@@ -284,7 +285,7 @@ function viewLog(){
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(x,i,"x",d)}
       <div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
-      <div class="row-actions"><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
+      <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
   }).join("");
   return `
@@ -294,6 +295,7 @@ function viewLog(){
       <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
       <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
       <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
+      ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
       ${cards}${extras}
       <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
       <div class="section notes-card"><label for="notes"><h3>Session notes</h3></label><p class="muted">How did you feel today?</p>
@@ -498,6 +500,7 @@ $("#app").addEventListener("click", async e => {
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
   if(act==="resetdefault"){const e=grp(),key=exerciseKey(e.name,e.exerciseId),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;Object.assign(e,before);toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
   if(act==="savedefault"){const e=grp();const key=exerciseKey(e.name,e.exerciseId);const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:Number(e.loadIncrement||S.exerciseDefaults?.[key]?.loadIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||"kg"});const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else {render();toast("Exercise defaults saved");}return;}
+  if(act==="copyforward"){const e=grp(),prev=lastFor(e.name);if(!prev){toast("No previous sets available");return;}const converted=prev.sets.map(x=>({w:String(tidy(conv(x.w||0,prev.unit,e.unit),e.unit)),r:String(x.r||"")}));if(!converted.length)return;e.sets=converted;saveDrafts();render();toast("Previous sets copied to draft");return;}
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
