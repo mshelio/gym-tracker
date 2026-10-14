@@ -134,6 +134,19 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
  await expect(page.locator('#app')).toContainText('0 hard sets');
 });
 
+test('invalid exercise increment cannot replace a saved default', async ({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.locator('[data-f="exrest"]').first().fill('120');
+ await page.locator('[data-f="increment"]').first().fill('2.5');
+ await page.locator('[data-act="savedefault"]').first().click();
+ await expect(page.getByText('Exercise defaults saved')).toBeVisible();
+ await page.locator('[data-f="increment"]').first().fill('101');
+ await page.locator('[data-act="savedefault"]').first().click();
+ await expect(page.getByText(/Load increment must be/)).toBeVisible();
+ await page.reload();
+ await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
+});
+
 test('second tab refuses stale draft overwrite', async ({browser})=>{
  const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
  await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
