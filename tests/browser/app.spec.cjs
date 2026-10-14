@@ -259,3 +259,15 @@ test('large history renders bounded accessible chart elements',async({page})=>{
  await expect(page.locator('.chart svg').first()).toHaveAttribute('tabindex','0');
  expect(Date.now()-started).toBeLessThan(15000);
 });
+
+test('completed session, draft cleanup and cursor survive immediate reload atomically',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.getByText('Session saved')).toBeVisible();
+ await page.reload();
+ await page.getByRole('button',{name:/history/i}).first().click();
+ await expect(page.locator('details.hist')).toHaveCount(1);
+ await page.getByRole('button',{name:/train/i}).first().click();
+ await expect(page.locator('.workout-main')).toContainText('Push A');
+});

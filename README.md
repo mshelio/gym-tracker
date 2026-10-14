@@ -125,3 +125,7 @@ Workout drafts show pending, confirmed saved, storage error, or concurrent-tab c
 ### Large history performance (#46)
 
 The progress dashboard caches filtered analytics by session-array identity and filter values, computes record ties with linear passes, and draws no more than 240 SVG markers per chart using bucketed extrema sampling. All unmodified sessions remain included in precise totals and personal-record calculations; the chart is only a bounded visual overview. Filters and data changes invalidate the cached calculation. Chart SVGs remain keyboard focusable, and data tables retain exact weekly values. No IndexedDB or backup migration is necessary.
+
+### Atomic session completion (#52)
+
+Finishing a session now persists its record, deletion of the finished draft, selected next workout and schedule cursor in one IndexedDB snapshot transaction. The app reports success only after the transaction completes; a write rejection restores all affected in-memory state so the workout draft can be retried or exported. No schema or backup version change is required.
