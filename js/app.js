@@ -463,12 +463,21 @@ function cachedAnalytics(sessions,filter){
  }
  return analyticsCache.value;
 }
+const recordsCache={sessions:null,exercise:null,unit:null,value:null};
+function cachedRecords(sessions,exercise,unit){
+ if(recordsCache.sessions!==sessions||recordsCache.exercise!==exercise||recordsCache.unit!==unit){
+  recordsCache.sessions=sessions;recordsCache.exercise=exercise;recordsCache.unit=unit;
+  recordsCache.value=calculateRecords(sessions,exercise,unit);
+ }
+ return recordsCache.value;
+}
 function chartSVG(points, color, unit){
   if (points.length < 2) return `<div class="empty" style="margin-top:10px">Log this at least twice to see a trend line.</div>`;
   const displayed=sampleChartPoints(points);
   const W=600,H=230,P={l:44,r:14,t:16,b:30};
-  const xs=points.map(p=>p.x), ys=points.map(p=>p.y);
-  const x0=Math.min(...xs), x1=Math.max(...xs); let y0=Math.min(...ys), y1=Math.max(...ys);
+  // Bounded-memory extrema: spread Math.min/Math.max fails for large histories.
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
   const pad=(y1-y0)*0.12 || 2; y0-=pad; y1+=pad;
   const X=x=>P.l+((x-x0)/((x1-x0)||1))*(W-P.l-P.r), Y=y=>H-P.b-((y-y0)/((y1-y0)||1))*(H-P.t-P.b);
   const path=displayed.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
@@ -494,7 +503,7 @@ function viewProgress(){
   if (!names.length) exHtml = `<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
   else {
     if (!names.includes(S.progressEx)) S.progressEx = names[0];
-    const records=calculateRecords(filtered,S.progressEx,S.bodyUnit||"kg");
+    const records=cachedRecords(filtered,S.progressEx,S.bodyUnit||"kg");
     const recordHTML=`<div class="pr-summary" aria-label="Personal records"><h3>Personal records</h3><div class="pr-grid"><span>Heaviest <strong>${records.heaviest?records.heaviest.value+" "+records.unit:"—"}</strong></span><span>Most reps <strong>${records.mostReps?records.mostReps.value:"—"}</strong></span><span>Best estimated 1RM <strong>${records.estimated1RM?records.estimated1RM.value+" "+records.unit:"—"}</strong></span><span>Best exercise-session volume <strong>${records.sessionVolume?records.sessionVolume.value+" "+records.unit+"·reps":"—"}</strong></span></div><p class="muted">Calculated for the selected exercise in matching sessions. Warm-up sets are excluded; drop sets contribute to volume. Ties share the record; estimated 1RM is calculated, not measured.</p></div>`;
     const pts = [], dayType = (()=>{ for (const d of allDays()) if (d.ex.some(e=>e.n===S.progressEx||(e.alt||[]).includes(S.progressEx))) return d.type; return "other"; })();
     let best=0, heaviest=0;

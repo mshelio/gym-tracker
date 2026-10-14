@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-assert.match(workerSource,/gt-shell-d81b10b7/);
+assert.match(workerSource,/gt-shell-c47209ed/);
 assert.match(workerSource,/ppl-default-workouts.json/);
 assert.match(workerSource,/SKIP_WAITING/);
 assert(!workerSource.includes('indexedDB.deleteDatabase'));
@@ -81,6 +81,13 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   }
   assert(a.viewLog().includes('data-act="completeset"'));
   const big=Array.from({length:10000},(_,i)=>({id:String(i),date:"2026-10-12",dayId:"pullA",exercises:[{name:"Lat pulldown",unit:"kg",sets:[{w:50+i%20,r:10}]}]}));
+  // >100k chart points previously overflowed function argument limits in
+  // Math.min(...xs)/Math.max(...ys), despite rendering being downsampled.
+  const hugePoints=Array.from({length:120000},(_,i)=>({x:Date.UTC(2026,0,1)+i*60000,y:i%91}));
+  const hugeChart=a.chartSVG(hugePoints,'red','kg');
+  assert(hugeChart.includes('with 120000 points'));
+  assert((hugeChart.match(/<circle /g)||[]).length<=240);
+  assert(hugeChart.length<50000);
   const start=Date.now();const metrics=a.analyticsSummary(big,{unit:"kg"});
   assert.equal(metrics.sessions,10000);assert.equal(metrics.hardSets,10000);
   assert.equal(metrics.weekly.length,1);
