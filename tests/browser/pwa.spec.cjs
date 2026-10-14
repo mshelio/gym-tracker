@@ -20,7 +20,8 @@ test('installability metadata and shell cache are repository scoped',async({page
  expect(info.keys.some(x=>x.endsWith('/gym-tracker/ppl-default-workouts.json'))).toBe(true);
  expect(info.scope).toMatch(/\/gym-tracker\/$/);
 });
-test('offline logging, draft persistence and session completion survive reload',async({page,context})=>{
+test('offline logging, draft persistence and session completion survive reload',async({page,context,isMobile})=>{
+ test.skip(isMobile,'Full offline workout session is covered on desktop Chromium; mobile offline startup is tested separately.');
  await controlled(page);
  await context.setOffline(true);
  await page.reload();
