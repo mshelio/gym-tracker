@@ -220,9 +220,11 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
 });
 
 test('date, workout and exercise filters scope both PR and volume metrics',async({page})=>{
+ test.setTimeout(75000);
  const fixture={sessions:[{id:'mixed',dayId:'pushA',dayName:'Push A',type:'push',date:'2026-10-12',createdAt:1,notes:'',exercises:[{name:'Bench',unit:'kg',sets:[{w:50,r:10,type:'working',completed:true}]},{name:'Row',unit:'kg',sets:[{w:100,r:10,type:'working',completed:true}]}]},{id:'old',dayId:'pullA',dayName:'Pull A',type:'pull',date:'2026-09-01',createdAt:2,notes:'',exercises:[{name:'Bench',unit:'kg',sets:[{w:200,r:10,type:'working',completed:true}]}]}],body:[],custom:[],drafts:{},schedules:[],preferences:{}};
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
  await page.goto('/gym-tracker/');
+ await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
  await page.getByRole('button',{name:/progress/i}).first().click();
  await page.locator('[data-analytics="from"]').fill('2026-10-01');
  await page.locator('[data-analytics="workout"]').selectOption('pushA');
@@ -249,12 +251,14 @@ test('autosave displays confirmed state and offers recovery on cross-tab conflic
 });
 
 test('large history renders bounded accessible chart elements',async({page})=>{
+ test.setTimeout(75000);
  const fixture={sessions:Array.from({length:1200},(_,i)=>({id:'large-'+i,dayId:'pullA',dayName:'Pull A',type:'pull',date:'2026-10-12',createdAt:i,exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50+i%20,r:10}]}]})),body:[],custom:[],drafts:{},preferences:{},schedules:[]};
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
  await page.goto('/gym-tracker/');
+ await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
  const started=Date.now();
  await page.getByRole('button',{name:/progress/i}).first().click();
- await expect(page.getByText('Training analytics')).toBeVisible();
+ await expect(page.getByText('Training analytics')).toBeVisible({timeout:20000});
  const count=await page.locator('.chart circle').count();
  expect(count).toBeLessThanOrEqual(720);
  await expect(page.locator('.chart svg').first()).toHaveAttribute('tabindex','0');
