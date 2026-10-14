@@ -11,7 +11,7 @@ if(!items.length)throw Error('Empty app shell');
 let digest=2166136261;
 const hashText=text=>{for(const c of Buffer.from(text,'utf8')){digest=Math.imul(digest^c,16777619)>>>0;}};
 for(const item of items){
- const filename=path.join(root,item==='.'?'index.html':item.replace(/^\.\//,''));
+ const filename=path.join(root,(item==='.'||item==='./')?'index.html':item.replace(/^\.\//,''));
  if(!fs.existsSync(filename))throw Error('Missing cached asset: '+item);
  hashText(item+'\0'+execFileSync('git',['hash-object',filename],{cwd:root,encoding:'utf8'}).trim()+'\0');
 }
