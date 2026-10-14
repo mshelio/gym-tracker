@@ -5,6 +5,7 @@ import { conv, tidy, today, uid, num, fmtDate, e1rm, round1, sortSessions, sortB
 import { icon } from "./render.js";
 import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
+import { recommendProgression } from "./progression.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 
@@ -58,7 +59,7 @@ const $ = s => document.querySelector(s);
 let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 /* ---------- browser storage ---------- */
-const preferences = () => ({bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
+const preferences = () => ({progressionEnabled:S.progressionEnabled!==false,bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
 const {initialize, readLocal, writeLocal, loadDrafts, getMode, hasConflict} = createLocalStorage({state:S, preferences, toast});
 let draftTimer;
 async function flushDrafts(){if(!S.ready)return;if(!await writeLocal())toast(hasConflict()?"Another tab changed your data. Export a backup and reload before editing.":"Browser storage unavailable. Export a backup.");}
@@ -69,7 +70,7 @@ function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
   const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
-  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
+  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
 }
 async function persist(field, value){
   const previous = S[field]; S[field] = value;
@@ -250,6 +251,11 @@ function exerciseDefaultControls(e,i,group,d){
  const unitLabel=converted==null?"":`≈ ${converted} ${esc(e.unit||unit)}`;
  return `<div class="exercise-default-controls"><label>Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-g="${group}" data-i="${i}" value="${e.restSeconds??saved.restSeconds??d.restSeconds}"></label><label>Load increment <input type="number" min="0.1" max="100" step="0.1" data-f="increment" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} load increment" value="${esc(inc)}"></label><label>Increment unit <select data-act="incrementunit" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} increment unit"><option value="kg" ${unit==="kg"?"selected":""}>kg</option><option value="lb" ${unit==="lb"?"selected":""}>lb</option></select></label><span class="muted" aria-label="Converted load increment">${unitLabel}</span><button type="button" class="btn small" data-act="savedefault" data-g="${group}" data-i="${i}">Save default</button><button type="button" class="btn small" data-act="resetdefault" data-g="${group}" data-i="${i}">Reset default</button></div>`;
 }
+function progressionHint(e,definition){
+ const settings=S.exerciseDefaults?.[exerciseKey(e.name,e.exerciseId)]||{};
+ const result=recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false});
+ return `<p class="progression-hint" role="status"><strong>Next workout:</strong> ${esc(result.weight==null?"No load suggestion":result.weight+" "+result.unit)} — ${esc(result.reason)}</p>`;
+}
 function viewLog(){
   if(S.scheduleEditing)return viewScheduleEditor();
   if(S.manageSchedules)return viewScheduleManager();
@@ -273,7 +279,7 @@ function viewLog(){
       ${lb.html}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(de,i,"",d)}
-      <div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
+      ${progressionHint(de,e)}<div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
   }).join("");
@@ -284,12 +290,12 @@ function viewLog(){
       ${x.name.trim() ? lb.html : ""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(x,i,"x",d)}
-      <div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
+      ${progressionHint(x,null)}<div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
   }).join("");
   return `
-    ${schedulePanel()}<div class="program-label"><h2>Workout library</h2><span>Any workout, any split</span></div>
+    ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label><div class="program-label"><h2>Workout library</h2><span>Any workout, any split</span></div>
     <div class="plates" role="group" aria-label="Choose workout">${plates}</div>
     <div class="workout-layout"><div class="workout-main">
       <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
@@ -473,6 +479,7 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", e => {
+  if(e.target.dataset.act==="progressiontoggle"){S.progressionEnabled=e.target.checked;saveDrafts();render();return;}
   if(e.target.dataset.act==="incrementunit"){const t=e.target;(t.dataset.g==="x"?getDraft(S.dayId).extra:getDraft(S.dayId).ex)[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="settype"){const t=e.target;const d=getDraft(S.dayId);(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].type=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="restpreset"){getDraft(S.dayId).restSeconds=Number(e.target.value);saveDrafts();return;}
