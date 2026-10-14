@@ -121,10 +121,13 @@ test('set types, RIR, and exercise rest survive autosave and session export',asy
 test('exercise default survives reload and hard-set count excludes warmups', async ({page})=>{
  await page.goto('/gym-tracker/');
  await page.locator('[data-f="exrest"]').first().fill('135');
+ await page.locator('[data-f="increment"]').first().fill('2.5');
+ await page.locator('[data-act="incrementunit"]').first().selectOption('kg');
  await page.locator('[data-act="savedefault"]').first().click();
  await page.waitForTimeout(400);
  await page.reload();
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('135');
+ await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
  await page.getByRole('combobox',{name:/Lat pulldown set 1 type/}).selectOption('warmup');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await page.getByRole('button',{name:/Finish & save session/}).click();
