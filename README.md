@@ -79,3 +79,7 @@ Each training set has a Done toggle. Toggling it saves its completion timestamp 
 ## Timers (GT-06)
 
 Mark a set Done to start a timestamp-based rest countdown. Select a rest duration, then pause, resume or skip. Reset clears the rest countdown and restarts workout elapsed time. Timer state is part of the existing IndexedDB-backed draft, so page reload preserves elapsed time and paused countdowns. Backgrounded tabs calculate elapsed time from wall-clock timestamps on return; no new backup version or IndexedDB schema is needed.
+
+## RIR and exercise settings (GT-07)
+
+Each set has a type (working, warmup or drop) and optional RIR (integer 0–10; blank means unknown). An exercise rest interval (15–600 seconds) overrides the workout rest preset when a set is completed. These settings autosave with the workout draft, and set type/RIR are included in version 4 session exports. Existing history without these optional fields remains valid. Warm-up sets should be excluded by future hard-set analytics; current general workout metrics are unchanged.

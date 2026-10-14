@@ -98,3 +98,22 @@ test('rest and workout timers recover from reload and support controls',async({p
  await page.getByRole('button',{name:'Reset'}).click();
  await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
 });
+
+test('set types, RIR, and exercise rest survive autosave and session export',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const type=page.getByRole('combobox',{name:/Lat pulldown set 1 type/});
+ await type.selectOption('warmup');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('3');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.locator('[data-f="exrest"]').first().fill('120');
+ await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await expect(page.locator('[data-timer="rest"]')).toContainText('02:');
+ await page.waitForTimeout(500);
+ await page.reload();
+ await expect(page.getByRole('combobox',{name:/Lat pulldown set 1 type/})).toHaveValue('warmup');
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/})).toHaveValue('3');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ const data=await page.evaluate(async()=>new Promise((ok,no)=>{const req=indexedDB.open('gym-tracker',1);req.onsuccess=()=>{const get=req.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');get.onsuccess=()=>ok(get.result);get.onerror=()=>no(get.error);};req.onerror=()=>no(req.error);}));
+ expect(data.sessions[0].exercises[0].sets[0].type).toBe('warmup');
+ expect(data.sessions[0].exercises[0].sets[0].rir).toBe(3);
+});
