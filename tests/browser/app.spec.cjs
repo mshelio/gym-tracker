@@ -365,6 +365,27 @@ for(const count of [1000,10000]){
  });
 }
 
+test('calendar events migrate to IndexedDB and survive reload without inferred missed days',async({page})=>{
+ const event={id:'skip-1',date:'2026-03-30',type:'skipped',workoutId:'pullA',updatedAt:'2026-03-30T12:00:00Z'};
+ await page.addInitScript(e=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions:[],body:[],custom:[],drafts:{},schedules:[],preferences:{},calendarEvents:[e]})),event);
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
+ const snapshot=()=>page.evaluate(async()=>new Promise((resolve,reject)=>{
+  const r=indexedDB.open('gym-tracker',1);
+  r.onerror=()=>reject(r.error);
+  r.onsuccess=()=>{const db=r.result,tx=db.transaction('snapshots','readonly'),q=tx.objectStore('snapshots').get('primary');
+   q.onsuccess=()=>{db.close();resolve(q.result)};
+   q.onerror=()=>reject(q.error);
+  };
+ }));
+ await expect.poll(async()=>(await snapshot()).calendarEvents?.length).toBe(1);
+ expect((await snapshot()).calendarEvents[0]).toEqual(event);
+ await page.reload();
+ await expect(page.locator('#status')).toContainText('IndexedDB');
+ expect((await snapshot()).calendarEvents).toEqual([event]);
+ await expect(page.getByRole('button',{name:/train/i}).first()).toBeVisible();
+});
+
 test('navigation clicked during startup is honored after IndexedDB hydration', async ({page})=>{
  let unblockProgram,programRequested;
  const requested=new Promise(resolve=>{programRequested=resolve;});
