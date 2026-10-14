@@ -129,3 +129,7 @@ The progress dashboard caches filtered analytics by session-array identity and f
 ### Atomic session completion (#52)
 
 Finishing a session now persists its record, deletion of the finished draft, selected next workout and schedule cursor in one IndexedDB snapshot transaction. The app reports success only after the transaction completes; a write rejection restores all affected in-memory state so the workout draft can be retried or exported. No schema or backup version change is required.
+
+## Browser and mobile release testing (#53)
+
+The browser workflow runs desktop Chromium, Firefox and WebKit, plus touch-enabled mobile Chromium (Pixel 7) and mobile WebKit (iPhone 13) projects. The desktop suite covers IndexedDB migration and conflicts, workout logging, timers and JSON backups in each browser engine. Mobile smoke tests cover viewport overflow, touch navigation, input/draft persistence, export and completed-session IndexedDB cleanup. Run `npm run test:browser` after `npx playwright install --with-deps chromium firefox webkit`. These are emulated mobile browser profiles; real-device validation is still recommended before promising full hardware compatibility.
