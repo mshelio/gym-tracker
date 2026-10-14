@@ -62,8 +62,8 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const start=Date.now();const metrics=a.analyticsSummary(big,{unit:"kg"});
   assert.equal(metrics.sessions,10000);assert.equal(metrics.hardSets,10000);
   assert.equal(metrics.weekly.length,1);
-  const pr=a.calculateRecords(big,"Lat pulldown","kg");assert.equal(pr.heaviest.value,69);
-  assert.equal(pr.sampleCount,10000);
+  const largePR=a.calculateRecords(big,"Lat pulldown","kg");assert.equal(largePR.heaviest.value,69);
+  assert.equal(largePR.sampleCount,10000);
   const points=Array.from({length:10000},(_,i)=>({x:i,y:i%127}));
   const reduced=a.sampleChartPoints(points);
   assert(reduced.length<=240);assert.equal(reduced[0].x,0);assert.equal(reduced[reduced.length-1].x,9999);
