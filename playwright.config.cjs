@@ -2,6 +2,7 @@ const { defineConfig, devices } = require('@playwright/test');
 module.exports = defineConfig({
   testDir: './tests/browser',
   timeout: 45000,
+  workers: process.env.CI ? 2 : undefined,
   projects: [
     {name:'chromium',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Chrome']}},
     {name:'firefox',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Firefox']}},
