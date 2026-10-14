@@ -133,3 +133,27 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
  await page.getByRole('button',{name:/Finish & save session/}).click();
  await expect(page.locator('#app')).toContainText('0 hard sets');
 });
+
+test('second tab refuses stale draft overwrite', async ({browser})=>{
+ const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
+ await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
+ await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await a.waitForTimeout(700);
+ await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await b.waitForTimeout(700);
+ await expect(b.locator('#toast')).toContainText('Another tab');
+ await a.reload();
+ await expect(a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
+ await context.close();
+});
+test('copying previous sets requires explicit action',async ({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).fill('100');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await page.getByRole('button',{name:/train/i}).first().click();
+ await page.getByRole('button',{name:/Pull A/}).first().click();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('');
+ await page.getByRole('button',{name:'Copy last sets'}).first().click();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('100');
+});
