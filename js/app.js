@@ -263,6 +263,7 @@ function viewLog(){
       <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
+      <label class="ex-rest-label">Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-i="${i}" value="${de.restSeconds??d.restSeconds}"></label>
       <div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
@@ -273,6 +274,7 @@ function viewLog(){
       <div class="ex-head"><input type="text" class="ex-name" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
+      <label class="ex-rest-label">Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-g="x" data-i="${i}" value="${x.restSeconds??d.restSeconds}"></label>
       <div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
