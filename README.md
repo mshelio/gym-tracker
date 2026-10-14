@@ -105,3 +105,7 @@ The Progress tab computes personal records directly from saved sessions, includi
 ## Training analytics (GT-11)
 
 The Progress tab includes a read-only dashboard with inclusive date, workout and exercise filters, weekly volume, weekly hard sets and exercise progress. Workouts are grouped into Monday-starting ISO-style weeks. Warm-up sets and incomplete entries do not contribute to volume; drop sets contribute to volume but not hard sets. Weight is converted to the chosen kg/lb display unit. Filtered PRs recalculate from matching sessions, and no IndexedDB or v4 backup migration is required. Empty views display explanatory messages. Undo a filter selection to restore results; nothing is written to stored workouts.
+
+### Version 4 draft backup recovery (#42)
+
+Backups now preserve paused/rest timer deadlines, workout start time, exercise-specific rest and increment settings, and set completion/type/RIR metadata. Older v4 backups remain valid because fields are optional. v1–v3 backups still use the existing migration normalization. If a backup fails validation, the import is rejected without replacing saved data. Export an additional copy before testing restore on another device.

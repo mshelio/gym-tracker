@@ -387,6 +387,41 @@
         },
         "r": {
           "$ref": "#/$defs/draftValue"
+        },
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "working",
+            "warmup",
+            "drop"
+          ]
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rir": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "restSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
         }
       },
       "required": [
@@ -414,6 +449,36 @@
             "$ref": "#/$defs/draftSet"
           },
           "minItems": 1
+        },
+        "exerciseId": {
+          "type": "string"
+        },
+        "restSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 600
+        },
+        "loadIncrement": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "incrementUnit": {
+          "type": "string",
+          "enum": [
+            "kg",
+            "lb"
+          ]
         }
       },
       "required": [
@@ -448,6 +513,55 @@
           "items": {
             "$ref": "#/$defs/draftExercise"
           }
+        },
+        "startedAt": {
+          "type": "number",
+          "minimum": 0
+        },
+        "restSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 600
+        },
+        "recoveryWarning": {
+          "type": "boolean"
+        },
+        "restTimer": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "durationSeconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3600
+                },
+                "deadline": {
+                  "type": "number"
+                },
+                "pausedRemainingMs": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "durationSeconds",
+                "deadline",
+                "pausedRemainingMs"
+              ],
+              "additionalProperties": false
+            }
+          ]
         }
       },
       "required": [

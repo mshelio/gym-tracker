@@ -184,3 +184,19 @@ test('dashboard filters training data and displays empty states',async({page})=>
  await page.locator('[data-analytics="from"]').fill('2026-10-01');
  await expect(page.locator('[data-analytics="from"]')).toHaveValue('2026-10-01');
 });
+
+test('v4 backup round trip preserves paused timer and exercise settings',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.locator('[data-f="exrest"]').first().fill('125');
+ await page.locator('[data-f="increment"]').first().fill('2.5');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('2');
+ await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await page.locator('[data-act="timerpause"]').click();
+ await page.getByRole('button',{name:/data/i}).first().click();
+ await page.locator('[data-act="export"]').click();
+ const backup=JSON.parse(await page.locator('#exportOut').inputValue());
+ expect(backup.drafts.pullA.restTimer.pausedRemainingMs).toBeGreaterThan(0);
+ expect(backup.drafts.pullA.ex[0].restSeconds).toBe(125);
+ expect(backup.drafts.pullA.ex[0].sets[0].rir).toBe(2);
+});
