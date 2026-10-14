@@ -1,0 +1,49 @@
+name: GitHub Pages production smoke
+on:
+  pull_request:
+    paths:
+      - 'tests/pages-smoke.cjs'
+      - '.github/workflows/pages-production-smoke.yml'
+  push:
+    branches: [main]
+  deployment_status:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * *'
+permissions:
+  contents: read
+jobs:
+  pages:
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'github-pages')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Verify deployed Pages and start application
+        env:
+          PAGES_URL: https://mshelio.github.io/gym-tracker/
+        run: node tests/pages-smoke.cjs
+      - name: Record observed deployment status and source ref
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF_SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          DEPLOYED_SHA: ${{ github.event.deployment.sha }}
+        run: |
+          {
+            echo '## GitHub Pages production smoke'
+            echo '- URL: https://mshelio.github.io/gym-tracker/'
+            echo "- Workflow source SHA: $REF_SHA"
+            echo "- Trigger: $EVENT"
+            if [ -n "$DEPLOYED_SHA" ]; then echo "- Reported deployment SHA: $DEPLOYED_SHA"; fi
+            echo '- Note: workflow SHA is not proof of deployed Pages content.'
+            echo '- GitHub Pages configuration:'
+            gh api "repos/$REPO/pages" --jq '{url, status, build_type, source}' || echo 'Pages API unavailable: verify repository Settings > Pages.'
+          } >> "$GITHUB_STEP_SUMMARY"
