@@ -295,3 +295,19 @@ test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page
  }
  await expect(page.getByText('Make every rep count.')).toBeVisible();
 });
+
+test('service worker caches app shell and preserves draft on offline reload',async({page,context})=>{
+ await page.goto('/gym-tracker/');
+ await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await page.evaluate(()=>navigator.serviceWorker.ready);
+ await page.reload();
+ await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await context.setOffline(true);
+ await page.reload();
+ await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await expect(page.locator('#pwa-status')).toContainText('Offline');
+ await context.setOffline(false);
+});
