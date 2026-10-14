@@ -26,7 +26,7 @@ export function createLocalStorage({state,preferences,toast,idb=globalThis.index
  async function writeLocal(){
    const data=current();
    if(mode==="idb"){try{await query(db,"readwrite",s=>s.put(data,"primary"));return true;}catch{return false;}}
-   try{local.setItem(LOCAL_KEY,JSON.stringify(data));return true;}catch{return false;}
+   try{local.setItem(LOCAL_KEY,JSON.stringify(data));try{local.setItem(DRAFT_KEY,JSON.stringify(data.drafts));}catch{}return true;}catch{return false;}
  }
  function loadDrafts(data){state.drafts=data?.drafts&&typeof data.drafts==="object"&&!Array.isArray(data.drafts)?data.drafts:{};}
  return {initialize,readLocal,writeLocal,loadDrafts,getMode:()=>mode};
