@@ -3,6 +3,23 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workouts.json'),'utf8'));
+
+const pwaManifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8'));
+assert.equal(pwaManifest.start_url,'./');
+assert.equal(pwaManifest.scope,'./');
+assert.equal(pwaManifest.display,'standalone');
+assert.equal(pwaManifest.id,'./');
+assert(pwaManifest.icons.some(icon=>icon.purpose==='maskable'&&icon.sizes==='512x512'));
+for(const icon of pwaManifest.icons){
+  assert(icon.src.startsWith('./')&&!icon.src.startsWith('//'));
+  const bytes=fs.readFileSync(path.join(root,icon.src));
+  assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  const dimensions=icon.sizes.split('x').map(Number);
+  assert.equal(bytes.readUInt32BE(16),dimensions[0]);
+  assert.equal(bytes.readUInt32BE(20),dimensions[1]);
+}
+assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
+
 const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','analytics.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
