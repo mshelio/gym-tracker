@@ -690,17 +690,18 @@ async function exportJSON(){
   } catch {toast("Download unavailable. Copy the JSON below.");}
 }
 async function importJSON(){
-  let incoming,legacy=false;
+  let incoming,legacy=false,importedPreferenceKeys=[];
   try {
     const j=JSON.parse($("#importText").value);
     if(!j || typeof j!=="object" || Array.isArray(j))throw new Error("Expected a tracker backup object");
     if(j.workouts)throw new Error("This is a default workout program. Use Load program JSON instead.");
     if(j.app!=="ppl-tracker")throw new Error("Expected app: ppl-tracker");
     if(![1,2,3,4].includes(j.version))throw new Error("Unsupported backup version");
+    importedPreferenceKeys=Object.keys(j.preferences||{});
     legacy=j.version<3;incoming=validateAppData(j.version<4 ? migrateLegacy(j) : j);
   } catch(err){importFeedback("Import cancelled: "+err.message,true);return;}
   const replace=$("#importMode")?.value==="replace";
-  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId};
+  const previous={sessions:S.sessions,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,progressionEnabled:S.progressionEnabled};
   const merge=(current,added)=>[...new Map([...current,...added].map(x=>[x.id,x])).values()];
   try {
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
@@ -711,6 +712,11 @@ async function importJSON(){
     S.activeScheduleId=legacy && !replace ? S.activeScheduleId : incoming.preferences.activeScheduleId || S.schedules[0].id;
     S.drafts=replace ? incoming.drafts : {...S.drafts,...incoming.drafts};
     S.bodyUnit=incoming.preferences.bodyUnit;S.progressEx=incoming.preferences.progressExercise;
+    // Replace takes backed-up settings (defaults for older backups); merge
+    // preserves current keys absent from incoming and prefers incoming keys.
+    const p=incoming.preferences;
+    S.exerciseDefaults=replace ? {...(importedPreferenceKeys.includes("exerciseDefaults") ? p.exerciseDefaults||{} : {})} : {...(S.exerciseDefaults||{}),...(importedPreferenceKeys.includes("exerciseDefaults")?p.exerciseDefaults||{}:{})};
+    S.progressionEnabled=replace ? (!importedPreferenceKeys.includes("progressionEnabled") || p.progressionEnabled!==false) : (importedPreferenceKeys.includes("progressionEnabled") ? p.progressionEnabled : S.progressionEnabled!==false);
     S.dayId=getDay(incoming.preferences.selectedWorkoutId)?.id || nextDayId();
     // All collections and drafts commit together in one atomic localStorage write.
     if(!await writeLocal())throw new Error("Browser storage is full or unavailable");
