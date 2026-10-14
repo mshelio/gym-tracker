@@ -55,21 +55,21 @@ let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 /* ---------- browser storage ---------- */
 const preferences = () => ({bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null});
-const {readLocal, writeLocal, loadDrafts} = createLocalStorage({state:S, preferences, toast});
+const {initialize, readLocal, writeLocal, loadDrafts, getMode} = createLocalStorage({state:S, preferences, toast});
 let draftTimer;
-function flushDrafts(){if(!S.ready)return;if(!writeLocal()){toast("Browser storage unavailable. Export a backup.");return;}try{localStorage.setItem(DRAFT_KEY,JSON.stringify(S.drafts));}catch{}}
+async function flushDrafts(){if(!S.ready)return;if(!await writeLocal())toast("Browser storage unavailable. Export a backup.");}
 function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushDrafts(); });
 window.addEventListener("pagehide", flushDrafts);
 function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
-  const l = readLocal(); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
-  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;setStatus("Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
+  const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
+  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
 }
 async function persist(field, value){
   const previous = S[field]; S[field] = value;
-  if (!writeLocal()) { S[field] = previous; throw new Error("Browser storage unavailable"); }
+  if (!await writeLocal()) { S[field] = previous; throw new Error("Browser storage unavailable"); }
 }
 async function putSession(s,advance=false){
   const previous=S.schedules,active=activeSchedule();
@@ -114,7 +114,7 @@ async function saveScheduleList(list,activeId=S.activeScheduleId){
   validateSchedules(list);
   const previous={schedules:S.schedules,activeScheduleId:S.activeScheduleId,dayId:S.dayId};
   S.schedules=list;S.activeScheduleId=activeId;S.dayId=nextDayId();
-  if(!writeLocal()){Object.assign(S,previous);throw new Error("Browser storage is full or unavailable");}
+  if(!await writeLocal()){Object.assign(S,previous);throw new Error("Browser storage is full or unavailable");}
 }
 async function useSchedule(id){
   if(!S.schedules.some(s=>s.id===id))return;
@@ -400,12 +400,12 @@ function programError(){
   setStatus("Program file needed");
   $("#app").innerHTML = `<div class="empty load-error"><span class="panel-icon">${icon("activity")}</span><h2>Let’s load your program.</h2><p>Place <code>ppl-default-workouts.json</code> next to <code>index.html</code> on GitHub Pages. If you opened this HTML directly, choose the program file below.</p><button class="btn" data-act="retryprogram">Try again</button><label class="file-label">Choose program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Choose default workout program"></label></div>`;
 }
-async function initApp(){ if (await loadProgram()) { loadDrafts(); await initStore(); } else programError(); }
+async function initApp(){ if (await loadProgram()) { await initStore(); } else programError(); }
 async function useProgramFile(file){
   try {
     const j = JSON.parse(await file.text()); applyProgram(j); programSource = "Selected JSON file";
     try { localStorage.setItem(PROGRAM_CACHE, JSON.stringify(j)); } catch {}
-    if (!S.ready) { loadDrafts(); await initStore(); } else { ensureSchedules(); S.dayId = nextDayId(); render(); }
+    if (!S.ready) { await initStore(); } else { ensureSchedules(); S.dayId = nextDayId(); render(); }
     toast("Program loaded");
   } catch { toast("That file is not a valid workout program."); }
 }
@@ -642,9 +642,9 @@ async function importJSON(){
     S.bodyUnit=incoming.preferences.bodyUnit;S.progressEx=incoming.preferences.progressExercise;
     S.dayId=getDay(incoming.preferences.selectedWorkoutId)?.id || nextDayId();
     // All collections and drafts commit together in one atomic localStorage write.
-    if(!writeLocal())throw new Error("Browser storage is full or unavailable");
+    if(!await writeLocal())throw new Error("Browser storage is full or unavailable");
     clearTimeout(draftTimer);
-    try {localStorage.setItem(DRAFT_KEY,JSON.stringify(S.drafts));}catch{}
+
     S.editing=null;S.scheduleEditing=null;S.manageSchedules=false;S.armedDelete=null;render();
     importFeedback(`${replace ? "Replaced local data" : "Imported app data"}: ${incoming.sessions.length} sessions, ${incoming.body.length} body entries, ${incoming.custom.length} workouts, ${Object.keys(incoming.drafts).length} drafts, ${legacy ? 0 : incoming.schedules.length} schedules.`);
   } catch(err){Object.assign(S,previous);importFeedback("Import failed; existing data kept. "+err.message,true);}
