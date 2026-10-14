@@ -1,14 +1,15 @@
 
-import { LOCAL_KEY, DRAFT_KEY, PROGRAM_CACHE } from "./config.js";
+import { PROGRAM_CACHE } from "./config.js";
+import { createInitialState } from "./state.js";
+import { conv, tidy, today, uid, num, fmtDate, e1rm, round1, sortSessions, sortBody, esc } from "./workouts.js";
+import { icon } from "./render.js";
+import { scheduleIndexFor } from "./schedules.js";
+import { createLocalStorage } from "./storage.js";
 
 (() => {
 "use strict";
-function icon(name){
-  const paths = {activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>', calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/>', arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>', spark:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>', download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/>', upload:'<path d="M12 15V3m-5 5 5-5 5 5M4 16v4h16v-4"/>', log:'<path d="M6 6v12M3 9v6M18 6v12M21 9v6M6 12h12"/>', history:'<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-4v6l4 2"/>', progress:'<path d="M4 20V4m0 16h16M8 15l4-5 4 2 4-7"/>', data:'<path d="M4 5h6l2 3h8v12H4Z"/>', brand:'<path d="m5 17 7-12 7 12M8 13h8"/>'};
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.log}</svg>`;
-}
-
-
+const S = createInitialState();
+const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
 let programSource = "JSON file";
 const TYPES = [["pull","Pull"],["push","Push"],["legs","Legs"],["other","Other"]];
@@ -46,36 +47,15 @@ async function loadProgram(){
     return false;
   }
 }
-const KG_PER_LB = 0.45359237;
-const conv = (w, from, to) => { const n = num(w); if (n == null) return null; if (from === to) return n; return to === "kg" ? n * KG_PER_LB : n / KG_PER_LB; };
-const tidy = (n, unit) => n == null ? "" : (unit === "kg" ? Math.round(n*2)/2 : Math.round(n));
-const exUnit = (e, s) => e.unit || (s && s.unit) || DEFAULT_UNIT;
-
-
-
-const S = { tab:"log", sessions:[], body:[], custom:[], editing:null, scheduleEditing:null, manageSchedules:false, schedules:[], activeScheduleId:null, dayId:null, drafts:{}, progressEx:null, mode:"pending", armedDelete:null, ready:false };
-
 function allDays(){ return [...PROGRAM, ...S.custom]; }
 function getDay(id){ return BASE_DAY[id] || S.custom.find(c => c.id === id) || null; }
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
-const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : null; };
-const fmtDate = iso => { try { return new Date(iso + "T12:00:00").toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"}); } catch { return iso; } };
-const e1rm = (w, r) => (w > 0 && r > 0) ? w * (1 + r/30) : 0;
-const round1 = n => Math.round(n*10)/10;
 let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
-const sortSessions = arr => arr.slice().sort((a,b) => (b.date||"").localeCompare(a.date||"") || (b.createdAt||0)-(a.createdAt||0));
-const sortBody = arr => arr.slice().sort((a,b) => (a.date||"").localeCompare(b.date||""));
-
 /* ---------- browser storage ---------- */
-function preferences(){return {bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null};}
-function readLocal(){ try { const j = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}"); return { sessions: Array.isArray(j.sessions)?j.sessions:[], body: Array.isArray(j.body)?j.body:[], custom: Array.isArray(j.custom)?j.custom:[], schedules:j.schedules || [], preferences:j.preferences || {} }; } catch { toast("Stored data could not be read. Restore a JSON backup."); return {sessions:[],body:[],custom:[],schedules:[],preferences:{}}; } }
-function writeLocal(){ try { localStorage.setItem(LOCAL_KEY, JSON.stringify({sessions:S.sessions, body:S.body, custom:S.custom, drafts:S.drafts, schedules:S.schedules, preferences:preferences()})); return true; } catch { return false; } }
-function loadDrafts(){ try { const saved=JSON.parse(localStorage.getItem(LOCAL_KEY)||"{}"); const d=saved.drafts || JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}"); S.drafts = d && typeof d === "object" && !Array.isArray(d) ? d : {}; } catch { S.drafts = {}; } }
+const preferences = () => ({bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null});
+const {readLocal, writeLocal, loadDrafts} = createLocalStorage({state:S, preferences, toast});
 let draftTimer;
 function flushDrafts(){if(!S.ready)return;if(!writeLocal()){toast("Browser storage unavailable. Export a backup.");return;}try{localStorage.setItem(DRAFT_KEY,JSON.stringify(S.drafts));}catch{}}
 function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
@@ -107,7 +87,7 @@ function starterSchedule(sessions=S.sessions){
   return {id:"starter-ppl",name:"PPL starter",mode:"cycle",days:ORDER.slice(),cursor:last ? (ORDER.indexOf(last.dayId)+1)%ORDER.length : 0};
 }
 function activeSchedule(){return S.schedules.find(s=>s.id===S.activeScheduleId) || null;}
-function scheduleIndex(schedule=activeSchedule()){return schedule?.mode==="weekly" ? (new Date().getDay()+6)%7 : schedule?.cursor || 0;}
+const scheduleIndex = (schedule=activeSchedule()) => scheduleIndexFor(schedule);
 function nextSlot(){const s=activeSchedule();return s ? s.days[scheduleIndex(s)] : ORDER[0];}
 function nextDayId(){
   const s=activeSchedule();
