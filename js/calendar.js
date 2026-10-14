@@ -1,6 +1,6 @@
 // Calendar events use local YYYY-MM-DD dates; no UTC conversion or inferred missed days.
 const EVENT_TYPES=new Set(["planned","rest","skipped","completed"]);
-const ID=/^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_\\-.~:@+]{1,190}$/;
+const ID=/^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_.~:@+-]{1,190}$/;
 export function isLocalDate(date){
  if(typeof date!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return false;
  const stamp=new Date(date+"T12:00:00Z");
