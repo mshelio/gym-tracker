@@ -99,9 +99,16 @@ async function persist(field, value){
   if (!await writeLocal()) { S[field] = previous; throw new Error("Browser storage unavailable"); }
 }
 async function putSession(s,advance=false){
-  const previous=S.schedules,active=activeSchedule();
+  const previous={sessions:S.sessions,schedules:S.schedules,drafts:S.drafts,dayId:S.dayId};
+  const active=activeSchedule();
   if(advance && active?.mode==="cycle" && nextSlot()===s.dayId)S.schedules=S.schedules.map(w=>w.id===active.id?{...w,cursor:(w.cursor+1)%w.days.length}:w);
-  try{await persist("sessions",sortSessions([s,...S.sessions.filter(x=>x.id!==s.id)]));}catch(err){S.schedules=previous;throw err;}
+  S.sessions=sortSessions([s,...S.sessions.filter(x=>x.id!==s.id)]);
+  if(advance){
+    const drafts={...S.drafts};delete drafts[s.dayId];S.drafts=drafts;
+    S.dayId=nextDayId();
+  }
+  // One full-snapshot commit: session, schedule cursor, draft deletion and selection.
+  if(!await writeLocal()){Object.assign(S,previous);throw new Error(hasConflict()?"Another tab changed your data":"Browser storage unavailable");}
 }
 async function removeSession(id){ await persist("sessions", S.sessions.filter(x => x.id !== id)); }
 async function putBody(b){ await persist("body", sortBody([b, ...S.body.filter(x => x.id !== b.id)])); }
@@ -615,9 +622,10 @@ async function saveSession(btn){
   const s = { id: uid("s"), dayId: day.id, dayName: day.name, type: day.type, date: d.date, notes: (d.notes||"").trim(), exercises, createdAt: Date.now() };
   sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {
+    clearTimeout(draftTimer);
     await putSession(s,true);
-    delete S.drafts[day.id]; clearTimeout(draftTimer); flushDrafts();
-    S.dayId = nextDayId(); flushDrafts(); S.tab = "history"; render(); window.scrollTo({top:0});
+    setSaveStatus("saved");
+    S.tab = "history"; render(); window.scrollTo({top:0});
     toast("Session saved");
   } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); } finally { sessionSavePending=false; }
 }
