@@ -63,11 +63,31 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 /* ---------- browser storage ---------- */
 const preferences = () => ({progressionEnabled:S.progressionEnabled!==false,bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
 const {initialize, readLocal, writeLocal, loadDrafts, getMode, hasConflict} = createLocalStorage({state:S, preferences, toast});
-let draftTimer;
-async function flushDrafts(){if(!S.ready)return;if(!await writeLocal())toast(hasConflict()?"Another tab changed your data. Export a backup and reload before editing.":"Browser storage unavailable. Export a backup.");}
-function saveDrafts(){ clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushDrafts(); });
-window.addEventListener("pagehide", flushDrafts);
+let draftTimer,saveStatus="saved",saveVersion=0;
+function setSaveStatus(status){
+ saveStatus=status;
+ const el=document.querySelector("[data-save-status]");
+ if(el){el.dataset.state=status;el.textContent=({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[status];}
+ const recovery=document.querySelector("[data-save-recovery]");
+ if(recovery)recovery.hidden=status!=="error"&&status!=="conflict";
+}
+async function flushDrafts(){
+ if(!S.ready||hasConflict()){if(hasConflict())setSaveStatus("conflict");return false;}
+ clearTimeout(draftTimer);
+ const version=saveVersion;
+ const ok=await writeLocal();
+ if(!ok){setSaveStatus(hasConflict()?"conflict":"error");toast(hasConflict()?"Another tab changed your data. Export a backup and reload.":"Browser storage unavailable. Export a backup.");return false;}
+ if(version===saveVersion)setSaveStatus("saved");
+ return true;
+}
+function saveDrafts(){
+ saveVersion++;
+ setSaveStatus(hasConflict()?"conflict":"pending");
+ clearTimeout(draftTimer);
+ if(!hasConflict())draftTimer=setTimeout(flushDrafts,250);
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")void flushDrafts();});
+window.addEventListener("pagehide",()=>{void flushDrafts();});
 function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
@@ -311,7 +331,7 @@ function viewLog(){
     </div><aside class="session-sidebar">
       <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        ${timerPanel(d)}<button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note">Draft saved automatically on this device</p>
+        ${timerPanel(d)}<button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
       <div class="guide-card"><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
     </aside></div>`;
@@ -468,6 +488,7 @@ async function useProgramFile(file){
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   if (!S.ready) return;
+  if(S.tab==="log"&&saveStatus==="pending")void flushDrafts();
   S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
 });
 
@@ -513,10 +534,12 @@ $("#app").addEventListener("change", e => {
 $("#app").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="recoverbackup"){S.tab="data";render();await exportJSON();return;}
+  if(act==="reloadconflict"){window.location.reload();return;}
   if(["manageschedules","closeschedules","newschedule","editschedule","cancelschedule","activateschedule","skipscheduled","movescheduleday","addscheduleday","removescheduleday","saveschedule","deleteschedule"].includes(act)){await scheduleAction(b);return;}
   if (act === "retryprogram") { await initApp(); return; }
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
-  if (act === "day") { S.dayId = b.dataset.id; render(); flushDrafts(); return; }
+  if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
   if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(exercise.restSeconds??d.restSeconds);}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}

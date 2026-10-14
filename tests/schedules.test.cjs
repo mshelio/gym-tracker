@@ -58,6 +58,9 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
   assert(a.viewLog().includes('data-act="completeset"'));
+  assert(a.viewLog().includes('data-save-status'));
+  assert(a.viewLog().includes('data-act="recoverbackup"'));
+  assert(a.viewLog().includes('Draft saved on this device'));
   const scopedSessions=[
     {id:"mixed",dayId:"pushA",date:"2026-10-12",createdAt:1,exercises:[{name:"Bench",unit:"kg",sets:[{w:50,r:10,type:"working"},{w:20,r:12,type:"warmup"},{w:30,r:8,type:"drop"}]},{name:"Row",unit:"lb",sets:[{w:220.462262,r:5}]}]},
     {id:"outside",dayId:"pullA",date:"2026-09-30",createdAt:2,exercises:[{name:"Bench",unit:"lb",sets:[{w:220.462262,r:6}]}]}
