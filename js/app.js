@@ -508,7 +508,7 @@ async function saveSession(btn){
     delete S.drafts[day.id]; clearTimeout(draftTimer); flushDrafts();
     S.dayId = nextDayId(); flushDrafts(); S.tab = "history"; render(); window.scrollTo({top:0});
     toast("Session saved");
-  } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); }
+  } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); } finally { sessionSavePending=false; }
 }
 
 async function saveWorkout(btn){
