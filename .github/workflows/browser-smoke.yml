@@ -13,6 +13,7 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
+      - run: node tests/version-sw.cjs --check
       - run: npm run test:regression
       - run: npm run test:browser
       - name: Production GitHub Pages smoke
