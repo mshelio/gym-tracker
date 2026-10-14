@@ -10,7 +10,7 @@ export function createLocalStorage({state,preferences,toast,idb=globalThis.index
  async function initialize(){
    if(!idb)return safeLegacy();
    try{db=await open(idb);}catch{toast("IndexedDB unavailable; using browser storage.");return safeLegacy();}
-   const prior=safeLegacy();
+   let prior;try{prior=legacy();}catch(error){db.close();throw new Error('Legacy data is malformed; export or restore your backup before migration. '+error.message);}
    // Atomic, idempotent first-run copy. Keep localStorage untouched for recovery.
    const data=await new Promise((resolve,reject)=>{
      const tx=db.transaction(STORE,"readwrite"),store=tx.objectStore(STORE),req=store.get("primary");let value;
