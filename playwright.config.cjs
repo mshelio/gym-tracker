@@ -3,9 +3,9 @@ module.exports = defineConfig({
   testDir: './tests/browser',
   timeout: 45000,
   projects: [
-    {name:'chromium',use:{...devices['Desktop Chrome']}},
-    {name:'firefox',use:{...devices['Desktop Firefox']}},
-    {name:'webkit',use:{...devices['Desktop Safari']}},
+    {name:'chromium',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Chrome']}},
+    {name:'firefox',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Firefox']}},
+    {name:'webkit',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Safari']}},
     {name:'mobile-chromium',testMatch:'**/mobile.spec.cjs',use:{...devices['Pixel 7']}},
     {name:'mobile-webkit',testMatch:'**/mobile.spec.cjs',use:{...devices['iPhone 13']}}
   ],
