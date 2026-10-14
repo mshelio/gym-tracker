@@ -342,7 +342,7 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  }));
  await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
  const saved=await readSnapshot();
- expect(saved.drafts?.['pull-a']).toBeUndefined();
+ expect(saved.drafts?.pullA).toBeUndefined();
  await page.reload();
  await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
  await page.getByRole('button',{name:/history/i}).first().click();
