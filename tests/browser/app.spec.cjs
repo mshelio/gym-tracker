@@ -324,6 +324,47 @@ test('large history renders bounded accessible chart elements',async({page})=>{
  expect(Date.now()-started).toBeLessThan(15000);
 });
 
+// Browser performance budgets: actual Progress interaction and DOM size,
+// including the IndexedDB migration path with representative exercise mixes.
+// Each data size is reported in CI for longitudinal comparison.
+for(const count of [1000,10000]){
+ test('analytics remains accurate and bounded with '+count+' realistic sessions',async({page,browserName})=>{
+  test.skip(count===10000&&browserName!=='chromium','10k stress profile runs in Chromium; 1k runs in every engine');
+  test.setTimeout(120000);
+  await page.addInitScript(n=>{
+   const sessions=Array.from({length:n},(_,i)=>({
+    id:'perf-'+i,dayId:i%2?'pushA':'pullA',dayName:i%2?'Push A':'Pull A',
+    date:'2026-10-'+String(1+i%28).padStart(2,'0'),createdAt:i,
+    exercises:[
+     {name:'Lat pulldown',unit:'kg',sets:[{w:50,r:10,type:'working',completed:true},{w:20,r:10,type:'warmup',completed:true},{w:30,r:8,type:'drop',completed:true}]},
+     {name:'Bench',unit:'kg',sets:[{w:40,r:5,type:'working',completed:true}]}
+    ]
+   }));
+   localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions,body:[],custom:[],drafts:{},schedules:[],preferences:{}}));
+  },count);
+  const navigationStart=Date.now();
+  await page.goto('/gym-tracker/');
+  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:90000});
+  const hydratedMs=Date.now()-navigationStart;
+  const renderStart=Date.now();
+  await page.getByRole('button',{name:/progress/i}).first().click();
+  await expect(page.locator('.analytics-dashboard')).toBeVisible({timeout:60000});
+  const renderMs=Date.now()-renderStart;
+  const stats=page.locator('.analytics-dashboard .stat b');
+  await expect(stats.nth(0)).toHaveText(String(count));
+  await expect(stats.nth(1)).toHaveText(String(count*2));
+  await expect(stats.nth(2)).toHaveText(String(count*940));
+  const circles=await page.locator('.chart circle').count();
+  expect(circles).toBeLessThanOrEqual(720);
+  await expect(page.locator('.chart svg').first()).toHaveAttribute('tabindex','0');
+  await page.locator('[data-analytics="exercise"]').selectOption('Lat pulldown');
+  await expect(stats.nth(1)).toHaveText(String(count));
+  await expect(stats.nth(2)).toHaveText(String(count*740));
+  console.log('analytics-benchmark',JSON.stringify({browser:browserName,sessions:count,hydratedMs,renderMs,circles}));
+  expect(renderMs).toBeLessThan(count===10000?30000:15000);
+ });
+}
+
 test('navigation clicked during startup is honored after IndexedDB hydration', async ({page})=>{
  let unblockProgram,programRequested;
  const requested=new Promise(resolve=>{programRequested=resolve;});
