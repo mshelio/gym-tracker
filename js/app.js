@@ -10,7 +10,7 @@ import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
-import { validateCalendarEvents } from "./calendar.js";
+import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent } from "./calendar.js";
 
 (() => {
 "use strict";
@@ -115,6 +115,14 @@ async function putSession(s,advance=false){
   }
   // One full-snapshot commit: session, schedule cursor, draft deletion and selection.
   if(!await writeLocal()){Object.assign(S,previous);throw new Error(hasConflict()?"Another tab changed your data":"Browser storage unavailable");}
+}
+async function saveCalendarEvent(event){
+ const next=upsertCalendarEvent(S.calendarEvents,event);
+ await persist("calendarEvents",next);
+}
+async function deleteCalendarEvent(id){
+ const next=removeCalendarEvent(S.calendarEvents,id);
+ await persist("calendarEvents",next);
 }
 async function removeSession(id){ await persist("sessions", S.sessions.filter(x => x.id !== id)); }
 async function putBody(b){ await persist("body", sortBody([b, ...S.body.filter(x => x.id !== b.id)])); }
