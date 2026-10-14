@@ -55,3 +55,9 @@ GitHub Pages never receives your personal workout log. Browser data cannot be ac
 ## Verification
 
 Run `node tests/schedules.test.cjs`. Checks cover custom and default workouts, repeating and weekly schedules, reordering, rest days, independent schedule progress, legacy migration, version 3 backup round trips, malformed-import rejection, persistence, and storage-failure rollback, plus existing sessions, units, charts and missing-program recovery. Browser visual QA was unavailable in the execution environment.
+
+## Modular architecture and browser tests
+
+`js/app.js` composes independent modules: `state.js` (initial state), `storage.js` (legacy localStorage adapter), `workouts.js` (workout calculations and utilities), `schedules.js` (schedule index), and `render.js` (presentation primitives). Core controller/view routines remain in `app.js` and can be migrated in follow-up refactors without changing the persistence contract.
+
+Run `node tests/schedules.test.cjs` for regression checks. Run `npm install`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Current localStorage keys and v3 backups remain unchanged, so rolling back the code does not require data migration.
