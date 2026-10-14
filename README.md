@@ -93,3 +93,7 @@ The default editor now supports built-in and extra exercises, explicitly shows i
 ## Recovery and multiple tabs (GT-08)
 
 Draft edits remain debounced and committed with the entire IndexedDB snapshot. Every write now checks the snapshot revision in the same read/write transaction. If another tab has saved since the current tab loaded, the stale tab refuses to overwrite newer data and shows a warning to export a backup and reload. Previous sets are only copied to a draft when the user explicitly selects Copy last sets; copied weight values convert into the active unit. Program changes no longer silently discard an incompatible draft; the app flags it for recovery. Existing v4 backups remain unchanged.
+
+## Progressive overload suggestions (GT-09)
+
+When enabled, each exercise displays a non-editing suggestion based on the most recent completed **working** sets. If all consistent-load working sets meet the top of the repetition range, and known RIR is at least 1, it suggests the configured increment; otherwise it recommends holding load. Warm-up and drop sets are excluded. The optional exercise load increment and its kg/lb unit are respected. Unknown effort is not treated as zero RIR. Missing history produces no numeric suggestion. Uncheck **Show progression recommendations** to disable this feature; existing sets and drafts are never modified by recommendations.
