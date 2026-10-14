@@ -97,3 +97,7 @@ Draft edits remain debounced and committed with the entire IndexedDB snapshot. E
 ## Progressive overload suggestions (GT-09)
 
 When enabled, each exercise displays a non-editing suggestion based on the most recent completed **working** sets. If all consistent-load working sets meet the top of the repetition range, and known RIR is at least 1, it suggests the configured increment; otherwise it recommends holding load. Warm-up and drop sets are excluded. The optional exercise load increment and its kg/lb unit are respected. Unknown effort is not treated as zero RIR. Missing history produces no numeric suggestion. Uncheck **Show progression recommendations** to disable this feature; existing sets and drafts are never modified by recommendations.
+
+## Personal records (GT-10)
+
+The Progress tab computes personal records directly from saved sessions, including historical data: heaviest weight, most repetitions, estimated 1RM (Epley), rep-at-load records, and best session volume. Units are converted into the chosen display unit; warm-up and incomplete sets are excluded. Ties use the earliest saved record and record a tie count. PRs are derived rather than stored, so deletions and imports automatically recalculate them. No IndexedDB migration or v4 backup change is needed.
