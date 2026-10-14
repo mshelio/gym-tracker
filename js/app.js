@@ -467,8 +467,9 @@ function chartSVG(points, color, unit){
   if (points.length < 2) return `<div class="empty" style="margin-top:10px">Log this at least twice to see a trend line.</div>`;
   const displayed=sampleChartPoints(points);
   const W=600,H=230,P={l:44,r:14,t:16,b:30};
-  const xs=points.map(p=>p.x), ys=points.map(p=>p.y);
-  const x0=Math.min(...xs), x1=Math.max(...xs); let y0=Math.min(...ys), y1=Math.max(...ys);
+  // Bounded-memory extrema: spread Math.min/Math.max fails for large histories.
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const p of points){if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x;if(p.y<y0)y0=p.y;if(p.y>y1)y1=p.y;}
   const pad=(y1-y0)*0.12 || 2; y0-=pad; y1+=pad;
   const X=x=>P.l+((x-x0)/((x1-x0)||1))*(W-P.l-P.r), Y=y=>H-P.b-((y-y0)/((y1-y0)||1))*(H-P.t-P.b);
   const path=displayed.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
