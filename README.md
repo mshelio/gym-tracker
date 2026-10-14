@@ -75,3 +75,7 @@ Backups now export as `version: 4` while retaining `app: "ppl-tracker"`. Imports
 ## Set completion (GT-05)
 
 Each training set has a Done toggle. Toggling it saves its completion timestamp in the workout draft and survives reload. Editing a completed set clears its completion state. Saved sets contain v4 completion metadata; legacy draft entries without explicit status remain compatible. Saving is guarded against duplicate clicks. A follow-up can enforce explicit completion for all newly created sets, which requires corresponding changes to the historical regression assumptions.
+
+## Timers (GT-06)
+
+Mark a set Done to start a timestamp-based rest countdown. Select a rest duration, then pause, resume or skip. Reset clears the rest countdown and restarts workout elapsed time. Timer state is part of the existing IndexedDB-backed draft, so page reload preserves elapsed time and paused countdowns. Backgrounded tabs calculate elapsed time from wall-clock timestamps on return; no new backup version or IndexedDB schema is needed.

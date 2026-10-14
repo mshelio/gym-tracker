@@ -81,3 +81,20 @@ test('set completion survives reload and retains metadata when saved', async ({p
   expect(data.sessions[0].exercises[0].sets[0].completed).toBe(true);
   expect(data.sessions[0].exercises[0].sets[0].completedAt).toBeTruthy();
 });
+
+test('rest and workout timers recover from reload and support controls',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first().fill('8');
+ await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await expect(page.locator('[data-timer="rest"]')).toContainText(':');
+ await page.getByRole('button',{name:'Pause'}).click();
+ await expect(page.getByRole('button',{name:'Resume'})).toBeEnabled();
+ await page.waitForTimeout(500);
+ await page.reload();
+ await expect(page.getByRole('button',{name:'Resume'})).toBeEnabled();
+ await page.getByRole('button',{name:'Resume'}).click();
+ await page.locator('[data-act="timerskip"]').click();
+ await expect(page.locator('[data-timer="rest"]')).toHaveText('—');
+ await page.getByRole('button',{name:'Reset'}).click();
+ await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
+});

@@ -5,10 +5,13 @@ import { conv, tidy, today, uid, num, fmtDate, e1rm, round1, sortSessions, sortB
 import { icon } from "./render.js";
 import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
+import { createTimers } from "./timers.js";
 
 (() => {
 "use strict";
 const S = createInitialState();
+const timerTools=createTimers();
+let timerTicker=null;
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
 let programSource = "JSON file";
@@ -172,6 +175,8 @@ function getDraft(dayId){
     S.drafts[dayId] = d;
   }
   if (!Array.isArray(d.extra)) d.extra = [];
+  if(!Number.isFinite(d.startedAt))d.startedAt=Date.now();
+  if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=90;
   d.ex.forEach(e => { if (!e.unit) e.unit = unitFor(e.name, day); });
   d.extra.forEach(e => { if (!e.unit) e.unit = day.unit || DEFAULT_UNIT; });
   return d;
@@ -200,6 +205,20 @@ function render(){
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
 }
 
+function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
+function timerPanel(d){
+ const rest=d.restTimer,seconds=timerTools.remaining(rest),elapsed=timerTools.elapsed(d.startedAt);
+ return `<div class="timer-panel" aria-label="Workout timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><div class="timer-actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
+}
+function updateTimers(){
+ if(!S.ready||S.tab!=="log"||S.editing||S.scheduleEditing||S.manageSchedules)return;
+ const d=getDraft(S.dayId),rest=d.restTimer;
+ const elapsed=document.querySelector('[data-timer="workout"]'),remaining=document.querySelector('[data-timer="rest"]');
+ if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
+ if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
+}
+if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
+document.addEventListener("visibilitychange",updateTimers);
 function setRows(i, prefix, name, sets, last, lo, hi, unit){
   return sets.map((s, j) => {
     const ph = last && last.sets[j] ? { w: tidy(conv(last.sets[j].w ?? 0, last.unit, unit), unit), r: last.sets[j].r } : null;
@@ -270,7 +289,7 @@ function viewLog(){
     </div><aside class="session-sidebar">
       <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        <button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note">Draft saved automatically on this device</p>
+        ${timerPanel(d)}<button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note">Draft saved automatically on this device</p>
       </div>
       <div class="guide-card"><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
     </aside></div>`;
@@ -438,6 +457,7 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", e => {
+  if(e.target.dataset.act==="restpreset"){getDraft(S.dayId).restSeconds=Number(e.target.value);saveDrafts();return;}
   const t = e.target;
   if(t.dataset.act==="useschedule"){useSchedule(t.value).catch(err=>toast(err.message));return;}
   if(t.dataset.scheduleDay!=null && S.scheduleEditing){S.scheduleEditing.days[+t.dataset.scheduleDay]=t.value || null;render();return;}
@@ -458,7 +478,8 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
-  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();}saveDrafts();render();return; }
+  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);d.restTimer=timerTools.start(d.restSeconds);}saveDrafts();render();return; }
+  if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
