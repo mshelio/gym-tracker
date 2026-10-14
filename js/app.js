@@ -206,6 +206,7 @@ function setRows(i, prefix, name, sets, last, lo, hi, unit){
     return `<div class="setrow"><span>Set ${j+1}</span>
       <input type="number" inputmode="decimal" step="any" min="0" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
       <input type="number" inputmode="numeric" step="1" min="0" aria-label="${esc(name)} set ${j+1} reps" data-f="r" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}r-${i}-${j}" value="${esc(s.r)}" placeholder="${ph ? esc(ph.r ?? "") : (lo ? lo+"–"+hi : "reps")}">
+      <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}">${s.completed===true ? "✓ Done" : "○ Done"}</button>
     </div>`; }).join("");
 }
 function lastBlock(name, e, unit){
@@ -429,7 +430,7 @@ $("#app").addEventListener("input", e => {
   }
   const f = t.dataset.f; if (!f || S.tab !== "log") return;
   const d = getDraft(S.dayId);
-  if (f === "w" || f === "r") (t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j][f] = t.value;
+  if (f === "w" || f === "r") {const set=(t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j];set[f]=t.value;if(set.completed===true){set.completed=false;delete set.completedAt;}}
   else if (f === "xname") d.extra[+t.dataset.i].name = t.value;
   else if (f === "notes") d.notes = t.value;
   else if (f === "date") d.date = t.value;
@@ -457,6 +458,7 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
+  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();}saveDrafts();render();return; }
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
@@ -491,14 +493,16 @@ $("#app").addEventListener("click", async e => {
   if (act === "import") return importJSON();
 });
 
+let sessionSavePending=false;
 async function saveSession(btn){
+  if(sessionSavePending)return;
   const day = getDay(S.dayId), d = getDraft(S.dayId);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){toast("Use non-negative weights and whole-number reps.");return;}
-  const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0).map(s => ({ w: num(s.w) ?? 0, r: num(s.r) })) })).filter(e => e.sets.length);
+  const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
   if (!exercises.length) { toast("Enter reps for at least one set first."); return; }
   if (!validDataDate(d.date)) { toast("Pick a valid date for this session."); return; }
   const s = { id: uid("s"), dayId: day.id, dayName: day.name, type: day.type, date: d.date, notes: (d.notes||"").trim(), exercises, createdAt: Date.now() };
-  btn.disabled = true; btn.textContent = "Saving…";
+  sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {
     await putSession(s,true);
     delete S.drafts[day.id]; clearTimeout(draftTimer); flushDrafts();
