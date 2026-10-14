@@ -459,7 +459,7 @@ function cachedAnalytics(sessions,filter){
  if(analyticsCache.sessions!==sessions||analyticsCache.key!==key){
   const filtered=analyticsRange(sessions,filter);
   analyticsCache.sessions=sessions;analyticsCache.key=key;
-  analyticsCache.value={filtered,summary:analyticsSummary(filtered,{...filter,from:"",to:"",workout:"",exercise:filter.exercise,unit:filter.unit})};
+  analyticsCache.value={filtered,summary:analyticsSummary(filtered,{...filter,from:"",to:"",workout:"",exercise:filter.exercise,unit:filter.unit,includeExercisePoints:false})};
  }
  return analyticsCache.value;
 }

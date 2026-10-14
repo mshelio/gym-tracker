@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-assert.match(workerSource,/gt-shell-c47209ed/);
+assert.match(workerSource,/gt-shell-95304dcd/);
 assert.match(workerSource,/ppl-default-workouts.json/);
 assert.match(workerSource,/SKIP_WAITING/);
 assert(!workerSource.includes('indexedDB.deleteDatabase'));
@@ -88,6 +88,15 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert(hugeChart.includes('with 120000 points'));
   assert((hugeChart.match(/<circle /g)||[]).length<=240);
   assert(hugeChart.length<50000);
+  // Dashboard can skip materializing individual set points without changing totals.
+  const fullAnalytics=a.analyticsSummary(big,{unit:"kg"});
+  const aggregateAnalytics=a.analyticsSummary(big,{unit:"kg",includeExercisePoints:false});
+  assert.deepEqual(aggregateAnalytics.weekly,fullAnalytics.weekly);
+  assert.equal(aggregateAnalytics.sessions,fullAnalytics.sessions);
+  assert.equal(aggregateAnalytics.volume,fullAnalytics.volume);
+  assert.equal(aggregateAnalytics.hardSets,fullAnalytics.hardSets);
+  assert.equal(aggregateAnalytics.exercisePoints.length,0);
+  assert.equal(fullAnalytics.exercisePoints.length,10000);
   const start=Date.now();const metrics=a.analyticsSummary(big,{unit:"kg"});
   assert.equal(metrics.sessions,10000);assert.equal(metrics.hardSets,10000);
   assert.equal(metrics.weekly.length,1);
