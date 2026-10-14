@@ -95,7 +95,7 @@ test('rest and workout timers recover from reload and support controls',async({p
  await page.getByRole('button',{name:'Resume'}).click();
  await page.locator('[data-act="timerskip"]').click();
  await expect(page.locator('[data-timer="rest"]')).toHaveText('—');
- await page.getByRole('button',{name:'Reset'}).click();
+ await page.locator('[data-act="timerreset"]').click();
  await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
 });
 
@@ -116,4 +116,20 @@ test('set types, RIR, and exercise rest survive autosave and session export',asy
  const data=await page.evaluate(async()=>new Promise((ok,no)=>{const req=indexedDB.open('gym-tracker',1);req.onsuccess=()=>{const get=req.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');get.onsuccess=()=>ok(get.result);get.onerror=()=>no(get.error);};req.onerror=()=>no(req.error);}));
  expect(data.sessions[0].exercises[0].sets[0].type).toBe('warmup');
  expect(data.sessions[0].exercises[0].sets[0].rir).toBe(3);
+});
+
+test('exercise default survives reload and hard-set count excludes warmups', async ({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.locator('[data-f="exrest"]').first().fill('135');
+ await page.locator('[data-f="increment"]').first().fill('2.5');
+ await page.locator('[data-act="incrementunit"]').first().selectOption('kg');
+ await page.locator('[data-act="savedefault"]').first().click();
+ await page.waitForTimeout(400);
+ await page.reload();
+ await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('135');
+ await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
+ await page.getByRole('combobox',{name:/Lat pulldown set 1 type/}).selectOption('warmup');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.locator('#app')).toContainText('0 hard sets');
 });

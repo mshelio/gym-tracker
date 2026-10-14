@@ -24,3 +24,6 @@ input[type=date],input[type=number],input[type=text],select,textarea{background:
 
 /* GT-07 exercise effort metadata */
 .setrow{grid-template-columns:42px minmax(0,1fr) minmax(0,1fr) minmax(75px,.8fr) 64px 72px;gap:5px;align-items:center}.setrow select,.setrow input{min-width:0}.ex-rest-label{display:inline-flex;align-items:center;gap:8px;margin:8px 0;font-size:12px}.ex-rest-label input{width:76px}@media(max-width:550px){.setrow{grid-template-columns:35px minmax(0,1fr) minmax(0,1fr) 65px 52px 62px}.setrow select,.setrow input{font-size:11px;padding:5px 2px}}
+
+/* Exercise-specific preference editor */
+.exercise-default-controls{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:10px 0}.exercise-default-controls label{display:flex;flex-direction:column;gap:4px;font-size:12px}.exercise-default-controls input{width:90px;max-width:100%}.exercise-default-controls .btn{min-height:38px}.exercise-default-controls .muted{font-size:11px}@media(max-width:520px){.exercise-default-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.exercise-default-controls input{width:100%}}

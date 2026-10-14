@@ -498,6 +498,38 @@
               "type": "null"
             }
           ]
+        },
+        "exerciseDefaults": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "^(?!(__proto__|constructor|prototype)$).+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "restSeconds": {
+                "type": "integer",
+                "minimum": 15,
+                "maximum": 600
+              },
+              "loadIncrement": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 100
+              },
+              "incrementUnit": {
+                "type": "string",
+                "enum": [
+                  "kg",
+                  "lb"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "required": [

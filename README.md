@@ -83,3 +83,9 @@ Mark a set Done to start a timestamp-based rest countdown. Select a rest duratio
 ## RIR and exercise settings (GT-07)
 
 Each set has a type (working, warmup or drop) and optional RIR (integer 0–10; blank means unknown). An exercise rest interval (15–600 seconds) overrides the workout rest preset when a set is completed. These settings autosave with the workout draft, and set type/RIR are included in version 4 session exports. Existing history without these optional fields remains valid. Warm-up sets should be excluded by future hard-set analytics; current general workout metrics are unchanged.
+
+## Exercise defaults and hard sets (#36)
+
+Choose exercise rest and optional load increment, then Save default to reuse settings on future drafts. Defaults are stored alongside preferences in IndexedDB and v4 backups. Historical untyped completed sets count as working hard sets; warm-up and drop sets are excluded. This metric is separate from all-set volume totals. Existing sessions and schedule progress are unchanged.
+
+The default editor now supports built-in and extra exercises, explicitly shows increment units and converted increments, and offers Reset default to return to the global fallback. Drop sets are excluded from the initial hard-set metric (along with warm-up sets); legacy sets lacking a type count when reps are positive and completion is not false.
