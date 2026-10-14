@@ -647,6 +647,11 @@
         },
         "progressionEnabled": {
           "type": "boolean"
+        },
+        "globalRestSeconds": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 600
         }
       },
       "required": [

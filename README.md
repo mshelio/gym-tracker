@@ -169,3 +169,8 @@ History → expand a session → **Edit session** allows corrections to its date
 ## Exercise search (#65)
 
 The Train screen and custom workout editor have a local **Search exercises** field. It filters visible exercise cards or rows without changing the underlying workout, saved draft, schedule or exercise identity. **Clear search** restores every item; an empty-results message and live result count support keyboard and mobile use. When entering a custom workout exercise or extra exercise, browser suggestions come from the existing starter and custom exercise library, with no network dependency. Free-text custom names remain supported. Backup v4 format and IndexedDB storage are unchanged.
+
+
+### v1.1.0 final exercise-default compatibility
+
+New exercise defaults for ID-less workout rows are scoped to their workout and row rather than shared solely by exercise name. Old name-based defaults remain readable as a fallback without rewriting or deleting older v4 backups. Saving a new row-specific default isolates that row, and resetting a row default prevents an inherited name-based value from reappearing. A persistent **Global rest default** can be saved from the workout timer's rest picker and is stored as optional `preferences.globalRestSeconds` in v4 JSON and IndexedDB. When absent, the preference defaults to 90 seconds. Existing in-progress drafts retain their chosen rest intervals. No schema version change or destructive migration is required.
