@@ -316,3 +316,73 @@ test('service worker caches app shell and preserves draft on offline reload',asy
  await expect(page.locator('#pwa-status')).toContainText('Offline');
  await context.setOffline(false);
 });
+
+
+test('edit completed workout atomically without advancing schedule or losing metadata',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const before=await page.locator('.overview').innerText();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.getByText('Session saved')).toBeVisible();
+ const snapshot=await page.evaluate(async()=>{
+  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+  return await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots');const r=tx.objectStore('snapshots').get('primary');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+ });
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
+ await page.getByRole('button',{name:'Edit session'}).click();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await page.getByRole('button',{name:'Cancel'}).click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
+ await page.getByRole('button',{name:'Edit session'}).click();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await page.getByRole('textbox',{name:'Saved session notes'}).fill('Corrected session');
+ await page.getByRole('button',{name:'Save changes'}).click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
+ await expect(page.getByText('Corrected session')).toBeVisible();
+ await page.reload();
+ await page.getByRole('button',{name:/history/i}).first().click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
+ await page.getByRole('button',{name:'Edit session'}).click();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
+ const after=await page.evaluate(async()=>{
+  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>resolve(r.result)});
+  return await new Promise(resolve=>{const tx=db.transaction('snapshots');const r=tx.objectStore('snapshots').get('primary');r.onsuccess=()=>resolve(r.result)});
+ });
+ expect(after.sessions[0].id).toBe(snapshot.sessions[0].id);
+ expect(after.sessions[0].createdAt).toBe(snapshot.sessions[0].createdAt);
+ expect(after.schedules).toEqual(snapshot.schedules);
+ expect(after.sessions[0].exercises[0].sets[0].r).toBe(12);
+});
+
+
+test('concurrent saved-session edits reject stale commits without data loss',async({browser})=>{
+ const context=await browser.newContext();
+ try{
+  const a=await context.newPage();
+  await a.goto('/gym-tracker/');
+  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+  await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+  await a.getByRole('button',{name:/Finish & save session/}).click();
+  await expect(a.getByText('Session saved')).toBeVisible();
+  const b=await context.newPage();
+  await b.goto('/gym-tracker/');
+  await b.getByRole('button',{name:/history/i}).first().click();
+  await b.locator('details.hist').first().evaluate(el=>el.open=true);
+ await b.getByRole('button',{name:'Edit session'}).click();
+  await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
+  await a.locator('details.hist').first().evaluate(el=>el.open=true);
+ await a.getByRole('button',{name:'Edit session'}).click();
+  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+  await a.getByRole('button',{name:'Save changes'}).click();
+  await expect(a.getByText('Session updated')).toBeVisible();
+  await b.getByRole('button',{name:'Save changes'}).click();
+  await expect(b.getByText(/Could not save changes/)).toBeVisible();
+  await b.reload();
+  await b.getByRole('button',{name:/history/i}).first().click();
+  await b.locator('details.hist').first().evaluate(el=>el.open=true);
+ await b.getByRole('button',{name:'Edit session'}).click();
+  await expect(b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
+ }finally{await context.close();}
+});
