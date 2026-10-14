@@ -167,3 +167,11 @@ test('progression hints can be disabled without changing draft',async({page})=>{
  await page.waitForTimeout(500);await page.reload();
  await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
 });
+
+test('historical personal records appear without modifying sessions',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions:[{id:'pr1',date:'2026-10-01',dayId:'pullA',dayName:'Pull A',type:'pull',createdAt:1,notes:'',exercises:[{name:'Lat pulldown',unit:'lb',sets:[{w:100,r:8,completed:true,type:'working'}]}]}],body:[],custom:[],schedules:[],drafts:{},preferences:{}})));
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.getByText('Personal records')).toBeVisible();
+ await expect(page.locator('.pr-summary')).toContainText('Heaviest');
+});
