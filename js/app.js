@@ -374,7 +374,22 @@ function viewEditor(){
     </div></div>`;
 }
 
+function viewSavedSessionEdit(){
+ const s=savedSessionEdit;
+ if(!s)return '';
+ return `<div class="section stack" aria-label="Edit saved session"><h2>Edit saved session</h2>
+ <p class="muted">Changes are not saved until you confirm. Your schedule will not advance.</p>
+ <label>Date <input aria-label="Saved session date" type="date" data-history-field="date" value="${esc(s.date)}"></label>
+ <label>Notes <textarea aria-label="Saved session notes" data-history-field="notes">${esc(s.notes||"")}</textarea></label>
+ ${s.exercises.map((ex,i)=>`<fieldset><legend>${esc(ex.name)} (${esc(ex.unit||s.unit||DEFAULT_UNIT)})</legend>
+ ${(ex.sets||[]).map((set,j)=>`<div class="row-actions"><label>Weight <input aria-label="${esc(ex.name)} set ${j+1} weight" type="number" min="0" step="any" data-history-set="w" data-i="${i}" data-j="${j}" value="${esc(set.w??0)}"></label>
+ <label>Reps <input aria-label="${esc(ex.name)} set ${j+1} reps" type="number" min="1" step="1" data-history-set="r" data-i="${i}" data-j="${j}" value="${esc(set.r??0)}"></label>
+ <button class="btn small" data-act="historyrmset" data-i="${i}" data-j="${j}">Remove set ${j+1}</button></div>`).join("")}
+ <button class="btn small" data-act="historyaddset" data-i="${i}">Add set to ${esc(ex.name)}</button></fieldset>`).join("")}
+ <div class="row-actions"><button class="btn primary" data-act="historysave">Save changes</button><button class="btn" data-act="historycancel">Cancel</button></div></div>`;
+}
 function viewHistory(){
+  if(savedSessionEdit)return viewSavedSessionEdit();
   if (!S.sessions.length) return `<div class="empty">No sessions yet. Log your first workout and it will show up here.</div>`;
   return `<div class="section">` + S.sessions.map(s => {
     const gd = getDay(s.dayId); const day = { name: s.dayName || (gd && gd.name) || "Workout", type: (gd && gd.type) || s.type || "other" };
@@ -387,7 +402,7 @@ function viewHistory(){
     return `<details class="hist"><summary><span class="chip ${esc(day.type)}">${esc(day.name)}</span><span>${esc(fmtDate(s.date))}</span><span class="meta">${sets} sets · ${hardSetCount([s])} hard sets<br>${vol.toLocaleString()} ${vu}</span></summary>
       <div class="body"><table><tbody>${rows}</tbody></table>
       ${s.notes ? `<p class="muted">${esc(s.notes)}</p>` : ""}
-      <div class="row-actions"><button class="btn small danger" data-act="delsession" data-id="${esc(s.id)}">${armed ? "Tap again to delete" : "Delete session"}</button></div></div></details>`;
+      <div class="row-actions"><button class="btn small" data-act="historyedit" data-id="${esc(s.id)}">Edit session</button><button class="btn small danger" data-act="delsession" data-id="${esc(s.id)}">${armed ? "Tap again to delete" : "Delete session"}</button></div></div></details>`;
   }).join("") + `</div>`;
 }
 
@@ -524,6 +539,8 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
 
 $("#app").addEventListener("input", e => {
   const t = e.target;
+  if(savedSessionEdit && t.dataset.historyField){savedSessionEdit[t.dataset.historyField]=t.value;return;}
+  if(savedSessionEdit && t.dataset.historySet){savedSessionEdit.exercises[+t.dataset.i].sets[+t.dataset.j][t.dataset.historySet]=t.value;return;}
   if(t.hasAttribute?.("data-schedule-name") && S.scheduleEditing){S.scheduleEditing.name=t.value;return;}
   if (S.tab === "log" && S.editing) {
     if (t.dataset.ed === "name") S.editing.name = t.value;
@@ -596,6 +613,39 @@ $("#app").addEventListener("click", async e => {
     catch { toast("Couldn't delete. Try again."); }
     return;
   }
+  if(act==="historyedit"){
+    const original=S.sessions.find(x=>x.id===b.dataset.id);
+    if(original){savedSessionEdit=structuredClone(original);render();window.scrollTo({top:0});}
+    return;
+  }
+  if(act==="historycancel"){savedSessionEdit=null;render();return;}
+  if(act==="historyaddset"&&savedSessionEdit){
+    const ex=savedSessionEdit.exercises[+b.dataset.i];
+    ex.sets.push({w:0,r:1,type:"working",completed:true});
+    render();return;
+  }
+  if(act==="historyrmset"&&savedSessionEdit){
+    savedSessionEdit.exercises[+b.dataset.i].sets.splice(+b.dataset.j,1);
+    render();return;
+  }
+  if(act==="historysave"&&savedSessionEdit){
+    if(savedSessionEditPending)return;
+    const corrected=structuredClone(savedSessionEdit);
+    if(!validDataDate(corrected.date)){toast("Enter a valid session date.");return;}
+    if(!corrected.exercises.length||corrected.exercises.some(ex=>!ex.sets?.length||ex.sets.some(set=>!Number.isFinite(Number(set.w))||Number(set.w)<0||!Number.isInteger(Number(set.r))||Number(set.r)<1))){
+      toast("Each exercise needs a set with non-negative weight and positive whole-number reps.");return;
+    }
+    corrected.notes=(corrected.notes||"").trim();
+    for(const ex of corrected.exercises)for(const set of ex.sets){set.w=Number(set.w);set.r=Number(set.r);}
+    if(!S.sessions.some(x=>x.id===corrected.id)){toast("Session no longer exists. Reload.");return;}
+    savedSessionEditPending=true;b.disabled=true;
+    try{
+      await putSession(corrected,false);
+      savedSessionEdit=null;render();toast("Session updated");
+    }catch(err){toast("Could not save changes: "+err.message);b.disabled=false;}
+    finally{savedSessionEditPending=false;}
+    return;
+  }
   if (act === "save") return saveSession(b);
   if (act === "delsession" || act === "delbody") {
     const id = b.dataset.id;
@@ -611,6 +661,8 @@ $("#app").addEventListener("click", async e => {
 });
 
 let sessionSavePending=false;
+let savedSessionEdit=null;
+let savedSessionEditPending=false;
 async function saveSession(btn){
   if(sessionSavePending)return;
   const day = getDay(S.dayId), d = getDraft(S.dayId);
