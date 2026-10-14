@@ -30,7 +30,7 @@ const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -73,6 +73,14 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   malformed.calendarEvents=[{...skipped,date:"2026-02-30"}];
   assert.throws(()=>a.validateAppData(malformed),/calendarEvents/);
   a.S.calendarEvents=[];
+  await a.saveCalendarEvent(skipped);
+  assert.equal(a.S.calendarEvents.length,1);
+  c.setRejectWrites(true);
+  await assert.rejects(()=>a.deleteCalendarEvent("event-1"),/storage/);
+  c.setRejectWrites(false);
+  assert.equal(a.S.calendarEvents.length,1);
+  await a.deleteCalendarEvent("event-1");
+  assert.equal(a.S.calendarEvents.length,0);
   assert.equal(a.S.ready,true); assert.equal(c.requested(),'https://user.github.io/ppl-tracker/ppl-default-workouts.json');
   assert.equal(a.nextDayId(),'pullA');
   // Import preference contract: merge overlays keys, replace clears missing keys.
