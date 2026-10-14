@@ -1,0 +1,16 @@
+// Persistent exercise defaults and warm-up-aware volume semantics.
+export function exerciseKey(name, exerciseId) {
+  return exerciseId ? "id:" + exerciseId : "name:" + String(name || "").trim().toLocaleLowerCase();
+}
+export function hardSetCount(sessions) {
+  return sessions.reduce((total,session)=>total+(session.exercises||[]).reduce((count,exercise)=>count+(exercise.sets||[]).filter(set=>set.type!=="warmup" && set.type!=="drop" && set.completed!==false && Number(set.r)>0).length,0),0);
+}
+export function normalizeExerciseSetting(raw) {
+  if(!raw || typeof raw!=="object")return {};
+  const result={};
+  if(Number.isInteger(raw.restSeconds)&&raw.restSeconds>=15&&raw.restSeconds<=600)result.restSeconds=raw.restSeconds;
+  if(Number.isFinite(raw.loadIncrement)&&raw.loadIncrement>0&&raw.loadIncrement<=100&&["kg","lb"].includes(raw.incrementUnit)) {
+    result.loadIncrement=raw.loadIncrement;result.incrementUnit=raw.incrementUnit;
+  }
+  return result;
+}
