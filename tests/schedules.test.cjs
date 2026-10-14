@@ -33,6 +33,9 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   }
   assert(a.viewLog().includes('data-act="completeset"'));
   assert(a.viewLog().includes('data-act="timerpause"'));
+  assert(a.viewLog().includes('data-act="settype"'));
+  assert(a.viewLog().includes('data-f="rir"'));
+  assert(a.viewLog().includes('data-f="exrest"'));
   assert(a.viewLog().includes('data-act="timerreset"'));
   assert(a.viewLog().includes('Make every')===false);assert(node('#app').innerHTML.includes('Make every rep count.'));
   const d=a.getDraft('pullA');d.ex[0].sets[0]={w:'100',r:'8'};a.updateSessionMeter();assert.equal(node('#loggedSets').textContent,1);
