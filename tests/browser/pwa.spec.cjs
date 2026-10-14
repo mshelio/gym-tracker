@@ -30,6 +30,7 @@ test('offline logging, draft persistence and session completion survive reload',
  await page.reload();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
  await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.getByText('Session saved')).toBeVisible();
  await page.reload();
  await page.getByRole('button',{name:/history/i}).first().click();
  await expect(page.locator('details.hist')).toHaveCount(1);
@@ -84,6 +85,6 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
  expect(before.controller.endsWith('/sw.js')).toBe(true);
  expect(before.oldCache).toBe(true);
  await page.locator('#pwa-status button').click();
- await expect.poll(()=>page.evaluate(async()=>!(await caches.has('gt-shell-stale')))).toBe(true);
+ await expect.poll(async()=>{try{return await page.evaluate(async()=>!(await caches.has('gt-shell-stale')))}catch{return false}},{timeout:15000}).toBe(true);
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
 });
