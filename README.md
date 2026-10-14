@@ -163,3 +163,7 @@ Any change to an app-shell asset requires regenerating `sw.js` with `node tests/
 ## Editing saved sessions (#64)
 
 History → expand a session → **Edit session** allows corrections to its date, notes, weights, reps, and sets. All changes remain in a temporary editor until **Save changes**; **Cancel** discards them. Saving replaces the same session ID atomically through existing IndexedDB snapshot persistence, preserves creation metadata and schedule cursor, and recalculates analytics from the corrected history. If a cross-tab revision conflict or storage failure occurs, the original saved session remains intact. Backup format v4 is unchanged.
+
+## Exercise search (#65)
+
+The Train screen and custom workout editor have a local **Search exercises** field. It filters visible exercise cards or rows without changing the underlying workout, saved draft, schedule or exercise identity. **Clear search** restores every item; an empty-results message and live result count support keyboard and mobile use. When entering a custom workout exercise or extra exercise, browser suggestions come from the existing starter and custom exercise library, with no network dependency. Free-text custom names remain supported. Backup v4 format and IndexedDB storage are unchanged.
