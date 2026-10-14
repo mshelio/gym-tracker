@@ -211,6 +211,7 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
  await page.locator('#importText').fill(JSON.stringify(original));
  await page.locator('#importMode').selectOption('replace');
  await page.locator('[data-act="import"]').click();
+ await expect(page.locator('#importResult')).toContainText('Replaced local data');
  await page.reload();
  await page.getByRole('button',{name:/train/i}).first().click();
  await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
