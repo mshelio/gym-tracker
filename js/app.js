@@ -721,11 +721,12 @@ async function saveSession(btn){
 async function saveWorkout(btn){
   const w = S.editing;
   const name = (w.name||"").trim();
-  const ex = w.ex.map(e => {
+  const previousDefinition=S.custom.find(c=>c.id===w.id);
+  const ex = w.ex.map((e,i) => {
     const s = Math.min(10, Math.max(1, Math.round(num(e.s) || 3)));
     let lo = Math.min(50, Math.max(1, Math.round(num(e.lo) || 8))), hi = Math.min(50, Math.max(1, Math.round(num(e.hi) || lo)));
     if (lo > hi) [lo, hi] = [hi, lo];
-    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [] };
+    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [], ...(e.exerciseId||(!previousDefinition||!previousDefinition.ex?.[i]||previousDefinition.ex[i].n!==e.n)?{exerciseId:e.exerciseId||uid("ex")}:{}) };
   }).filter(e => e.n);
   if (!name) { toast("Give the workout a name."); return; }
   if (!ex.length) { toast("Add at least one exercise."); return; }
