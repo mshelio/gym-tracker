@@ -14,3 +14,8 @@ export function normalizeExerciseSetting(raw) {
   }
   return result;
 }
+
+export function convertIncrement(value,from,to){
+ if(!Number.isFinite(value)||value<=0||!["kg","lb"].includes(from)||!["kg","lb"].includes(to))return null;
+ return Math.round((from===to?value:(to==="kg"?value*0.45359237:value/0.45359237))*100)/100;
+}
