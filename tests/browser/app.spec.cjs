@@ -386,3 +386,32 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await expect(b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
  }finally{await context.close();}
 });
+
+
+test('exercise search filters default workouts without modifying saved drafts',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const search=page.getByRole('searchbox',{name:'Search exercises'});
+ await search.fill('pulldown');
+ await expect(page.locator('[data-exercise-search-count]')).toContainText('1 of');
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toBeVisible();
+ await search.fill('unmatched exercise xyz');
+ await expect(page.getByText('No matching exercises.')).toBeVisible();
+ await page.getByRole('button',{name:'Clear search'}).click();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.reload();
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+});
+test('workout editor supports searchable rows and exercise suggestions',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.locator('[data-act="newworkout"]').click();
+ const exercise=page.getByLabel('Exercise 1 name');
+ await exercise.fill('Lat pulldown');
+ const matches=await page.locator('#exercise-name-suggestions option').evaluateAll(opts=>opts.map(o=>o.value));
+ expect(matches).toContain('Lat pulldown');
+ const search=page.getByRole('searchbox',{name:'Search exercises'});
+ await search.fill('unmatched');
+ await expect(page.getByText('No matching exercises.')).toBeVisible();
+ await page.getByRole('button',{name:'Clear search'}).click();
+ await expect(exercise).toHaveValue('Lat pulldown');
+});
