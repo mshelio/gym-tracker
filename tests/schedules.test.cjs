@@ -31,6 +31,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     const mapped=a.getDay(w.id);assert.equal(mapped.name,w.name);assert.equal(mapped.type,w.type);
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
+  assert(a.viewLog().includes('data-act="completeset"'));
   assert(a.viewLog().includes('Make every')===false);assert(node('#app').innerHTML.includes('Make every rep count.'));
   const d=a.getDraft('pullA');d.ex[0].sets[0]={w:'100',r:'8'};a.updateSessionMeter();assert.equal(node('#loggedSets').textContent,1);
   await a.saveSession({disabled:false,textContent:''});assert.equal(a.S.sessions.length,1);assert.equal(a.nextDayId(),'pushA');assert.equal(a.S.tab,'history');assert.equal(a.S.sessions[0].exercises[0].unit,'lb');assert.equal(a.S.sessions[0].exercises[0].sets[0].w,100);
