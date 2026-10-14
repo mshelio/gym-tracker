@@ -200,3 +200,19 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
  expect(backup.drafts.pullA.ex[0].restSeconds).toBe(125);
  expect(backup.drafts.pullA.ex[0].sets[0].rir).toBe(2);
 });
+
+test('v4 import restores preferences, merge and replace obey defaults',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/data/i}).first().click();
+ await page.locator('[data-act="export"]').click();
+ const original=JSON.parse(await page.locator('#exportOut').inputValue());
+ original.preferences.exerciseDefaults={"name:lat pulldown":{restSeconds:145,loadIncrement:2.5,incrementUnit:"kg"}};
+ original.preferences.progressionEnabled=false;
+ await page.locator('#importText').fill(JSON.stringify(original));
+ await page.locator('#importMode').selectOption('replace');
+ await page.locator('[data-act="import"]').click();
+ await page.reload();
+ await page.getByRole('button',{name:/train/i}).first().click();
+ await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
+ await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('145');
+});
