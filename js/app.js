@@ -566,8 +566,10 @@ async function useProgramFile(file){
 /* ---------- events ---------- */
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
-  if (!S.ready) return;
-  if(S.tab==="log"&&saveStatus==="pending")void flushDrafts();
+  // Keep navigation intent even while IndexedDB is still hydrating.
+  // render() shows a loading state until ready, then initStore renders the
+  // selected tab. Dropping early clicks caused intermittent Firefox failures.
+  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
   S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
 });
 
