@@ -5,7 +5,7 @@ import { conv, tidy, today, uid, num, fmtDate, e1rm, round1, sortSessions, sortB
 import { icon } from "./render.js";
 import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
-import { exerciseKey,hardSetCount,normalizeExerciseSetting } from "./exercise-settings.js";
+import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 
 (() => {
@@ -242,6 +242,13 @@ function lastBlock(name, e, unit){
   return { last, html };
 }
 
+function exerciseDefaultControls(e,i,group,d){
+ const key=exerciseKey(e.name,e.exerciseId),saved=S.exerciseDefaults?.[key]||{};
+ const inc=e.loadIncrement??saved.loadIncrement??"",unit=e.incrementUnit||saved.incrementUnit||e.unit||"kg";
+ const converted=inc!==""?convertIncrement(Number(inc),unit,e.unit||unit):null;
+ const unitLabel=converted==null?"":`≈ ${converted} ${esc(e.unit||unit)}`;
+ return `<div class="exercise-default-controls"><label>Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-g="${group}" data-i="${i}" value="${e.restSeconds??saved.restSeconds??d.restSeconds}"></label><label>Load increment <input type="number" min="0.1" max="100" step="0.1" data-f="increment" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} load increment" value="${esc(inc)}"></label><label>Increment unit <select data-act="incrementunit" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} increment unit"><option value="kg" ${unit==="kg"?"selected":""}>kg</option><option value="lb" ${unit==="lb"?"selected":""}>lb</option></select></label><span class="muted" aria-label="Converted load increment">${unitLabel}</span><button type="button" class="btn small" data-act="savedefault" data-g="${group}" data-i="${i}">Save default</button><button type="button" class="btn small" data-act="resetdefault" data-g="${group}" data-i="${i}">Reset default</button></div>`;
+}
 function viewLog(){
   if(S.scheduleEditing)return viewScheduleEditor();
   if(S.manageSchedules)return viewScheduleManager();
@@ -264,7 +271,7 @@ function viewLog(){
       <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
-      <label class="ex-rest-label">Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-i="${i}" value="${de.restSeconds??d.restSeconds}"> <button type="button" class="btn small" data-act="savedefault" data-i="${i}">Save default</button> <input type="number" min="0.1" max="100" step="0.1" data-f="increment" data-i="${i}" aria-label="${esc(de.name)} load increment" value="${S.exerciseDefaults[exerciseKey(de.name,de.exerciseId)]?.loadIncrement??""}" placeholder="Increment"> <select data-act="incrementunit" data-i="${i}" aria-label="${esc(de.name)} increment unit"><option value="kg" ${S.exerciseDefaults[exerciseKey(de.name,de.exerciseId)]?.incrementUnit==="kg"?"selected":""}>kg</option><option value="lb" ${S.exerciseDefaults[exerciseKey(de.name,de.exerciseId)]?.incrementUnit==="lb"?"selected":""}>lb</option></select></label>
+       ${exerciseDefaultControls(de,i,"",d)}
       <div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
@@ -275,7 +282,7 @@ function viewLog(){
       <div class="ex-head"><input type="text" class="ex-name" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
-      <label class="ex-rest-label">Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-g="x" data-i="${i}" value="${x.restSeconds??d.restSeconds}"> <button type="button" class="btn small" data-act="savedefault" data-g="x" data-i="${i}">Save default</button></label>
+       ${exerciseDefaultControls(x,i,"x",d)}
       <div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
@@ -464,7 +471,7 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", e => {
-  if(e.target.dataset.act==="incrementunit"){const t=e.target;getDraft(S.dayId).ex[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
+  if(e.target.dataset.act==="incrementunit"){const t=e.target;(t.dataset.g==="x"?getDraft(S.dayId).extra:getDraft(S.dayId).ex)[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="settype"){const t=e.target;const d=getDraft(S.dayId);(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].type=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="restpreset"){getDraft(S.dayId).restSeconds=Number(e.target.value);saveDrafts();return;}
   const t = e.target;
@@ -489,7 +496,8 @@ $("#app").addEventListener("click", async e => {
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
   if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(exercise.restSeconds??d.restSeconds);}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
-  if(act==="savedefault"){const e=grp();const key=exerciseKey(e.name,e.exerciseId);const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:Number(e.loadIncrement||S.exerciseDefaults?.[key]?.loadIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||"kg"});const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else toast("Exercise defaults saved");return;}
+  if(act==="resetdefault"){const e=grp(),key=exerciseKey(e.name,e.exerciseId),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;Object.assign(e,before);toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
+  if(act==="savedefault"){const e=grp();const key=exerciseKey(e.name,e.exerciseId);const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:Number(e.loadIncrement||S.exerciseDefaults?.[key]?.loadIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||"kg"});const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else {render();toast("Exercise defaults saved");}return;}
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
