@@ -57,6 +57,12 @@
       "items": {
         "$ref": "#/$defs/schedule"
       }
+    },
+    "calendarEvents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/calendarEvent"
+      }
     }
   },
   "required": [
@@ -706,6 +712,57 @@
         "mode",
         "days",
         "cursor"
+      ],
+      "additionalProperties": false
+    },
+    "calendarEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "date": {
+          "$ref": "#/$defs/date"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "rest",
+            "skipped",
+            "completed"
+          ]
+        },
+        "workoutId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "type",
+        "updatedAt"
       ],
       "additionalProperties": false
     }
