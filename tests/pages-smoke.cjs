@@ -47,9 +47,10 @@ async function verify(){
   // Only compare deployment with checkout on push/deployment events; PR and
   // scheduled runs can legitimately point to different source revisions.
   const deployedWorker=await (await page.request.get(new URL('sw.js',base).href,{headers:{'Cache-Control':'no-cache'}})).text();
-  const actualRevision=(deployedWorker.match(/const VERSION='(gt-shell-[a-f0-9]+)'/)||[])[1];
+  const actualRevision=(deployedWorker.match(/const VERSION='(gt-shell-[a-z0-9]+)'/)||[])[1];
   if(!actualRevision)throw Error('Deployed service worker has no valid cache revision; response begins: '+JSON.stringify(deployedWorker.slice(0,180)));
   console.log('Deployed service-worker revision:',actualRevision,'repository revision:',expectedRevision);
+  if(actualRevision!==expectedRevision)console.warn('WARNING: Production PWA worker revision differs from checkout; the live Pages site may be behind main.');
   if(process.env.REQUIRE_RELEASE_MATCH==='true'&&actualRevision!==expectedRevision)
    throw Error('Deployed service worker is stale: '+actualRevision+' (expected '+expectedRevision+')');
   const manifest=await (await page.request.get(new URL('manifest.webmanifest',base).href)).json();
