@@ -12,7 +12,7 @@ try{
  fs.copyFileSync(path.join(root,'sw.js'),path.join(tmp,'sw.js'));
  fs.copyFileSync(path.join(root,'tests/version-sw.cjs'),path.join(tmp,'tests/version-sw.cjs'));
  for(const item of items){
-  const rel=item==='.'?'index.html':item.replace(/^\.\//,'');
+  const rel=(item==='.'||item==='./')?'index.html':item.replace(/^\.\//,'');
   const output=path.join(tmp,rel);
   fs.mkdirSync(path.dirname(output),{recursive:true});
   fs.copyFileSync(path.join(root,rel),output);
