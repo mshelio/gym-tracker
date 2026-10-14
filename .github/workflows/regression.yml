@@ -15,5 +15,7 @@ jobs:
         run: node --check tests/schedules.test.cjs
       - name: Verify deployed service worker revision
         run: node tests/version-sw.cjs --check
+      - name: Test release revision upgrade
+        run: node tests/version-sw.test.cjs
       - name: Regression suite
         run: node tests/schedules.test.cjs
