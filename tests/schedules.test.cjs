@@ -32,6 +32,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
     w.exercises.forEach((e,i)=>{assert.equal(mapped.ex[i].n,e.name);assert.equal(mapped.ex[i].s,e.sets);assert.equal(mapped.ex[i].lo,e.repsMin);assert.equal(mapped.ex[i].hi,e.repsMax);assert.deepEqual(Array.from(mapped.ex[i].alt),e.alternatives)});
   }
   assert(a.viewLog().includes('data-act="completeset"'));
+  assert(a.viewLog().includes('data-act="copyforward"'));
   assert(a.viewLog().includes('data-act="savedefault"'));
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:8,type:"working",completed:true},{r:10,type:"warmup",completed:true},{r:9,type:"drop",completed:true},{r:6}]}]}]),2);
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:12,type:"working",completed:false}]}]}]),0);
