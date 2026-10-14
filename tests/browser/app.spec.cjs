@@ -271,3 +271,27 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await page.getByRole('button',{name:/train/i}).first().click();
  await expect(page.locator('.workout-main')).toContainText('Push A');
 });
+
+test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const url=await page.locator('link[rel="manifest"]').getAttribute('href');
+ expect(url).toBe('./manifest.webmanifest');
+ const response=await page.request.get(new URL(url,page.url()).toString());
+ expect(response.ok()).toBeTruthy();
+ const manifest=await response.json();
+ expect(manifest.start_url).toBe('./');
+ expect(manifest.scope).toBe('./');
+ expect(manifest.display).toBe('standalone');
+ expect(manifest.icons.some(x=>x.purpose==='maskable')).toBeTruthy();
+ for(const icon of manifest.icons){
+   const asset=await page.request.get(new URL(icon.src,response.url()).toString());
+   expect(asset.ok()).toBeTruthy();
+   expect(asset.headers()['content-type']).toMatch(/image\/png/);
+   const bytes=await asset.body();
+   expect(bytes.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
+   const [width,height]=icon.sizes.split('x').map(Number);
+   expect(bytes.readUInt32BE(16)).toBe(width);
+   expect(bytes.readUInt32BE(20)).toBe(height);
+ }
+ await expect(page.getByText('Make every rep count.')).toBeVisible();
+});
