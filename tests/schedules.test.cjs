@@ -6,9 +6,9 @@ const canonical = JSON.parse(fs.readFileSync(path.join(root,'ppl-default-workout
 const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
-const combined = moduleFiles.map(f => sources[f].replace(/^\\s*import\\s+[^;]+;\\s*/gm, '').replace(/^export\\s+\\{[^}]+\\};?\\s*/gm, '').replace(/^export\\s+(?=(?:async\\s+)?function|const|class)/gm, '')).join('\\n');
-assert.match(html, /type="module" src="\\.\\/js\\/app\\.js"/);
-const code = combined.replace('initApp();\\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\\ninitApp();\\n})();');
+const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
+assert.match(html, /type="module" src="\.\/js\/app\.js"/);
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
