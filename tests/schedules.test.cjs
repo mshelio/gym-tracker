@@ -7,7 +7,7 @@ const moduleCode = fs.readFileSync(path.join(root,'js/app.js'),'utf8');
 const configSource = fs.readFileSync(path.join(root,'js/config.js'),'utf8');
 const config = configSource.replace(/export /g, '');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = (config + '\n' + moduleCode.replace(/^import .* from "\.\/config\.js";\s*/, '')).replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\ninitApp();\n})();');
+const code = (config + '\n' + moduleCode.replace(/^\s*import\s+\{[^}]+\}\s+from\s+["']\.\/config\.js["'];\s*/, '')).replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
