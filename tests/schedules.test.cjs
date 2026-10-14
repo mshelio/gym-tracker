@@ -125,6 +125,18 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.recommendProgression({sessions:[sample],exerciseName:"Bench",unit:"kg",minimum:8,maximum:12,increment:5,incrementUnit:"lb"}).weight,52.27);
   assert.equal(a.recommendProgression({sessions:[sample],exerciseName:"Bench",enabled:false}).kind,"disabled");
   assert(a.viewLog().includes('data-act="copyforward"'));
+  // Exercise IDs from custom workout definitions must survive draft creation and reload.
+  const identityWorkout={id:'identity-test',name:'Identity test',type:'other',unit:'kg',ex:[{n:'Row',exerciseId:'unique-row-1',s:2,lo:8,hi:12,alt:[]},{n:'Row',exerciseId:'unique-row-2',s:2,lo:8,hi:12,alt:[]}]};
+  a.S.custom.push(identityWorkout);
+  a.S.exerciseDefaults={'id:unique-row-1':{restSeconds:180},'id:unique-row-2':{restSeconds:75}};
+  const identityDraft=a.getDraft('identity-test');
+  assert.equal(identityDraft.ex[0].exerciseId,'unique-row-1');
+  assert.equal(identityDraft.ex[1].exerciseId,'unique-row-2');
+  assert.equal(identityDraft.ex[0].restSeconds,180);
+  assert.equal(identityDraft.ex[1].restSeconds,75);
+  delete identityDraft.ex[1].exerciseId; // Older v4 draft: recover ID from unchanged definition.
+  assert.equal(a.getDraft('identity-test').ex[1].exerciseId,'unique-row-2');
+  a.S.custom.pop();a.S.exerciseDefaults={};delete a.S.drafts['identity-test'];
   assert(a.viewLog().includes('data-act="savedefault"'));
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:8,type:"working",completed:true},{r:10,type:"warmup",completed:true},{r:9,type:"drop",completed:true},{r:6}]}]}]),2);
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:12,type:"working",completed:false}]}]}]),0);
