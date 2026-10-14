@@ -337,6 +337,7 @@ test('edit completed workout atomically without advancing schedule or losing met
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
  await page.getByRole('textbox',{name:'Saved session notes'}).fill('Corrected session');
  await page.getByRole('button',{name:'Save changes'}).click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await expect(page.getByText('Corrected session')).toBeVisible();
  await page.reload();
  await page.getByRole('button',{name:/history/i}).first().click();
