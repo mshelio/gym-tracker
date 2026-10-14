@@ -324,6 +324,25 @@ test('large history renders bounded accessible chart elements',async({page})=>{
  expect(Date.now()-started).toBeLessThan(15000);
 });
 
+test('navigation clicked during startup is honored after IndexedDB hydration', async ({page})=>{
+ let unblockProgram,programRequested;
+ const requested=new Promise(resolve=>{programRequested=resolve;});
+ const unblock=new Promise(resolve=>{unblockProgram=resolve;});
+ await page.route('**/ppl-default-workouts.json',async route=>{
+   programRequested();
+   await unblock;
+   await route.continue();
+ });
+ await page.goto('/gym-tracker/',{waitUntil:'domcontentloaded'});
+ await requested;
+ await page.getByRole('button',{name:/history/i}).first().click();
+ await expect(page.locator('nav.tabs button[data-tab="history"]')).toHaveAttribute('aria-current','page');
+ unblockProgram();
+ await expect(page.locator('.overview')).toBeVisible();
+ await expect(page.locator('nav.tabs button[data-tab="history"]')).toHaveAttribute('aria-current','page');
+ await expect(page.locator('#app')).toContainText('No sessions yet');
+});
+
 test('completed session, draft cleanup and cursor survive immediate reload atomically',async({page})=>{
  await page.goto('/gym-tracker/');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
