@@ -61,6 +61,18 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.removeCalendarEvent([skipped],"event-1").length,0);
   assert.throws(()=>a.validateCalendarEvents([skipped,skipped]),/unique/);
   assert.throws(()=>a.validateCalendarEvents([{...skipped,type:"completed"}]),/session/);
+  // V4 round trip carries optional events, while older backups remain valid.
+  a.S.calendarEvents=[skipped];
+  const calendarBackup=a.buildAppData();
+  assert.equal(calendarBackup.version,4);
+  assert.equal(calendarBackup.calendarEvents[0].id,"event-1");
+  const olderV4=JSON.parse(JSON.stringify(calendarBackup));
+  delete olderV4.calendarEvents;
+  assert.doesNotThrow(()=>a.validateAppData(olderV4));
+  const malformed=JSON.parse(JSON.stringify(calendarBackup));
+  malformed.calendarEvents=[{...skipped,date:"2026-02-30"}];
+  assert.throws(()=>a.validateAppData(malformed),/calendarEvents/);
+  a.S.calendarEvents=[];
   assert.equal(a.S.ready,true); assert.equal(c.requested(),'https://user.github.io/ppl-tracker/ppl-default-workouts.json');
   assert.equal(a.nextDayId(),'pullA');
   // Import preference contract: merge overlays keys, replace clears missing keys.
