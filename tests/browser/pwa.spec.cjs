@@ -11,7 +11,7 @@ test('installability metadata and shell cache are repository scoped',async({page
  await controlled(page);
  const info=await page.evaluate(async()=>{
   const manifest=await (await fetch('./manifest.webmanifest')).json();
-  const cache=await caches.open('gt-shell-95304dcd');
+  const cache=await caches.open('gt-shell-14a65519');
   return {manifest,keys:(await cache.keys()).map(x=>x.url),scope:(await navigator.serviceWorker.ready).scope};
  });
  expect(info.manifest.start_url).toBe('./');
@@ -52,7 +52,7 @@ test('old worker remains active until an explicit update and drafts survive',asy
  const reg=await page.evaluate(()=>navigator.serviceWorker.getRegistration());
  expect(reg).toBeTruthy();
  expect(before).toMatch(/\/gym-tracker\/sw\.js$/);
- const preserved=await page.evaluate(async()=>{const cache=await caches.open('gt-shell-95304dcd');return !!(await cache.match(new URL('./js/app.js',location.href).href))});
+ const preserved=await page.evaluate(async()=>{const cache=await caches.open('gt-shell-14a65519');return !!(await cache.match(new URL('./js/app.js',location.href).href))});
  expect(preserved).toBe(true);
  await page.reload();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('7');
