@@ -113,3 +113,7 @@ Backups now preserve paused/rest timer deadlines, workout start time, exercise-s
 ### JSON import preferences (#43)
 
 Replace imports use the backup's exercise defaults and progression toggle; optional fields absent in older backups reset to empty defaults and enabled progression. Merge imports combine exercise settings by stable exercise key, with incoming settings overriding matching keys and current-only keys retained. The progression toggle changes on merge only when explicitly included. Failed storage writes restore all in-memory imported collections and preferences. These changes do not alter IndexedDB structure or v4 backup format.
+
+### Analytics filter scope (#44)
+
+Date (inclusive), workout and exercise filters apply together to the same set of sessions. With an exercise selected, the volume and personal-record session-volume values count **only that exercise** within matching sessions, not unrelated lifts. PR strength trends use the same selected exercise and kg/lb display unit; warm-up sets and explicitly incomplete sets are excluded. Drop sets are included in volume but not hard-set totals. Without an exercise filter, weekly volume and hard-set summaries cover all exercises in matching sessions. No stored sessions, IndexedDB metadata, or backup format changes are required.
