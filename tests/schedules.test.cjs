@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-assert.match(workerSource,/gt-shell-45d33d3f/);
+assert.match(workerSource,/gt-shell-d81ad809/);
 assert.match(workerSource,/ppl-default-workouts.json/);
 assert.match(workerSource,/SKIP_WAITING/);
 assert(!workerSource.includes('indexedDB.deleteDatabase'));
@@ -30,14 +30,14 @@ const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
     if(!nodes.has(id)) nodes.set(id,{value:'',textContent:'',innerHTML:'',hidden:true,style:{},dataset:{},listeners:{},classList:{add(){},remove(){}},addEventListener(type,fn){this.listeners[type]=fn},querySelector(){return null},setAttribute(){},select(){},focus(){}});
     return nodes.get(id);
   };
-  const tabs = ['log','history','progress','data'].map(tab=>({dataset:{tab},setAttribute(){}}));
+  const tabs = ['log','history','calendar','progress','data'].map(tab=>({dataset:{tab},setAttribute(){}}));
   const downloads=[]; let requested='',aiResponder;
   const document = {baseURI:'https://user.github.io/ppl-tracker/index.html',activeElement:null,visibilityState:'visible',querySelector:node,querySelectorAll:()=>tabs,addEventListener(){},createElement:()=>({click(){downloads.push(this.download)},remove(){}}),body:{appendChild(){}}};
   const context = {document,window:{addEventListener(){},scrollTo(){}},localStorage:{getItem:k=>storage[k]||null,setItem(k,v){if(rejectWrites) throw Error('Full');storage[k]=v}},CSS:{escape:x=>x},fetch:async (url,options)=>{if(options?.method==='POST')return aiResponder(url,options);requested=url.href;if(fetchFail)throw Error('Offline');return {ok:true,json:async()=>canonical}},URL,Blob,AbortController,Date,Math,console,setTimeout:()=>1,clearTimeout(){},navigator:{clipboard:{writeText:async()=>{}}}};
@@ -61,6 +61,23 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.removeCalendarEvent([skipped],"event-1").length,0);
   assert.throws(()=>a.validateCalendarEvents([skipped,skipped]),/unique/);
   assert.throws(()=>a.validateCalendarEvents([{...skipped,type:"completed"}]),/session/);
+  assert.equal(a.shiftCalendarMonth("2026-12",1),"2027-01");
+  assert.equal(a.shiftCalendarMonth("2027-01",-1),"2026-12");
+  assert.equal(a.calendarPeriod("2024-02").to,"2024-02-29");
+  const sampleSessions=[{id:"training-1",date:"2026-03-29",dayId:"pullA",exercises:[]}];
+  const aprilDays=a.calendarDays("2026-03-28","2026-04-04",sampleSessions,[skipped],calendarWeekPlan);
+  assert.equal(aprilDays.length,8);
+  assert.equal(aprilDays.find(d=>d.date==="2026-03-29").type,"completed");
+  assert.equal(aprilDays.find(d=>d.date==="2026-03-30").type,"skipped");
+  assert.equal(aprilDays.find(d=>d.date==="2026-03-31").type,"rest");
+  const compliance=a.calendarAdherence(aprilDays);
+  assert.equal(compliance.completed,1);
+  assert.equal(compliance.skipped,1);
+  assert.equal(compliance.scheduled,2);
+  assert.equal(compliance.percent,50);
+  assert.equal(a.calendarAdherence([]).percent,null);
+  assert.equal(a.calendarDays("2026-03-28","2026-04-04",[],[],{mode:"cycle",days:["pullA"],cursor:0}).every(d=>d.type==="none"),true);
+  assert.match(a.viewCalendar(),/Training calendar/);
   // V4 round trip carries optional events, while older backups remain valid.
   a.S.calendarEvents=[skipped];
   const calendarBackup=a.buildAppData();

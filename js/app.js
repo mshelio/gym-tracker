@@ -10,11 +10,12 @@ import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
-import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent } from "./calendar.js";
+import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence } from "./calendar.js";
 
 (() => {
 "use strict";
 const S = createInitialState();
+let calendarMonth=null,calendarMode="month",calendarWeekOffset=0;
 const timerTools=createTimers();
 let timerTicker=null;
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
@@ -242,11 +243,11 @@ function render(){
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
-  const intro = {log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
+  const intro = {log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], calendar:["TRAINING CALENDAR", "Your training at a glance.", "See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
   const weekStart = new Date(today()+"T00:00:00"); weekStart.setDate(weekStart.getDate() - (weekStart.getDay()+6)%7);
   const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${intro[0]}</p><h1>${intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
-    <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "progress" ? viewProgress() : viewData());
+    <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "calendar" ? viewCalendar() : S.tab === "progress" ? viewProgress() : viewData());
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -431,6 +432,34 @@ function viewSavedSessionEdit(){
  <button class="btn small" data-act="historyaddset" data-i="${i}">Add set to ${esc(ex.name)}</button></fieldset>`).join("")}
  <div class="row-actions"><button class="btn primary" data-act="historysave">Save changes</button><button class="btn" data-act="historycancel">Cancel</button></div></div>`;
 }
+function viewCalendar(){
+ const month=calendarMonth||today().slice(0,7),period=calendarPeriod(month);
+ const first=Date.parse(period.from+"T12:00:00Z");
+ const offset=(new Date(first).getUTCDay()+6)%7;
+ const start=new Date(first-offset*86400000).toISOString().slice(0,10);
+ const finish=new Date(Date.parse(period.to+"T12:00:00Z")+(6-(new Date(period.to+"T12:00:00Z").getUTCDay()+6)%7)*86400000).toISOString().slice(0,10);
+ const days=calendarDays(start,finish,S.sessions,S.calendarEvents,activeSchedule());
+ const monthDays=days.filter(d=>d.date.slice(0,7)===month);
+ const stats=calendarAdherence(monthDays);
+ const label=new Date(month+"-01T12:00:00Z").toLocaleDateString(undefined,{month:"long",year:"numeric",timeZone:"UTC"});
+ const activeDays=calendarMode==="week" ? days.slice(calendarWeekOffset*7,calendarWeekOffset*7+7) : days;
+ const cards=activeDays.map(d=>`<div class="calendar-day ${d.date.slice(0,7)===month?"":"outside"}" data-calendar-date="${d.date}" aria-label="${esc(d.date)} ${esc(d.type)}">
+  <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state state-${d.type}">${d.type==="none"?"—":esc(d.type)}</span>
+  ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
+ </div>`).join("");
+ return `<section class="section training-calendar" aria-label="Training calendar">
+  <div class="calendar-toolbar"><h2>${esc(label)}</h2><div class="row-actions">
+   <button class="btn small" data-act="calendarprev" aria-label="Previous month">←</button>
+   <button class="btn small" data-act="calendartoday">Today</button>
+   <button class="btn small" data-act="calendarnext" aria-label="Next month">→</button>
+  </div></div>
+  <div class="calendar-toolbar"><label>View <select data-calendar-mode aria-label="Calendar view"><option value="month" ${calendarMode==="month"?"selected":""}>Month</option><option value="week" ${calendarMode==="week"?"selected":""}>Week</option></select></label>
+  <p aria-live="polite">Adherence: ${stats.percent===null?"No recorded decisions":stats.percent+"%"} · ${stats.completed} completed, ${stats.skipped} skipped. Unlogged days are not counted as missed.</p></div>
+  <div class="calendar-weekdays" aria-hidden="true">${WEEKDAYS.map(d=>`<span>${d.slice(0,3)}</span>`).join("")}</div>
+  <div class="calendar-grid" role="group" aria-label="${esc(label)} calendar">${cards}</div>
+  <p class="muted">Projected dates are shown for weekly schedules only. Repeating cycle schedules do not imply calendar dates. Completed workouts are based on your saved sessions.</p>
+ </section>`;
+}
 function viewHistory(){
   if(savedSessionEdit)return viewSavedSessionEdit();
   if (!S.sessions.length) return `<div class="empty">No sessions yet. Log your first workout and it will show up here.</div>`;
@@ -591,6 +620,17 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
   S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
 });
 
+$("#app").addEventListener("change",e=>{
+ if(e.target.matches("[data-calendar-mode]")){calendarMode=e.target.value;calendarWeekOffset=0;render();}
+});
+$("#app").addEventListener("click",e=>{
+ const b=e.target.closest("button[data-act]");
+ if(!b||!["calendarprev","calendarnext","calendartoday"].includes(b.dataset.act))return;
+ if(b.dataset.act==="calendartoday"){calendarMonth=today().slice(0,7);calendarWeekOffset=0;}
+ else if(calendarMode==="week"){calendarWeekOffset+=b.dataset.act==="calendarprev"?-1:1;if(calendarWeekOffset<0){calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),-1);calendarWeekOffset=4;}if(calendarWeekOffset>4){calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),1);calendarWeekOffset=0;}}
+ else calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),b.dataset.act==="calendarprev"?-1:1);
+ render();
+});
 $("#app").addEventListener("input", e => {
   const t = e.target;
   if(t.matches("[data-exercise-search]")){exerciseQuery=t.value;applyExerciseFilter();return;}

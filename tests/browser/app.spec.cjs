@@ -590,3 +590,34 @@ test('workout editor supports searchable rows and exercise suggestions',async({p
  await page.getByRole('button',{name:'Clear search'}).click();
  await expect(exercise).toHaveValue('Lat pulldown');
 });
+
+test('calendar month/week navigation, status labels and exact adherence survive reload',async({page})=>{
+ const sessions=[{id:'cal-training',date:'2026-03-29',dayId:'pullA',dayName:'Pull A',type:'pull',createdAt:1,notes:'',exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50,r:10}]}]}];
+ const calendarEvents=[{id:'cal-skipped',date:'2026-03-30',type:'skipped',workoutId:'pullA',updatedAt:'2026-03-30T12:00:00Z'}];
+ await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),{sessions,calendarEvents,body:[],custom:[],drafts:{},schedules:[{id:'plan',name:'Weekly',mode:'weekly',days:['pullA',null,'pushA',null,'legsA',null,null],cursor:0}],preferences:{activeScheduleId:'plan'}});
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
+ await page.getByRole('button',{name:'Calendar'}).click();
+ await expect(page.locator('.training-calendar')).toBeVisible();
+ // Navigate to March 2026 without dependence on CI runner local date.
+ for(let i=0;i<14;i++){
+  const month=await page.locator('.training-calendar h2').innerText();
+  if(month==='March 2026')break;
+  const current=new Date(Date.parse(month+' 1, 12:00:00 UTC'));
+  if(Number.isNaN(current.getTime()))throw Error('Invalid displayed month: '+month);
+  const direction=current.getUTCFullYear()>2026||(current.getUTCFullYear()===2026&&current.getUTCMonth()>2)?'Previous month':'Next month';
+  await page.getByRole('button',{name:direction}).click();
+ }
+ await expect(page.locator('.training-calendar h2')).toHaveText('March 2026');
+ await expect(page.locator('[data-calendar-date="2026-03-29"]')).toContainText('completed');
+ await expect(page.locator('[data-calendar-date="2026-03-30"]')).toContainText('skipped');
+ await expect(page.locator('[data-calendar-date="2026-03-31"]')).toContainText('rest');
+ await expect(page.locator('.training-calendar')).toContainText('Adherence: 50%');
+ await page.getByRole('combobox',{name:'Calendar view'}).selectOption('week');
+ await expect(page.locator('.calendar-day')).toHaveCount(7);
+ await page.getByRole('button',{name:'Next month'}).click();
+ await expect(page.locator('.calendar-day')).toHaveCount(7);
+ await page.reload();
+ await page.getByRole('button',{name:'Calendar'}).click();
+ await expect(page.locator('.training-calendar')).toBeVisible();
+});
