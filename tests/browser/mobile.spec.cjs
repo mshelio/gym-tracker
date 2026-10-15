@@ -68,7 +68,7 @@ test('training dashboard action and five-tab navigation remain usable on mobile'
  await action.click();
  await expect(page.locator('#workout-editor')).toBeInViewport();
  const tabs=page.locator('nav.tabs button[data-tab]');
- await expect(tabs).toHaveCount(5);
+ await expect(tabs).toHaveCount(6);
  for(const tab of ['history','calendar','progress','data','log']){
   await page.locator('nav.tabs button[data-tab="'+tab+'"]').click();
   await expect(page.locator('nav.tabs button[data-tab="'+tab+'"]')).toHaveAttribute('aria-current','page');
@@ -115,4 +115,18 @@ test('backup preferences explain destructive replacement and preserve cancellati
  await page.locator('[data-act="import"]').click();
  await expect(page.locator('#importResult')).toContainText('cancelled');
  await expect(page.locator('#importMode')).toHaveValue('replace');
+});
+
+test('Home dashboard shows training overview and routes into existing workout flows',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="home"]').click();
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+ await expect(page.getByRole('progressbar',{name:'Weekly workout progress'})).toBeVisible();
+ await page.getByRole('button',{name:/Start New Workout/}).click();
+ await expect(page.locator('.workout-layout')).toBeVisible();
+ await page.locator('nav.tabs button[data-tab="home"]').click();
+ await page.getByRole('button',{name:/View schedule/}).click();
+ await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
