@@ -319,6 +319,7 @@ function updateTimers(){
  const elapsed=document.querySelector('[data-timer="workout"]'),remaining=document.querySelector('[data-timer="rest"]');
  if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
  if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
+ const mini=document.querySelector("[data-timer=mini-rest]");if(mini)mini.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
  const overlay=document.querySelector("[data-timer=overlay-rest]");if(overlay)overlay.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
 }
 if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
@@ -451,7 +452,7 @@ function viewLog(){
         ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
       <details class="guide-card workout-guidance"><summary>Workout guidance</summary><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></details>
-    </aside></div>`;
+    </aside></div>${d.restTimer?`<button class="rest-mini" type="button" data-act="timeropen" aria-label="Open rest timer"><span>Rest</span> <strong data-timer="mini-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></button>`:""}`;
 
 }
 
