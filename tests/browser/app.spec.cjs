@@ -621,3 +621,26 @@ test('calendar month/week navigation, status labels and exact adherence survive 
  await page.getByRole('button',{name:'Calendar'}).click();
  await expect(page.locator('.training-calendar')).toBeVisible();
 });
+
+test('known exercises carry semantic IDs while custom names remain valid after reload',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.getByText('Session saved')).toBeVisible();
+ const snapshot=()=>page.evaluate(async()=>new Promise((resolve,reject)=>{
+  const open=indexedDB.open('gym-tracker',1);
+  open.onerror=()=>reject(open.error);
+  open.onsuccess=()=>{const db=open.result,tx=db.transaction('snapshots','readonly'),request=tx.objectStore('snapshots').get('primary');
+   request.onsuccess=()=>{db.close();resolve(request.result)};
+   request.onerror=()=>reject(request.error);
+  };
+ }));
+ const before=await snapshot();
+ expect(before.sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
+ await page.reload();
+ await page.getByRole('button',{name:/history/i}).first().click();
+ await expect(page.locator('details.hist')).toHaveCount(1);
+ expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
+});
