@@ -107,6 +107,7 @@ test('rest and workout timers recover from reload and support controls',async({p
 
 test('set types, RIR, and exercise rest survive autosave and session export',async({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  const type=page.getByRole('combobox',{name:/Lat pulldown set 1 type/});
  await type.selectOption('warmup');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('3');
@@ -126,6 +127,7 @@ test('set types, RIR, and exercise rest survive autosave and session export',asy
 
 test('exercise default survives reload and hard-set count excludes warmups', async ({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('135');
  await page.locator('[data-f="increment"]').first().fill('2.5');
  await page.locator('[data-act="incrementunit"]').first().selectOption('kg');
@@ -142,6 +144,7 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
 
 test('invalid exercise increment cannot replace a saved default', async ({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('120');
  await page.locator('[data-f="increment"]').first().fill('2.5');
  await page.locator('[data-act="savedefault"]').first().click();
@@ -169,6 +172,7 @@ test('global rest default persists and restores for future drafts', async ({page
 
 test('exercise defaults stay isolated for same-name rows in a custom workout', async ({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-act="newworkout"]').click();
  await page.locator('[data-ed="name"]').fill('Two same names');
  await page.getByLabel('Exercise 1 name').fill('Row');
@@ -253,6 +257,7 @@ test('dashboard filters training data and displays empty states',async({page})=>
 
 test('v4 backup round trip preserves paused timer and exercise settings',async({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('125');
  await page.locator('[data-f="increment"]').first().fill('2.5');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
@@ -269,6 +274,7 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
 
 test('v4 import restores preferences, merge and replace obey defaults',async({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
  const original=JSON.parse(await page.locator('#exportOut').inputValue());
