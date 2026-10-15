@@ -243,3 +243,35 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{border-color:var
  .hist{border-radius:14px}
 }
 @media(prefers-reduced-motion:reduce){nav.tabs button,.plate{transition:none}.plate:hover{transform:none}}
+
+/* Phase 2: dedicated Home, accessible six-destination navigation. */
+.home-dashboard{display:grid;gap:1rem;max-width:1120px;margin:0 auto}
+.home-primary{background:linear-gradient(120deg,#1769f6,#3d92ff);color:white;border-radius:22px;padding:clamp(1.25rem,3vw,2.4rem);box-shadow:0 12px 32px rgba(24,104,240,.16)}
+.home-primary h2{font-size:clamp(1.45rem,3vw,2.2rem);color:white;margin:.35rem 0}
+.home-primary .eyebrow,.home-primary p{color:white}
+.home-primary p:not(.eyebrow){opacity:.9}
+.home-actions{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.2rem}
+.home-actions .btn{min-height:52px;padding:.7rem 1.2rem}
+.home-actions .btn.primary{background:white!important;color:#145fdc!important;box-shadow:none}
+.home-actions .btn:not(.primary){background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.5);color:white}
+.home-section-head{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.home-count{font-weight:750;color:var(--blue)}
+.home-progress{height:12px;margin:1rem 0 .6rem;background:var(--sunk);border-radius:100px;overflow:hidden}
+.home-progress span{height:100%;display:block;background:linear-gradient(90deg,#1068f3,#39b0ff);border-radius:100px}
+.home-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.home-metrics .section{display:flex;flex-direction:column;gap:.45rem}
+.home-metrics strong{font-size:clamp(1.5rem,3vw,2rem);line-height:1.2}
+.home-metrics .home-metric-name{font-size:clamp(1rem,2vw,1.45rem)}
+.home-shortcut-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-top:1rem}
+.home-shortcut-grid .btn{white-space:normal;text-align:left;min-height:52px}
+@media(max-width:600px){
+ nav.tabs{grid-template-columns:repeat(6,minmax(0,1fr))!important;padding-left:4px!important;padding-right:4px!important}
+ nav.tabs button{padding:6px 0!important;font-size:9px!important;gap:3px!important}
+ nav.tabs button svg{width:19px!important;height:19px!important}
+ .home-primary{padding:1.2rem;border-radius:18px}
+ .home-actions{flex-direction:column}
+ .home-actions .btn{width:100%}
+ .home-metrics{gap:.65rem}
+ .home-metrics .section{padding:.85rem}
+ .home-shortcut-grid{grid-template-columns:1fr}
+}
