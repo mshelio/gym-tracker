@@ -8,6 +8,7 @@ import { createLocalStorage } from "./storage.js";
 import { recommendProgression } from "./progression.js";
 import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
+import { muscleVolumeSummary } from "./muscle-analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 import { resolveExerciseMetadata,resolveExerciseIdentity } from "./exercise-catalog.js";
@@ -537,6 +538,14 @@ function viewProgress(){
   const hardPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.hardSets}));
   const analyticsHTML=`<section class="section analytics-dashboard"><h3>Training analytics</h3>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div><h4>Weekly volume</h4>${weekPts.length?chartSVG(weekPts,"var(--push)",summary.unit+"·reps"):'<p class="empty">No training sessions match these filters.</p>'}<h4>Weekly hard sets</h4>${hardPts.length?chartSVG(hardPts,"var(--pull)","hard sets"):'<p class="empty">No hard-set trend available.</p>'}${summary.weekly.length?`<details><summary>Weekly data table</summary><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></details>`:""}</section>`;
 
+  const muscle=muscleVolumeSummary(filtered,{unit:S.bodyUnit||"kg",secondaryCredit:0.5});
+  const muscleRows=(entries,kind)=>entries.map(entry=>`<tr><td>${esc(entry.muscle)}</td><td>${entry.hardSets}</td><td>${entry.volume}</td><td>${kind}</td></tr>`).join("");
+  const muscleHTML=`<section class="section muscle-analytics" aria-label="Muscle-group volume"><h3>Muscle-group volume</h3>
+    <p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p>
+    <div class="stats"><div class="stat"><b>${muscle.hardSets}</b><small>Total hard sets</small></div><div class="stat"><b>${muscle.unknown.hardSets}</b><small>Unclassified hard sets</small></div></div>
+    <table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
+    <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}
+  </section>`;
   const names = [...new Set(filtered.flatMap(s => (s.exercises||[]).map(e => e.name)).filter(n=>!filter.exercise||n===filter.exercise))].sort();
   let exHtml;
   if (!names.length) exHtml = `<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
