@@ -420,3 +420,33 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
 .subnav button{border:0;min-height:44px;min-width:86px;flex:1;border-radius:12px;background:transparent;color:var(--muted);font:inherit;font-weight:600;cursor:pointer}
 .subnav button[aria-current="page"]{background:var(--glass-2);color:var(--blue);box-shadow:inset 0 1px 0 var(--hi)}
 .more-hub h2{margin-bottom:8px}.more-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:20px}.more-links .btn{display:flex;justify-content:flex-start;align-items:center;text-align:left;min-height:56px}
+
+/* Phase 2: a focused, disclosure-based workout editor. */
+.focused-exercise{padding:0!important;overflow:visible}
+.focused-exercise-summary{display:flex;align-items:center;gap:12px;min-height:70px;padding:14px 16px;cursor:pointer;list-style:none}
+.focused-exercise-summary::-webkit-details-marker,.exercise-options>summary::-webkit-details-marker{display:none}
+.focused-exercise-summary-title{display:flex;flex:1;flex-direction:column;min-width:0;font-family:var(--display);font-size:15px;font-weight:700;line-height:1.35}
+.focused-exercise-summary-title small{font-family:var(--body);font-size:11px;font-weight:500;color:var(--muted);margin-top:5px}
+.focused-chevron{font-size:22px;color:var(--blue);transition:transform .16s ease}
+.focused-exercise[open]>.focused-exercise-summary .focused-chevron{transform:rotate(180deg)}
+.focused-exercise-body{padding:0 16px 16px;border-top:1px solid var(--line)}
+.focused-exercise-body>.ex-head{margin-top:12px}
+.focused-exercise:focus-within{border-color:var(--blue)}
+.exercise-options{background:var(--sunk);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin:12px 0}
+.exercise-options>summary{list-style:none;cursor:pointer;color:var(--muted);font-size:12px;font-weight:650;min-height:26px}
+.exercise-options[open]>summary{color:var(--blue);margin-bottom:12px}
+.workout-set-row select[data-act="settype"],.workout-set-row input[data-f="rir"]{display:none}
+.focused-exercise:has(.exercise-options[open]) .workout-set-row select[data-act="settype"],
+.focused-exercise:has(.exercise-options[open]) .workout-set-row input[data-f="rir"]{display:block}
+.workout-guidance{padding:14px}
+.workout-guidance>summary{cursor:pointer;list-style:none;min-height:30px;font-weight:650}
+.workout-guidance[open]>summary{margin-bottom:14px}
+.session-sidebar .session-card{position:sticky;top:16px}
+@media(max-width:600px){
+ .focused-exercise-summary{padding:13px;min-height:64px}
+ .focused-exercise-body{padding:0 12px 14px}
+ .session-sidebar{position:relative!important;top:auto!important}
+ .session-sidebar .session-card{position:relative;top:auto}
+ .session-card .finish-session-action{min-height:52px}
+}
+@media(prefers-reduced-motion:reduce){.focused-chevron{transition:none}}
