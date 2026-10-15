@@ -10,6 +10,7 @@ import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
+import { resolveExerciseMetadata,resolveExerciseIdentity } from "./exercise-catalog.js";
 import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence } from "./calendar.js";
 
 (() => {
@@ -32,7 +33,7 @@ function parseProgram(j){
     ids.add(w.id);
     return {id:w.id, name:w.name, type:w.type, unit:j.defaultUnit === "kg" ? "kg" : "lb", ex:w.exercises.map(e => {
       if (!e || typeof e.name !== "string" || !e.name.trim() || !Number.isInteger(e.sets) || e.sets < 1 || e.sets > 30 || !Number.isInteger(e.repsMin) || !Number.isInteger(e.repsMax) || e.repsMin < 1 || e.repsMax < e.repsMin || e.repsMax > 100 || (e.alternatives != null && (!Array.isArray(e.alternatives) || e.alternatives.some(a => typeof a !== "string")))) throw new Error("Invalid exercise");
-      return {n:e.name, s:e.sets, lo:e.repsMin, hi:e.repsMax, alt:e.alternatives || []};
+      return {n:e.name, s:e.sets, lo:e.repsMin, hi:e.repsMax, alt:e.alternatives || [],...(resolveExerciseIdentity(e.name,e.exerciseId)?{exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)}:{})};
     })};
   });
   if (!j.rotation.length || j.rotation.some(id => !ids.has(id)) || new Set(j.rotation).size !== j.rotation.length || j.rotation.length !== workouts.length) throw new Error("Invalid rotation");
@@ -769,7 +770,7 @@ async function saveSession(btn){
   if(sessionSavePending)return;
   const day = getDay(S.dayId), d = getDraft(S.dayId);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){toast("Use non-negative weights and whole-number reps.");return;}
-  const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), ...(e.exerciseId ? {exerciseId:e.exerciseId} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
+  const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){toast("RIR must be a whole number from 0 to 10.");return;}
   if (!exercises.length) { toast("Enter reps for at least one set first."); return; }
   if (!validDataDate(d.date)) { toast("Pick a valid date for this session."); return; }
@@ -792,7 +793,7 @@ async function saveWorkout(btn){
     const s = Math.min(10, Math.max(1, Math.round(num(e.s) || 3)));
     let lo = Math.min(50, Math.max(1, Math.round(num(e.lo) || 8))), hi = Math.min(50, Math.max(1, Math.round(num(e.hi) || lo)));
     if (lo > hi) [lo, hi] = [hi, lo];
-    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [], ...(e.exerciseId||(!previousDefinition||!previousDefinition.ex?.[i]||previousDefinition.ex[i].n!==e.n)?{exerciseId:e.exerciseId||uid("ex")}:{}) };
+    return { n: (e.n||"").trim().slice(0,80), s, lo, hi, alt: [], ...(e.exerciseId||(!previousDefinition||!previousDefinition.ex?.[i]||previousDefinition.ex[i].n!==e.n)?{exerciseId:resolveExerciseIdentity(e.n,e.exerciseId)||uid("ex")}:{}) };
   }).filter(e => e.n);
   if (!name) { toast("Give the workout a name."); return; }
   if (!ex.length) { toast("Add at least one exercise."); return; }
