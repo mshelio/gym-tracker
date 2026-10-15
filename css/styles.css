@@ -70,3 +70,6 @@ input,select,textarea{background-color:var(--field-bg);color:var(--ink)}
 @media (max-width:760px){.theme-settings{margin:.4rem .3rem}.theme-settings select{min-height:44px}}
 @media (forced-colors:active){.theme-settings select{forced-color-adjust:auto;border:1px solid ButtonText}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+.pwa-status-banner{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));right:12px;z-index:99;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font:14px system-ui;max-width:min(90vw,360px);box-shadow:var(--elevation)}
+.pwa-status-action{margin-left:12px;padding:7px 10px;min-height:44px;border-radius:5px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);cursor:pointer}
