@@ -103,3 +103,25 @@ nav.tabs button{min-height:48px}
  nav.tabs button span:last-child{overflow:hidden;text-overflow:ellipsis;max-width:100%}
  #app{padding-bottom:calc(125px + env(safe-area-inset-bottom))}
 }
+
+/* v1.4 logging UX: maintain legible, finger-friendly controls in dense set rows. */
+.exercise-search-panel{display:grid;gap:.5rem}
+.exercise-search-panel input[type="search"]{width:100%;min-height:48px}
+.exercise-search-panel [data-act="clearexercisesearch"]{min-height:44px;justify-self:start}
+.setrow{gap:clamp(4px,.8vw,12px);align-items:center}
+.setrow input,.setrow select,.setrow .set-complete{min-height:44px}
+.setrow input{min-width:0}
+.setrow .set-complete[aria-pressed="true"]{font-weight:750;outline-offset:2px}
+.setrow .set-complete:focus-visible,.timer-actions button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.last{border-left:3px solid var(--pull);padding-left:.6rem}
+.timer-panel{gap:.7rem}
+.timer-actions{display:flex;flex-wrap:wrap;gap:.45rem}
+.timer-actions button{min-height:44px}
+.finish-session-action{min-height:52px;width:100%}
+#session-save-help{font-size:.82rem;line-height:1.5;margin:.5rem 0}
+@media(max-width:600px){
+ .setrow{row-gap:.55rem}
+ .setrow .set-complete{min-height:48px}
+ .timer-actions button{flex:1 1 calc(50% - .5rem)}
+}
+@media(forced-colors:active){.last{border-color:Highlight}.setrow .set-complete[aria-pressed="true"]{outline:2px solid Highlight}}
