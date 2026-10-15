@@ -659,7 +659,7 @@ test('muscle analytics updates after session corrections and excludes warmups',a
  await expect(page.locator('.muscle-analytics')).toContainText('Primary');
  await expect(page.locator('.muscle-analytics')).toContainText('Secondary (0.5)');
  await expect(page.locator('.muscle-analytics')).toContainText('Unknown');
- await expect(page.locator('.muscle-analytics .chart svg').first()).toHaveAttribute('tabindex','0');
+ await expect(page.locator('.muscle-analytics')).toContainText('Log this at least twice to see a trend line.');
  await page.getByRole('button',{name:/history/i}).first().click();
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
