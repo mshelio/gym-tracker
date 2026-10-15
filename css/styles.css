@@ -275,3 +275,32 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{border-color:var
  .home-metrics .section{padding:.85rem}
  .home-shortcut-grid{grid-template-columns:1fr}
 }
+
+/* Phase 3: active workout-first controls for the blue design language */
+.redesigned-workout{align-items:start;gap:clamp(1rem,2vw,1.6rem)}
+.active-exercise{border-radius:20px;overflow:visible;padding:clamp(.9rem,2vw,1.35rem);margin-bottom:1rem;border-color:var(--line)}
+.workout-exercise-head{padding-bottom:.8rem;border-bottom:1px solid var(--line);margin-bottom:.8rem;align-items:center}
+.workout-exercise-head .ex-number{background:var(--blue-soft);color:var(--blue);font-weight:800;border-radius:10px;min-width:35px;min-height:35px;display:grid;place-items:center}
+.active-exercise .exercise-meta{gap:.55rem;margin:.6rem 0}
+.workout-previous{background:var(--sunk);padding:.75rem;border-left:3px solid var(--blue);border-radius:9px;color:var(--ink);font-size:.86rem;line-height:1.5}
+.workout-previous strong{color:var(--blue)}
+.workout-set-heading{font-size:.74rem;font-weight:750;color:var(--muted);letter-spacing:.03em}
+.workout-set-row{padding:.55rem .35rem;border-radius:13px;transition:background .14s ease;gap:8px}
+.workout-set-row:nth-child(even){background:var(--sunk)}
+.workout-set-row.is-complete{background:var(--blue-soft);border:1px solid color-mix(in srgb,var(--blue) 25%,transparent)}
+.workout-set-row .setrow__label{font-weight:750;white-space:nowrap;color:var(--ink)}
+.workout-set-row input,.workout-set-row select{background:var(--surface);border:1px solid var(--line);min-height:46px;padding-inline:.35rem}
+.workout-set-row input:focus-visible{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.workout-set-row .set-complete{border-radius:10px;min-height:46px;white-space:nowrap;padding-inline:.5rem;font-weight:750}
+.workout-set-row .set-complete[aria-pressed="true"]{background:var(--blue)!important;color:white!important}
+.active-exercise .row-actions{gap:.5rem;flex-wrap:wrap;padding-top:.5rem}
+.active-exercise .row-actions .btn{min-height:44px}
+@media(max-width:600px){
+ .active-exercise{padding:.8rem;border-radius:16px}
+ .workout-set-row{gap:5px;padding:.5rem .15rem}
+ .workout-set-row .setrow__label{font-size:.72rem}
+ .workout-set-row input,.workout-set-row select{font-size:14px;padding:.35rem .2rem}
+ .workout-set-row .set-complete{font-size:12px;padding:.3rem;white-space:normal}
+ .workout-exercise-head{gap:.5rem}
+}
+@media(prefers-reduced-motion:reduce){.workout-set-row{transition:none}}
