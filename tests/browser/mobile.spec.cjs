@@ -130,3 +130,17 @@ test('Home dashboard shows training overview and routes into existing workout fl
  await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('blue active workout provides accessible editable set cards and previous performance',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ const exercise=page.locator('.active-exercise').first();
+ await expect(exercise).toBeVisible();
+ const set=exercise.locator('.workout-set-row').first();
+ await expect(set).toHaveAttribute('role','group');
+ await expect(set.getByRole('spinbutton',{name:/weight in/i})).toBeVisible();
+ await expect(set.getByRole('spinbutton',{name:/reps/i})).toBeVisible();
+ await expect(set.locator('.set-complete')).toHaveAttribute('aria-pressed',/true|false/);
+ await expect(page.locator('.redesigned-workout')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
