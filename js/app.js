@@ -279,6 +279,7 @@ function render(){
   const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${intro[0]}</p><h1>${intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
     <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "calendar" ? viewCalendar() : S.tab === "progress" ? viewProgress() : viewData());
+  if(restOverlayOpen&&S.tab==="log"&&!S.editing&&!S.scheduleEditing&&!S.manageSchedules){const d=getDraft(S.dayId);app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -286,9 +287,26 @@ function render(){
 }
 
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
+let restOverlayOpen=false;
+function restOverlayMarkup(d){
+ const rest=d.restTimer,remaining=timerTools.remaining(rest),paused=rest?.pausedRemainingMs!=null;
+ return `<div class="rest-overlay" role="dialog" aria-modal="true" aria-label="Rest timer" data-rest-overlay>
+ <div class="rest-overlay__card"><button type="button" class="btn rest-overlay__close" data-act="timerclose" aria-label="Close rest timer">✕</button>
+ <p class="eyebrow">RECOVER AND RESET</p><h2>Rest timer</h2>
+ <p class="muted" id="rest-timer-instructions">Your countdown stays accurate when the app is in the background.</p>
+ <strong class="rest-overlay__count" data-timer="overlay-rest" role="timer" aria-label="Remaining rest time">${rest?timerLabel(remaining):"00:00"}</strong>
+ <span class="rest-overlay__state" data-rest-state>${!rest?"Timer is not running":paused?"Paused":"Time to recover"}</span>
+ <div class="rest-overlay__adjust" role="group" aria-label="Adjust rest duration">
+ <button type="button" class="btn" data-act="timeradjust" data-seconds="-15" ${!rest?"disabled":""}>−15 sec</button>
+ <button type="button" class="btn" data-act="timeradjust" data-seconds="15" ${!rest?"disabled":""}>+15 sec</button></div>
+ <div class="rest-overlay__buttons" role="group" aria-label="Rest timer controls">
+ <button type="button" class="btn primary" data-act="${paused?"timerresume":"timerpause"}" ${!rest?"disabled":""}>${paused?"Resume":"Pause"}</button>
+ <button type="button" class="btn" data-act="timerskip" ${!rest?"disabled":""}>Skip rest</button></div>
+ </div></div>`;
+}
 function timerPanel(d){
  const rest=d.restTimer,seconds=timerTools.remaining(rest),elapsed=timerTools.elapsed(d.startedAt);
- return `<div class="timer-panel" role="group" aria-label="Workout and rest timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest" aria-label="Rest time remaining">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><button class="btn small" data-act="saveglobalrest">Save global rest default</button><div class="timer-actions" role="group" aria-label="Rest timer actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
+ return `<div class="timer-panel" role="group" aria-label="Workout and rest timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest" aria-label="Rest time remaining">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><button class="btn small" data-act="saveglobalrest">Save global rest default</button><button class="btn primary" type="button" data-act="timeropen">Open rest timer</button><div class="timer-actions" role="group" aria-label="Rest timer actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
 }
 function updateTimers(){
  if(!S.ready||S.tab!=="log"||S.editing||S.scheduleEditing||S.manageSchedules)return;
@@ -296,6 +314,7 @@ function updateTimers(){
  const elapsed=document.querySelector('[data-timer="workout"]'),remaining=document.querySelector('[data-timer="rest"]');
  if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
  if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
+ const overlay=document.querySelector("[data-timer=overlay-rest]");if(overlay)overlay.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
 }
 if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
 document.addEventListener("visibilitychange",updateTimers);
@@ -750,6 +769,10 @@ $("#app").addEventListener("click", async e => {
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="timeropen"){restOverlayOpen=true;render();return;}
+  if(act==="timerclose"){restOverlayOpen=false;render();document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});return;}
+  if(act==="timeradjust"){const d=getDraft(S.dayId),t=d.restTimer,delta=Number(b.dataset.seconds);if(t&&Number.isFinite(delta)){const ms=Math.max(0,(t.pausedRemainingMs!=null?t.pausedRemainingMs:t.deadline-Date.now())+delta*1000);d.restTimer={...t,deadline:Date.now()+ms,pausedRemainingMs:t.pausedRemainingMs!=null?ms:null,durationSeconds:Math.max(0,(t.durationSeconds||0)+delta)};saveDrafts();render();}return;}
+
   if(["homestart","homecontinue","homeschedule","homeprogress","homehistory"].includes(act)){
    if(act==="homeprogress")S.tab="progress";else if(act==="homehistory")S.tab="history";else {S.tab="log";if(act==="homecontinue"&&getDay(b.dataset.id))S.dayId=b.dataset.id;if(act==="homeschedule")S.manageSchedules=true;}
    render();window.scrollTo({top:0});return;
@@ -762,7 +785,7 @@ $("#app").addEventListener("click", async e => {
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
   if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
-  if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip")d.restTimer=null;if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
+  if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
   if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=getDraft(S.dayId).restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
    if(act==="resetdefault"){const e=grp(),key=settingKey(e,+b.dataset.i,b.dataset.g),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};if(Object.hasOwn(next,exerciseKey(e.name)))next[key]={};else delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;for(const field of ["restSeconds","loadIncrement","incrementUnit"]){if(before[field]===undefined)delete e[field];else e[field]=before[field];}toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
   if(act==="savedefault"){const e=grp();const key=settingKey(e,+b.dataset.i,b.dataset.g);const rawIncrement=e.loadIncrement==null||e.loadIncrement===""?S.exerciseDefaults?.[key]?.loadIncrement:e.loadIncrement;
