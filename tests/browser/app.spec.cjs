@@ -476,7 +476,7 @@ test('service worker caches app shell and preserves draft on offline reload',asy
 
 test('edit completed workout atomically without advancing schedule or losing metadata',async({page})=>{
  await page.goto('/gym-tracker/');
- const before=await page.locator('.overview').innerText();
+ await expect(page.locator('.workout-hero')).toBeVisible();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.getByRole('button',{name:/Finish & save session/}).click();
@@ -554,7 +554,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await b.reload();
   // Firefox may complete navigation before async IndexedDB hydration. Verify
   // a completed app render before looking for the historical session.
-  await expect(b.locator('.overview')).toBeVisible();
+  await expect(b.locator('.workout-hero')).toBeVisible();
   await b.getByRole('button',{name:/history/i}).first().click();
   await expect(b.locator('details.hist')).toHaveCount(1);
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
