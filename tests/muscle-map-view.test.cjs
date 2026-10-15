@@ -16,7 +16,7 @@ const fs=require("node:fs"),path=require("node:path");
  assert.match(html,/id="front-chest-left"/);assert.match(html,/role="button" tabindex="0"/);
  assert.match(html,/aria-pressed="true"/);assert.match(html,/Secondary credited sets/);
  assert.match(html,/Unknown exercises: 1 hard sets/);
- assert(!html.includes("front-neck"));
+ assert.match(html,/id="front-neck-left"[^>]+class="muscle-map__anatomy-base" aria-hidden="true"/);
  const empty=view.renderMuscleMap(map.muscleMapData({unit:"lb",primary:[],secondary:[]}));
  assert.match(empty,/Highest relative activity \(0\)/);
  assert.throws(()=>view.renderMuscleMap(null));
