@@ -160,3 +160,86 @@ nav.tabs button{min-height:48px}
 .pwa-status-dismiss{margin-left:12px;min-height:44px;padding:7px 10px;background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .pwa-status-banner{max-width:min(calc(100vw - 24px),420px);overflow-wrap:anywhere}
 @media(max-width:600px){.pwa-status-banner{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(90px + env(safe-area-inset-bottom))}}
+
+/* Gym Tracker Blue: cohesive visual system for every app view. */
+:root{
+ --bg:#f4f7fc;--surface:#fff;--sunk:#edf3fc;--ink:#101d36;--muted:#65758e;--line:#dfe7f3;
+ --pull:#2469ef;--push:#2264ec;--legs:#6654e8;--other:#16849a;--ok:#10a47a;--focus:#125bde;
+ --blue:#1769ff;--blue-deep:#1055d8;--blue-soft:#eaf2ff;
+ --display:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+ --body:var(--display);color-scheme:light;
+}
+html[data-theme="dark"]{
+ --bg:#0b1424;--surface:#142238;--sunk:#1a304b;--ink:#f0f5ff;--muted:#afc1d9;--line:#304664;
+ --pull:#68a3ff;--push:#68a3ff;--legs:#a69cff;--other:#66c8d9;--ok:#53ddb6;--focus:#89b9ff;
+ --blue:#3385ff;--blue-deep:#2168e7;--blue-soft:#1c385c;color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);letter-spacing:-.008em}
+h1,h2,h3{letter-spacing:-.035em;font-weight:780}
+h1{font-size:clamp(1.9rem,3.2vw,2.8rem)}
+h2{font-size:clamp(1.3rem,2.3vw,1.8rem)}
+h3{font-size:1.1rem}
+header.top{background:var(--surface);border-color:var(--line)}
+.brand-mark{background:linear-gradient(135deg,var(--blue),#5bb2ff);color:#fff;border-radius:14px}
+.nav-caption,.eyebrow{color:var(--blue);font-weight:750;letter-spacing:.09em}
+nav.tabs button{transition:background .15s,color .15s,transform .15s;border-radius:14px}
+nav.tabs button[aria-current="page"]{background:var(--blue-soft)!important;color:var(--blue)!important;font-weight:750}
+nav.tabs button:hover{color:var(--blue)}
+.section,.overview,.overview>div,.workout-hero,.session-card,.guide-card,.ex,.hist,.plate,.stat,.data-grid>.section,.program-details{
+ border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:0 6px 24px rgba(21,64,125,.045)
+}
+.section{padding:clamp(1rem,2.2vw,1.5rem)}
+.page-intro{align-items:center;gap:1rem}
+.page-intro .muted{color:var(--muted)}
+.date-pill,.chip{background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:999px}
+.overview{background:transparent;border:0;box-shadow:none}
+.overview>div{padding:1.15rem}
+.overview b{color:var(--ink);font-size:clamp(1.3rem,2.3vw,1.8rem)}
+.stat-icon,.panel-icon{background:var(--blue-soft);color:var(--blue);border-radius:14px}
+.btn.primary,.workout-hero__action{background:linear-gradient(110deg,#1262f2,#307cff)!important;border-color:transparent!important;color:white!important;box-shadow:0 7px 20px rgba(20,102,250,.22);font-weight:700}
+.btn.primary:hover,.workout-hero__action:hover{filter:brightness(1.07)}
+.btn{border-radius:12px;min-height:44px}
+.btn:not(.primary),.iconbtn{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{border-color:var(--blue)}
+.workout-hero{background:linear-gradient(115deg,#135be6,#3686ff);color:white;padding:clamp(1.2rem,2.4vw,2rem);box-shadow:0 10px 26px rgba(19,95,231,.18)}
+.workout-hero h2,.workout-hero .eyebrow,.workout-hero .muted{color:#fff}
+.workout-hero .muted{opacity:.85}
+.workout-hero__action{background:white!important;color:#155ee3!important;box-shadow:none}
+.plates{gap:.75rem}
+.plate{transition:transform .15s,box-shadow .15s}
+.plate:hover{transform:translateY(-2px);box-shadow:0 9px 24px rgba(22,80,163,.1)}
+.plate[aria-pressed="true"]{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
+.ex{overflow:hidden}
+.ex-head,.dayline,.calendar-toolbar{gap:.75rem}
+.setrow input,.setrow select{border-radius:9px}
+.set-complete[aria-pressed="true"]{background:var(--blue-soft)!important;color:var(--blue)!important;border:1px solid var(--blue)}
+.timer-panel{background:var(--sunk);border-radius:16px;padding:1rem}
+.meter-track{background:var(--line);border-radius:99px}
+#setMeter{background:linear-gradient(90deg,#1167f5,#33a3ff);border-radius:99px}
+.hist summary{padding:.9rem;border-radius:14px}
+.hist[open]{border-color:var(--blue)}
+.analytics-dashboard svg,.muscle-map svg{max-width:100%}
+.analytics-controls{background:var(--sunk);padding:.85rem;border-radius:14px}
+.responsive-table{background:var(--surface)}
+.training-calendar .calendar-day{border:1px solid var(--line);border-radius:11px}
+.calendar-day.state-completed{background:var(--blue-soft)}
+.data-grid{gap:1rem}
+.data-grid textarea{width:100%}
+.pwa-status-banner{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 15px 35px rgba(0,0,0,.16);border-radius:14px}
+@media(max-width:600px){
+ header.top{padding-left:18px;padding-right:18px}
+ nav.tabs{background:color-mix(in srgb,var(--surface) 92%,transparent)!important;border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(16,60,126,.09);backdrop-filter:blur(18px)}
+ nav.tabs button{border-radius:12px}
+ nav.tabs button[aria-current="page"]{background:var(--blue-soft)!important;color:var(--blue)!important}
+ #app{padding:20px 16px calc(128px + env(safe-area-inset-bottom))}
+ .page-intro{align-items:start}
+ .page-intro h1{font-size:1.75rem}
+ .overview{gap:.6rem}
+ .overview>div{border-radius:14px}
+ .workout-hero{border-radius:18px}
+ .section{border-radius:16px}
+ .plate{border-radius:14px}
+ .hist{border-radius:14px}
+}
+@media(prefers-reduced-motion:reduce){nav.tabs button,.plate{transition:none}.plate:hover{transform:none}}
