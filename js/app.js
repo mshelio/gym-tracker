@@ -551,7 +551,24 @@ function viewProgress(){
 
   const muscle=muscleVolumeSummary(filtered,{unit:S.bodyUnit||"kg",exercise:filter.exercise||"",secondaryCredit:0.5});
   const mapData=muscleMapData(muscle,{metric:muscleMapMetric});
-  const muscleMapHTML=`<div class="muscle-map-controls"><label>Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected})}`;
+  // Aggregate only the already-filtered sessions. Reuse the canonical calculation
+  // for each exercise; never infer muscle attribution from display strings.
+  const grouped=new Map();
+  for(const session of filtered)for(const item of session.exercises||[]){
+    if(filter.exercise&&item.name!==filter.exercise)continue;
+    const name=String(item.name||"");
+    if(!grouped.has(name))grouped.set(name,[]);
+    grouped.get(name).push({...session,exercises:[item]});
+  }
+  const contributors=[];
+  for(const [name,entries] of grouped){
+    const totals=muscleVolumeSummary(entries,{unit:S.bodyUnit||"kg",secondaryCredit:0.5});
+    for(const [kind,values] of [["primary",totals.primary],["secondary",totals.secondary]]){
+      for(const row of values)contributors.push({muscle:row.muscle,name,kind,hardSets:row.hardSets,volume:row.volume});
+    }
+  }
+
+  const muscleMapHTML=`<div class="muscle-map-controls"><label>Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected,contributors})}`;
   const muscleRows=(entries,kind)=>entries.map(entry=>`<tr><td>${esc(entry.muscle)}</td><td>${entry.hardSets}</td><td>${entry.volume}</td><td>${kind}</td></tr>`).join("");
   const muscleHTML=`<section class="section muscle-analytics" aria-label="Muscle-group volume"><h3>Muscle-group volume</h3>
     <p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p>
