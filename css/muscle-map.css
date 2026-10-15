@@ -64,3 +64,8 @@
 :root[data-theme="dark"] .muscle-map__activation--inactive{fill:#54675c}
 :root[data-theme="dark"] .muscle-map__activation--primary{fill:#ad91ff}
 :root[data-theme="dark"] .muscle-map__activation--secondary{fill:#79c9ea}
+
+/* Blue design system: muscle activity levels share the app accent palette. */
+.muscle-map__region{fill:color-mix(in srgb,var(--blue) calc(var(--muscle-intensity)*82%),var(--sunk));stroke:var(--surface)}
+.muscle-map__region:hover,.muscle-map__region:focus-visible{stroke:var(--blue-deep)}
+.muscle-map__view{background:var(--sunk);border-radius:15px;padding:.8rem}
