@@ -55,6 +55,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.resolveExerciseMetadata("Machine chest press")?.primaryMuscle,"chest");
   assert.notEqual(a.resolveExerciseMetadata("Leg press")?.exerciseId,a.resolveExerciseMetadata("Barbell bench press")?.exerciseId);
   assert.equal(a.parseProgram(canonical).workouts.find(w=>w.id==="pullA").ex[0].exerciseId,"catalog:lat-pulldown");
+  for(const workout of canonical.workouts)for(const exercise of workout.exercises)assert(a.resolveExerciseMetadata(exercise.name),`Missing catalog metadata: ${exercise.name}`);
   assert.equal(a.isLocalDate("2026-03-29"),true);
   assert.equal(a.isLocalDate("2026-02-30"),false);
   const calendarWeekPlan={mode:"weekly",days:["pullA",null,"pushA",null,"legsA",null,null],cursor:0};
