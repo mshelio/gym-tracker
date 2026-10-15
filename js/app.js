@@ -575,7 +575,7 @@ function viewProgress(){
   const wpts = visibleBody.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
   const recent = visibleBody.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
     <button class="btn small danger" data-act="delbody" data-id="${esc(b.id)}">${S.armedDelete===b.id?"Tap again":"Delete"}</button></li>`).join("");
-  return `${analyticsHTML}<div class="section"><h3>Lifts</h3>${exHtml}</div>
+  return `${analyticsHTML}${muscleHTML}<div class="section"><h3>Lifts</h3>${exHtml}</div>
     <div class="section"><h3>Body</h3>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
