@@ -59,3 +59,19 @@ test('mobile appearance control remains operable and saved after reload',async({
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('training dashboard action and five-tab navigation remain usable on mobile',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ const action=page.locator('.workout-hero__action');
+ await expect(action).toContainText(/Start Workout|Continue Workout/);
+ await action.click();
+ await expect(page.locator('#workout-editor')).toBeInViewport();
+ const tabs=page.locator('nav.tabs button[data-tab]');
+ await expect(tabs).toHaveCount(5);
+ for(const tab of ['history','calendar','progress','data','log']){
+  await page.locator('nav.tabs button[data-tab="'+tab+'"]').click();
+  await expect(page.locator('nav.tabs button[data-tab="'+tab+'"]')).toHaveAttribute('aria-current','page');
+ }
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
