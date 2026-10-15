@@ -10,7 +10,7 @@ import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { muscleVolumeSummary } from "./muscle-analytics.js";
 import { muscleMapData } from "./muscle-map-data.js";
-import { renderMuscleMap } from "./muscle-map-view.js";
+import { renderMuscleMap,renderExerciseMusclePreview } from "./muscle-map-view.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 import { resolveExerciseMetadata,resolveExerciseIdentity } from "./exercise-catalog.js";
@@ -334,6 +334,10 @@ function applyExerciseFilter(){
  const empty=document.querySelector('[data-exercise-search-empty]');
  if(empty)empty.hidden=shown!==0;
 }
+function exerciseActivationInfo(name){
+ const metadata=resolveExerciseMetadata(name);
+ return `<details class="exercise-activation"><summary>Muscles worked</summary>${renderExerciseMusclePreview(metadata)}</details>`;
+}
 function viewLog(){
   if(S.scheduleEditing)return viewScheduleEditor();
   if(S.manageSchedules)return viewScheduleManager();
@@ -355,6 +359,7 @@ function viewLog(){
     return `<section class="ex ${esc(day.type)}" data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
       <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
+      ${exerciseActivationInfo(de.name)}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(de,i,"",d)}
       ${progressionHint(de,e)}<div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
@@ -366,6 +371,7 @@ function viewLog(){
     return `<section class="ex other" data-exercise-search-item="${esc(x.name)}">
       <div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
+      ${x.name.trim()?exerciseActivationInfo(x.name):""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(x,i,"x",d)}
       ${progressionHint(x,null)}<div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
