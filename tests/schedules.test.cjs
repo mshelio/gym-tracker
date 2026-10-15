@@ -62,6 +62,8 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   ]},{date:"2026-03-30",dayId:"pushA",exercises:[{name:"Barbell bench press",unit:"kg",sets:[{w:90,r:5,type:"working",completed:true}]}]}];
   const muscleResult=a.muscleVolumeSummary(muscleSessions,{unit:"kg"});
   assert.equal(muscleResult.hardSets,3);
+  assert.equal(a.muscleVolumeSummary(muscleSessions,{exercise:"Barbell bench press"}).hardSets,2);
+  assert.equal(a.muscleVolumeSummary(muscleSessions,{exercise:"Barbell bench press"}).unknown.hardSets,0);
   assert.equal(muscleResult.volume,2350);
   assert.equal(muscleResult.primary.find(x=>x.muscle==="chest").hardSets,2);
   assert.equal(muscleResult.primary.find(x=>x.muscle==="chest").volume,2050);
