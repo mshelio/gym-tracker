@@ -73,3 +73,17 @@ input,select,textarea{background-color:var(--field-bg);color:var(--ink)}
 
 .pwa-status-banner{position:fixed;bottom:max(12px,env(safe-area-inset-bottom));right:12px;z-index:99;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font:14px system-ui;max-width:min(90vw,360px);box-shadow:var(--elevation)}
 .pwa-status-action{margin-left:12px;padding:7px 10px;min-height:44px;border-radius:5px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);cursor:pointer}
+
+/* Preserve navigation geometry in compact and installed mobile layouts. */
+@media (min-width:601px) and (max-width:1000px){
+ .theme-settings{margin:auto 0 0;width:100%;min-width:0}
+ .theme-settings label{font-size:.65rem}
+ .theme-settings select{font-size:11px;padding:.45rem .15rem;width:100%;min-width:0}
+}
+@media (max-width:600px){
+ header.top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:center;background:var(--bg)}
+ .theme-settings{grid-column:1/-1;display:flex;align-items:center;gap:.75rem;margin:.5rem 0 0}
+ .theme-settings select{width:min(100%,240px);flex:1}
+ nav.tabs{grid-template-columns:repeat(5,minmax(0,1fr));background:var(--overlay)}
+ nav.tabs button[aria-current=page]{background:var(--brand);color:var(--brand-contrast)}
+}
