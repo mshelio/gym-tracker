@@ -41,3 +41,18 @@ test('muscle map touch targets, anatomy coverage, and mobile layout',async({page
  }else await map.locator('#front-chest-left').click();
  await expect(map.locator('.muscle-map__details')).toContainText('Chest');
 });
+
+test('contributors and accessible table work with pointer, keyboard and touch',async({page,isMobile})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/Progress/}).first().click();
+ const map=page.locator('.muscle-map');
+ await expect(map.locator('.muscle-map__instructions')).toContainText('accessible muscle table');
+ await map.locator('.muscle-map__contributors summary').click();
+ await expect(map.locator('.muscle-map__contributors')).toContainText('No classified exercise contributions');
+ await map.locator('.muscle-map__table summary').click();
+ const fallback=map.locator('.muscle-map__table button[data-muscle="triceps"]');
+ await expect(fallback).toBeVisible();
+ if(isMobile)await fallback.tap();else {await fallback.focus();await fallback.press('Enter');}
+ await expect(map.locator('.muscle-map__details')).toContainText('Triceps');
+ await expect(map.locator('.muscle-map__table button[data-muscle="triceps"]')).toHaveAttribute('aria-pressed','true');
+});
