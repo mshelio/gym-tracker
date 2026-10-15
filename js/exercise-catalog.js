@@ -27,7 +27,11 @@ const normalize=name=>String(name||"").trim().toLowerCase().replace(/\\s+/g," ")
 const lookup=new Map();
 for(const [id,name,primaryMuscle,secondaryMuscles,equipment,aliases] of known){
  const value={id:"catalog:"+id,primaryMuscle,secondaryMuscles,equipment};
- for(const alias of [name,...aliases]){const k=normalize(alias);if(!lookup.has(k))lookup.set(k,value);}
+ lookup.set(normalize(name),value);
+}
+for(const [id,name,primaryMuscle,secondaryMuscles,equipment,aliases] of known){
+ const value={id:"catalog:"+id,primaryMuscle,secondaryMuscles,equipment};
+ for(const alias of aliases){const k=normalize(alias);if(!lookup.has(k))lookup.set(k,value);}
 }
 export function resolveExerciseMetadata(name){
  const item=lookup.get(normalize(name));
