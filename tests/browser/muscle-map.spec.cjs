@@ -23,6 +23,21 @@ test('Muscle map regions support keyboard selection',async({page})=>{
  const triceps=page.locator('#back-triceps-left');
  await triceps.focus();
  await triceps.press('Enter');
+ await expect(triceps).toBeFocused();
  await expect(page.locator('.muscle-map__details')).toContainText('Triceps');
  await expect(page.locator('#back-triceps-left')).toHaveAttribute('aria-pressed','true');
+});
+
+
+test('muscle map touch targets, anatomy coverage, and mobile layout',async({page,isMobile})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/Progress/}).first().click();
+ const map=page.locator('.muscle-map');
+ expect(await map.locator('.muscle-map__region').count()).toBeGreaterThan(50);
+ expect(await map.locator('.muscle-map__anatomy-base').count()).toBeGreaterThan(10);
+ if(isMobile){
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
+  await map.locator('#front-chest-left').tap();
+ }else await map.locator('#front-chest-left').click();
+ await expect(map.locator('.muscle-map__details')).toContainText('Chest');
 });

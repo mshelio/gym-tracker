@@ -1,8 +1,12 @@
 # Gym Tracker
 
-Release history: [CHANGELOG.md](CHANGELOG.md). The forthcoming v1.2.0 release notes are staged in [docs/releases/v1.2.0-draft.md](docs/releases/v1.2.0-draft.md); no v1.2.0 tag or release has been published.
+Release history: [CHANGELOG.md](CHANGELOG.md). The latest released version is v1.2.0. The v1.3.0 muscle-visualization work is merged on main, but v1.3.0 remains unreleased. Draft notes: [docs/releases/v1.3.0-draft.md](docs/releases/v1.3.0-draft.md).
 
 A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter schedule; you can train with any split.
+
+## v1.3.0 muscle visualizations
+
+**Progress → Muscle-group volume** displays detailed interactive front/back anatomy, using credited primary hard sets or primary volume as a relative heatmap. Choose a muscle by pointer, touch or keyboard (Tab then Enter/Space) to inspect precise primary and separately credited secondary sets and volumes. The exact-values table is an accessible fallback; unknown exercises remain unclassified. In **Train**, expand **Muscles worked** for primary and secondary exercise targets. These diagrams illustrate training attribution, not actual measured muscle activation, growth or recovery. The SVG geometry is adapted from `vulovix/body-muscles`, Apache-2.0; see `assets/vendor/body-muscles/LICENSE` and `NOTICE`. All assets are bundled locally for offline use.
 
 ## Files and setup
 

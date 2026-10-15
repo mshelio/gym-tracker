@@ -245,6 +245,7 @@ function draftHasData(d){ return [...d.ex, ...(d.extra||[])].some(e => e.sets.so
 function render(){
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === S.tab ? "page" : "false"));
   const active = document.activeElement, key = active && active.dataset ? active.dataset.key : null;
+  const mapFocus = S.tab==="progress" && active?.matches?.(".muscle-map [data-muscle]") ? {muscle:active.dataset.muscle,id:active.id} : null;
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
@@ -256,6 +257,7 @@ function render(){
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
+  if(mapFocus){const el=[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.id===mapFocus.id&&x.dataset.muscle===mapFocus.muscle)||[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.dataset.muscle===mapFocus.muscle);el?.focus({preventScroll:true});}
 }
 
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
