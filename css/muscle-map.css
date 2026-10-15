@@ -32,3 +32,12 @@
 .muscle-map__activation--primary{fill:#7056cc}
 .muscle-map__activation--secondary{fill:#6da5d3}
 @media (forced-colors:active){.muscle-map__activation--primary{fill:Highlight;stroke:CanvasText}.muscle-map__activation--secondary{fill:Mark;stroke:CanvasText}.muscle-map__activation--inactive{fill:Canvas}}
+
+/* Detailed vendor anatomy uses a 35×93 viewBox, so strokes are in SVG units. */
+.muscle-map__view svg,.muscle-map__exercise-figures svg{overflow:visible}
+.muscle-map__anatomy-base{fill:#e1e5e2;stroke:#a9b3ad;stroke-width:.11;pointer-events:none}
+.muscle-map__region{stroke:#fff;stroke-width:.14;stroke-linejoin:round}
+.muscle-map__region:hover,.muscle-map__region:focus-visible{stroke:var(--ink);stroke-width:.25}
+.muscle-map__region.is-selected{stroke:var(--ink);stroke-width:.26}
+.muscle-map__activation{stroke:#fff;stroke-width:.13;stroke-linejoin:round}
+@media(forced-colors:active){.muscle-map__anatomy-base{fill:Canvas;stroke:CanvasText}.muscle-map__region{fill:Highlight;stroke:CanvasText}}
