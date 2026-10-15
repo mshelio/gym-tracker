@@ -1,9 +1,9 @@
 // Versioned app shell only. Never cache IndexedDB, API mutations or user backups.
-const VERSION='gt-shell-52126a61';
+const VERSION='gt-shell-f15b3a4e';
 const SHELL=['./','./index.html','./manifest.webmanifest','./css/styles.css','./ppl-default-workouts.json',
  './js/app.js','./js/pwa.js','./js/config.js','./js/state.js','./js/workouts.js','./js/render.js',
  './js/schedules.js','./js/storage.js','./js/timers.js','./js/exercise-settings.js',
- './js/muscle-map-data.js','./js/muscle-map-view.js','./css/muscle-map.css',
+ './js/muscle-map-data.js','./js/anatomy-paths.js','./js/muscle-map-view.js','./css/muscle-map.css',
  './js/progression.js','./js/exercise-catalog.js','./js/records.js','./js/analytics.js','./js/muscle-analytics.js','./js/calendar.js',
  './assets/icons/icon-192.png','./assets/icons/icon-512.png','./assets/icons/icon-maskable-512.png'];
 const scope=new URL(self.registration.scope);

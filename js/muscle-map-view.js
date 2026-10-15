@@ -1,38 +1,48 @@
 import { MUSCLE_REGIONS } from "./muscle-map-data.js";
+import { ANATOMY_PATHS } from "./anatomy-paths.js";
 
-// Self-authored schematic regions (not a medical anatomical illustration).
-// Each focusable muscle shape is a semantic button; keyboard and pointer share one handler.
-const shapes = {
- "front-chest-left":[94,108,25,18],"front-chest-right":[146,108,25,18],
- "front-deltoid-left":[65,91,13,23],"front-deltoid-right":[175,91,13,23],
- "front-biceps-left":[55,145,12,28],"front-biceps-right":[185,145,12,28],
- "front-forearm-left":[43,202,10,30],"front-forearm-right":[197,202,10,30],
- "front-core":[120,180,29,47],
- "front-quads-left":[99,299,18,53],"front-quads-right":[141,299,18,53],
- "back-upper-left":[99,111,22,25],"back-upper-right":[141,111,22,25],
- "back-lats-left":[99,156,19,37],"back-lats-right":[141,156,19,37],
- "back-deltoid-left":[65,91,13,23],"back-deltoid-right":[175,91,13,23],
- "back-triceps-left":[55,149,12,27],"back-triceps-right":[185,149,12,27],
- "back-forearm-left":[43,202,10,30],"back-forearm-right":[197,202,10,30],
- "back-glutes-left":[101,244,19,26],"back-glutes-right":[139,244,19,26],
- "back-hamstrings-left":[99,316,18,48],"back-hamstrings-right":[141,316,18,48],
- "back-calves-left":[100,399,13,34],"back-calves-right":[140,399,13,34]
-};
+// SVG path geometry is adapted from vulovix/body-muscles under Apache-2.0.
+// Retain the original conservative 11-group taxonomy; no inference for unknown exercises.
 const sides=["front","back"];
+const anatomyGroup = id => {
+ if (/^chest-/.test(id)) return "chest";
+ if (/^(traps-|lats-|lower-back-|spine$)/.test(id)) return "back";
+ if (/^(shoulder-|deltoid-)/.test(id)) return "shoulders";
+ if (/^biceps-/.test(id)) return "biceps";
+ if (/^triceps-/.test(id)) return "triceps";
+ if (/^forearm-/.test(id)) return "forearms";
+ if (/^quads-/.test(id)) return "quadriceps";
+ if (/^hamstrings-/.test(id)) return "hamstrings";
+ if (/^gluteus-/.test(id)) return "glutes";
+ if (/^calves-/.test(id)) return "calves";
+ if (/^(abs-|obliques-|serratus-)/.test(id)) return "core";
+ return null;
+};
+const regionId=(side,p)=>{
+ // Keep selectors used by existing smoke tests stable.
+ if(p.id==="chest-upper-left")return "front-chest-left";
+ if(p.id==="gluteus-maximus-left")return "back-glutes-left";
+ if(p.id==="triceps-long-left")return "back-triceps-left";
+ return side+"-"+p.id;
+};
+
 const humanize = name => name==="core"?"Core / abdominals":name[0].toUpperCase()+name.slice(1);
 const escapeText = value => String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 export function renderMuscleMap(data,{selected="chest"}={}){
  if(!data||!Array.isArray(data.muscles))throw Error("Muscle-map data required");
  const chosen=data.muscles.find(m=>m.id===selected)||data.muscles[0];
- const byRegion=new Map();
- for(const m of data.muscles)for(const id of m.regions)if(Object.hasOwn(shapes,id))byRegion.set(id,m);
+ const byMuscle=new Map(data.muscles.map(m=>[m.id,m]));
  const renderSide=side=>{
-  const regions=[...byRegion.entries()].filter(([id])=>id.startsWith(side+"-")).map(([id,m])=>{
-   const [x,y,rx,ry]=shapes[id], intensity=Math.max(0,Math.min(1,Number(m.intensity)||0));
-   const active=chosen?.id===m.id;
-   return `<ellipse id="${id}" class="muscle-map__region${active?" is-selected":""}" data-muscle="${m.id}" role="button" tabindex="0" aria-label="${escapeText(humanize(m.id))}, ${m.primaryHardSets} primary hard sets" aria-pressed="${active}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" style="--muscle-intensity:${intensity}"><title>${escapeText(humanize(m.id))}</title></ellipse>`;
+  const regions=ANATOMY_PATHS[side].map(p=>{
+   const muscle=anatomyGroup(p.id),m=byMuscle.get(muscle);
+   const id=regionId(side,p),intensity=Math.max(0,Math.min(1,Number(m?.intensity)||0));
+   const active=m?.id===chosen?.id;
+   return m
+    ? `<path id="${id}" d="${p.path}" class="muscle-map__region${active?" is-selected":""}" data-muscle="${m.id}" role="button" tabindex="0" aria-label="${escapeText(p.name)}, ${m.primaryHardSets} primary hard sets" aria-pressed="${active}" style="--muscle-intensity:${intensity}"><title>${escapeText(p.name)}</title></path>`
+    : `<path id="${id}" d="${p.path}" class="muscle-map__anatomy-base" aria-hidden="true"/>`;
   }).join("");
-  return `<figure class="muscle-map__view"><svg viewBox="0 0 240 462" role="group" aria-label="${side==="front"?"Front":"Back"} muscle regions" xmlns="http://www.w3.org/2000/svg"><g class="muscle-map__silhouette" aria-hidden="true"><circle cx="120" cy="35" r="24"/><path d="M95 62 Q65 67 61 92 L32 212 L48 220 L78 133 L86 238 L79 336 L87 450 L109 450 L120 270 L131 450 L153 450 L161 336 L154 238 L162 133 L192 220 L208 212 L179 92 Q175 67 145 62Z"/></g>${regions}</svg><figcaption>${side==="front"?"Front":"Back"} view</figcaption></figure>`;
+  const viewBox=side==="front"?"0 0 35 93":"37 0 35 93";
+  return `<figure class="muscle-map__view"><svg viewBox="${viewBox}" role="group" aria-label="${side==="front"?"Front":"Back"} muscle regions" xmlns="http://www.w3.org/2000/svg">${regions}</svg><figcaption>${side==="front"?"Front":"Back"} view</figcaption></figure>`;
  };
  const details=chosen?`<section class="muscle-map__details" aria-live="polite"><h4>${escapeText(humanize(chosen.id))}</h4><dl><div><dt>Primary hard sets</dt><dd>${chosen.primaryHardSets}</dd></div><div><dt>Secondary credited sets</dt><dd>${chosen.secondaryHardSets}</dd></div><div><dt>Primary volume</dt><dd>${chosen.primaryVolume} ${escapeText(data.unit||"kg")}</dd></div><div><dt>Secondary credited volume</dt><dd>${chosen.secondaryVolume} ${escapeText(data.unit||"kg")}</dd></div></dl></section>`:"";
  const rows=data.muscles.map(m=>`<tr><th scope="row"><button type="button" data-muscle="${m.id}" aria-pressed="${m.id===chosen?.id}">${escapeText(humanize(m.id))}</button></th><td>${m.primaryHardSets}</td><td>${m.secondaryHardSets}</td><td>${m.primaryVolume}</td></tr>`).join("");
@@ -61,12 +71,12 @@ export function renderExerciseMusclePreview(metadata) {
  const secondary=new Set((metadata.secondaryMuscles||[]).filter(m=>Object.hasOwn(MUSCLE_REGIONS,m)&&m!==metadata.primaryMuscle));
  const labelled=m=>humanize(m);
  const diagrams=sides.map(side=>{
-  const regions=Object.entries(shapes).filter(([id])=>id.startsWith(side+"-")).map(([id,[x,y,rx,ry]])=>{
-   const muscle=Object.keys(MUSCLE_REGIONS).find(m=>MUSCLE_REGIONS[m].includes(id));
+  const regions=ANATOMY_PATHS[side].map(p=>{
+   const muscle=anatomyGroup(p.id);
    const kind=muscle===metadata.primaryMuscle?"primary":secondary.has(muscle)?"secondary":"inactive";
-   return `<ellipse id="activation-${id}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="muscle-map__activation muscle-map__activation--${kind}"><title>${escapeText(labelled(muscle||"unknown"))}: ${kind}</title></ellipse>`;
+   return `<path id="activation-${regionId(side,p)}" d="${p.path}" class="muscle-map__activation muscle-map__activation--${kind}"><title>${escapeText(p.name)}: ${kind}</title></path>`;
   }).join("");
-  return `<svg viewBox="0 0 240 462" role="img" aria-label="${side==="front"?"Front":"Back"}: primary ${escapeText(labelled(metadata.primaryMuscle))}; secondary ${escapeText([...secondary].map(labelled).join(", ")||"none")}" xmlns="http://www.w3.org/2000/svg"><g class="muscle-map__silhouette" aria-hidden="true"><circle cx="120" cy="35" r="24"/><path d="M95 62 Q65 67 61 92 L32 212 L48 220 L78 133 L86 238 L79 336 L87 450 L109 450 L120 270 L131 450 L153 450 L161 336 L154 238 L162 133 L192 220 L208 212 L179 92 Q175 67 145 62Z"/></g>${regions}</svg>`;
+  return `<svg viewBox="${side==="front"?"0 0 35 93":"37 0 35 93"}" role="img" aria-label="${side==="front"?"Front":"Back"}: primary ${escapeText(labelled(metadata.primaryMuscle))}; secondary ${escapeText([...secondary].map(labelled).join(", ")||"none")}" xmlns="http://www.w3.org/2000/svg">${regions}</svg>`;
  }).join("");
  return `<div class="muscle-map__exercise"><p><strong>Primary:</strong> ${escapeText(labelled(metadata.primaryMuscle))}. <strong>Secondary:</strong> ${escapeText([...secondary].map(labelled).join(", ")||"None recorded")}.</p><div class="muscle-map__exercise-figures">${diagrams}</div><p class="muted">Illustrative muscle involvement, not measured activation or recovery.</p></div>`;
 }

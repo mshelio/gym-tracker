@@ -25,7 +25,7 @@ for(const icon of pwaManifest.icons){
 }
 assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
 
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','exercise-catalog.js','progression.js','records.js','analytics.js','calendar.js','muscle-analytics.js','muscle-map-data.js','muscle-map-view.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','exercise-catalog.js','progression.js','records.js','analytics.js','calendar.js','muscle-analytics.js','muscle-map-data.js','anatomy-paths.js','muscle-map-view.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
