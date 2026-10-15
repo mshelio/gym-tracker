@@ -336,7 +336,7 @@ body::before,body::after,.wrap::before{content:"";position:fixed;z-index:-1;bord
 body::before{width:320px;height:320px;left:-120px;top:-80px;background:var(--orb1)}
 body::after{width:260px;height:260px;right:-110px;top:300px;background:var(--orb2);animation-duration:20s;animation-delay:-6s}
 .wrap::before{width:280px;height:280px;left:18%;bottom:-120px;background:var(--orb3);animation-duration:24s;animation-delay:-11s}
-@keyframes design-drift{from{transform:translate(0,0)}to{transform:translate(35px,40px) scale(1.1)}}
+@keyframes design-drift{from{opacity:.28}to{opacity:.48}}
 h1,h2,h3,.brand,.pn,.home-stat-value strong{font-family:var(--display);letter-spacing:-.035em}
 h1,h2,h3{color:var(--ink)}
 .eyebrow{color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
@@ -413,3 +413,9 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 @media(prefers-reduced-transparency:reduce){:root,:root[data-theme="light"]{--glass:#f3f6fb;--glass-2:#fff;--surface:#fff;--sunk:#edf1f7}:root[data-theme="dark"]{--glass:#101723;--glass-2:#192330;--surface:#192330;--sunk:#101723}:is(.section,.active-exercise,.plate,.hist,.overview>div,.home-primary,.workout-hero,.session-card,.guide-card,.schedule-panel,.rest-overlay__card,nav.tabs){backdrop-filter:none;-webkit-backdrop-filter:none}}
+
+/* Cross-engine stability: decoration may pulse, but no layout ancestor or visual
+   backing layer may continuously move while a user interacts. WebKit's hit-test
+   stabilization is especially sensitive to animated filtered fixed layers. */
+body::before,body::after,.wrap::before{transform:none!important;will-change:auto;contain:paint}
+@media(prefers-reduced-motion:reduce){body::before,body::after,.wrap::before{animation:none!important;opacity:.3}}
