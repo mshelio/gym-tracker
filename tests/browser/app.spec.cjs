@@ -1,10 +1,16 @@
+async function openNested(page,destination){
+ const parent=destination==='history'?'progress':'more';
+ await page.locator('nav.tabs button[data-tab="'+parent+'"]').click();
+ if(destination==='history')await page.locator('#app .subnav button[data-destination="history"]').click();
+ else await page.locator('#app button[data-destination="data"]').first().click();
+}
 const {test,expect} = require('@playwright/test');
 test('boots native ES modules at GitHub Pages project subpath and persists drafts', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/gym-tracker/');
   await expect(page.getByText('Make every rep count.')).toBeVisible();
   await expect(page.getByText('Pull A').first()).toBeVisible();
-  await page.getByRole('button',{name:/history/i}).first().click();
+  await openNested(page,'history');
   await expect(page.getByText('The work adds up.')).toBeVisible();
   await page.reload();
   await expect(page.getByText('Make every rep count.')).toBeVisible();
@@ -253,7 +259,7 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('2');
  await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
  await page.locator('[data-act="timerpause"]').click();
- await page.getByRole('button',{name:/data/i}).first().click();
+ await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
  const backup=JSON.parse(await page.locator('#exportOut').inputValue());
  expect(backup.drafts.pullA.restTimer.pausedRemainingMs).toBeGreaterThan(0);
@@ -263,7 +269,7 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
 
 test('v4 import restores preferences, merge and replace obey defaults',async({page})=>{
  await page.goto('/gym-tracker/');
- await page.getByRole('button',{name:/data/i}).first().click();
+ await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
  const original=JSON.parse(await page.locator('#exportOut').inputValue());
  original.preferences.exerciseDefaults={"name:lat pulldown":{restSeconds:145,loadIncrement:2.5,incrementUnit:"kg"}};
@@ -398,11 +404,11 @@ test('navigation clicked during startup is honored after IndexedDB hydration', a
  });
  await page.goto('/gym-tracker/',{waitUntil:'domcontentloaded'});
  await requested;
- await page.getByRole('button',{name:/history/i}).first().click();
- await expect(page.locator('nav.tabs button[data-tab="history"]')).toHaveAttribute('aria-current','page');
+ await openNested(page,'history');
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  unblockProgram();
  await expect(page.locator('.overview')).toBeVisible();
- await expect(page.locator('nav.tabs button[data-tab="history"]')).toHaveAttribute('aria-current','page');
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  await expect(page.locator('#app')).toContainText('No sessions yet');
 });
 
@@ -427,7 +433,7 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  expect(saved.drafts?.pullA).toBeUndefined();
  await page.reload();
  await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
- await page.getByRole('button',{name:/history/i}).first().click();
+ await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
  await page.getByRole('button',{name:/train/i}).first().click();
  await expect(page.locator('.workout-main')).toContainText('Push A');
@@ -498,7 +504,7 @@ test('edit completed workout atomically without advancing schedule or losing met
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await expect(page.getByText('Corrected session')).toBeVisible();
  await page.reload();
- await page.getByRole('button',{name:/history/i}).first().click();
+ await openNested(page,'history');
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
@@ -524,7 +530,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await expect(a.getByText('Session saved')).toBeVisible();
   const b=await context.newPage();
   await b.goto('/gym-tracker/');
-  await b.getByRole('button',{name:/history/i}).first().click();
+  await openNested(b,'history');
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
  await b.getByRole('button',{name:'Edit session'}).click();
   await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
@@ -555,7 +561,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   // Firefox may complete navigation before async IndexedDB hydration. Verify
   // a completed app render before looking for the historical session.
   await expect(b.locator('.workout-hero')).toBeVisible();
-  await b.getByRole('button',{name:/history/i}).first().click();
+  await openNested(b,'history');
   await expect(b.locator('details.hist')).toHaveCount(1);
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
   await b.getByRole('button',{name:'Edit session'}).click();
@@ -598,7 +604,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),{sessions,calendarEvents,body:[],custom:[],drafts:{},schedules:[{id:'plan',name:'Weekly',mode:'weekly',days:['pullA',null,'pushA',null,'legsA',null,null],cursor:0}],preferences:{activeScheduleId:'plan'}});
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
- await page.getByRole('button',{name:'Calendar'}).click();
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
  await expect(page.locator('.training-calendar')).toBeVisible();
  // Navigate to March 2026 without dependence on CI runner local date.
  for(let i=0;i<14;i++){
@@ -619,7 +625,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
  await page.getByRole('button',{name:'Next month'}).click();
  await expect(page.locator('.calendar-day')).toHaveCount(7);
  await page.reload();
- await page.getByRole('button',{name:'Calendar'}).click();
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
  await expect(page.locator('.training-calendar')).toBeVisible();
 });
 
@@ -641,7 +647,7 @@ test('known exercises carry semantic IDs while custom names remain valid after r
  const before=await snapshot();
  expect(before.sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
  await page.reload();
- await page.getByRole('button',{name:/history/i}).first().click();
+ await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
  expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
 });
@@ -661,7 +667,7 @@ test('muscle analytics updates after session corrections and excludes warmups',a
  await expect(page.locator('.muscle-analytics')).toContainText('Secondary (0.5)');
  await expect(page.locator('.muscle-analytics')).toContainText('Unknown');
  await expect(page.locator('.muscle-analytics')).toContainText('Log this at least twice to see a trend line.');
- await page.getByRole('button',{name:/history/i}).first().click();
+ await openNested(page,'history');
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
  await page.getByRole('spinbutton',{name:/Barbell bench press set 1 reps/}).fill('12');
