@@ -47,7 +47,7 @@ function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
 async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
 (async()=>{
   const c=setup(); await settle(); const {api:a,node}=c;
-  assert.equal(a.resolveExerciseMetadata("  Lat PULLDOWN ")?.primaryMuscle,"back");
+  assert.equal(a.resolveExerciseMetadata("  Lat    PULLDOWN ")?.primaryMuscle,"back");
   assert.equal(a.resolveExerciseMetadata("bench press")?.exerciseId,"catalog:bench-press");
   assert.equal(a.resolveExerciseIdentity("Unknown made-up exercise"),null);
   assert.equal(a.resolveExerciseMetadata("Unknown made-up exercise"),null);
