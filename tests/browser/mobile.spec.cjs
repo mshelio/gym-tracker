@@ -89,3 +89,17 @@ test('workout set entry, search and timer controls retain accessible mobile pres
  await expect(page.locator('.finish-session-action')).toHaveAttribute('aria-describedby','session-save-help');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('mobile analytics filters, history and calendar remain navigable',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.getByRole('group',{name:'Analytics filters'})).toBeVisible();
+ await expect(page.locator('#training-analytics-heading')).toBeVisible();
+ await page.locator('nav.tabs button[data-tab="calendar"]').click();
+ await expect(page.getByRole('region',{name:'Training calendar'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Previous month'})).toBeVisible();
+ await page.locator('nav.tabs button[data-tab="history"]').click();
+ await expect(page.getByText(/No sessions yet|The work adds up/).first()).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
