@@ -272,18 +272,18 @@ function viewHome(){
 
 /* ---------- render ---------- */
 function render(){
-  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === S.tab ? "page" : "false"));
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === ({history:"progress",data:"more",calendar:"plan"}[S.tab] || S.tab) ? "page" : "false"));
   const active = document.activeElement, key = active && active.dataset ? active.dataset.key : null;
   const mapFocus = S.tab==="progress" && active?.matches?.(".muscle-map [data-muscle]") ? {muscle:active.dataset.muscle,id:active.id} : null;
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
   if(document.documentElement)document.documentElement.dataset.view=S.tab;
-  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], calendar:["TRAINING CALENDAR", "Your training at a glance.", "See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
+  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], plan:["TRAINING CALENDAR", calendar:["TRAINING CALENDAR", "Your training at a glance.", "See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], more:["SETTINGS AND DATA","Your training settings.","Manage your preferences and keep your data safe."],data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
   const weekStart = new Date(today()+"T00:00:00"); weekStart.setDate(weekStart.getDate() - (weekStart.getDay()+6)%7);
   const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${S.tab==="home"?esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})):intro[0]}</p><h1>${S.tab==="home"?'Small steps.<br><span>Stronger every day.</span>':intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
-    ${S.tab==="home"||S.tab==="log"?"":`<div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>`}` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "calendar" ? viewCalendar() : S.tab === "progress" ? viewProgress() : viewData());
+    ${S.tab==="home"||S.tab==="log"?"":`<div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>`}` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress">Overview</button><button type="button" data-destination="history" aria-current="page">History</button></nav>${viewHistory()}` : (S.tab === "calendar" || S.tab === "plan") ? viewCalendar() : S.tab === "progress" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress" aria-current="page">Overview</button><button type="button" data-destination="history">History</button></nav>${viewProgress()}` : S.tab === "more" ? `<section class="section more-hub" aria-label="More settings"><h2>More</h2><p class="muted">Manage your training and data.</p><div class="more-links"><button class="btn" type="button" data-destination="data">${icon("download")} Data & Backups</button><button class="btn" type="button" data-destination="log">${icon("activity")} Workout settings</button></div></section>` : S.tab === "data" ? `<nav class="subnav" aria-label="More views"><button type="button" data-destination="more">More</button><button type="button" data-destination="data" aria-current="page">Data & Backups</button></nav>${viewData()}` : viewData());
   if(restOverlayOpen&&S.tab==="log"&&!S.editing&&!S.scheduleEditing&&!S.manageSchedules){const d=getDraft(S.dayId);app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
   updateSessionMeter();
   applyExerciseFilter();
@@ -711,6 +711,12 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
   // selected tab. Dropping early clicks caused intermittent Firefox failures.
   if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
   S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
+});
+
+$("#app").addEventListener("click",e=>{
+ const link=e.target.closest("button[data-destination]");if(!link)return;
+ if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
+ S.tab=link.dataset.destination;S.armedDelete=null;render();window.scrollTo({top:0});
 });
 
 $("#app").addEventListener("change",e=>{
