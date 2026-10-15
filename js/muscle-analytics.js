@@ -1,8 +1,8 @@
 import { resolveExerciseMetadata } from "./exercise-catalog.js";
 
 const MUSCLE_KG=0.45359237;
-const rounded=n=>Math.round(n*100)/100;
-const weekOf=date=>{
+const muscleRounded=n=>Math.round(n*100)/100;
+const muscleWeekOf=date=>{
  if(typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
  const day=new Date(date+"T12:00:00Z");
  if(!Number.isFinite(day.getTime())||day.toISOString().slice(0,10)!==date)return null;
@@ -17,7 +17,7 @@ export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",unit="
  const add=(map,key,sets,volume)=>{const x=map.get(key)||{hardSets:0,volume:0};x.hardSets+=sets;x.volume+=volume;map.set(key,x);};
  let hardSets=0,volume=0;
  for(const session of sessions){
-  const date=session.date,week=weekOf(date);
+  const date=session.date,week=muscleWeekOf(date);
   if(!week||(from&&date<from)||(to&&date>to)||(workout&&session.dayId!==workout))continue;
   let row=weeks.get(week);if(!row){row={week,primary:new Map(),secondary:new Map(),unknown:{hardSets:0,volume:0}};weeks.set(week,row);}
   for(const exercise of session.exercises||[]){
@@ -40,7 +40,7 @@ export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",unit="
    }
   }
  }
- const records=map=>[...map].sort(([a],[b])=>a.localeCompare(b)).map(([muscle,x])=>({muscle,hardSets:rounded(x.hardSets),volume:rounded(x.volume)}));
- return {unit,secondaryCredit,hardSets,volume:rounded(volume),primary:records(primary),secondary:records(secondary),unknown:records(unknown)[0]||{muscle:"unknown",hardSets:0,volume:0},
-  weekly:[...weeks.values()].sort((a,b)=>a.week.localeCompare(b.week)).map(w=>({week:w.week,primary:records(w.primary),secondary:records(w.secondary),unknown:{hardSets:rounded(w.unknown.hardSets),volume:rounded(w.unknown.volume)}}))};
+ const records=map=>[...map].sort(([a],[b])=>a.localeCompare(b)).map(([muscle,x])=>({muscle,hardSets:muscleRounded(x.hardSets),volume:muscleRounded(x.volume)}));
+ return {unit,secondaryCredit,hardSets,volume:muscleRounded(volume),primary:records(primary),secondary:records(secondary),unknown:records(unknown)[0]||{muscle:"unknown",hardSets:0,volume:0},
+  weekly:[...weeks.values()].sort((a,b)=>a.week.localeCompare(b.week)).map(w=>({week:w.week,primary:records(w.primary),secondary:records(w.secondary),unknown:{hardSets:muscleRounded(w.unknown.hardSets),volume:muscleRounded(w.unknown.volume)}}))};
 }
