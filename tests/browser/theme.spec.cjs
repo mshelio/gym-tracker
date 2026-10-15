@@ -88,3 +88,24 @@ test('Home preview and session totals reflect a saved workout instead of prototy
  await page.locator('[data-tab="home"]').click();
  await expect(page.locator('.home-recent-row strong')).toHaveText('Pull A');
 });
+
+test('animated glass decoration does not destabilize navigation or set controls',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const orb=await page.evaluate(()=>({animation:getComputedStyle(document.body,'::before').animationName,transform:getComputedStyle(document.body,'::before').transform}));
+ expect(orb.animation).toBe('design-drift');
+ expect(orb.transform).toBe('none');
+ await page.locator('nav.tabs [data-tab="home"]').click({timeout:8000});
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+ await page.locator('nav.tabs [data-tab="log"]').click({timeout:8000});
+ await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click({timeout:8000});
+ await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toBeVisible();
+});
+
+test('reduced-motion disables animated ambient decoration',async({page})=>{
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.goto('/gym-tracker/');
+ const anim=await page.evaluate(()=>getComputedStyle(document.body,'::before').animationName);
+ expect(anim).toBe('none');
+ await page.locator('nav.tabs [data-tab="home"]').click({timeout:8000});
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+});
