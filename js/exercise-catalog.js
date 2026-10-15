@@ -21,7 +21,14 @@ const known=[
  ["pull-up","Pull-ups","back",["biceps"],"bodyweight",["Assisted pull-up machine","Assisted chin-up"]],
  ["incline-curl","Incline dumbbell curl","biceps",[],"dumbbell",["Bayesian cable curl","Preacher curl"]],
  ["chest-supported-row","Chest-supported dumbbell row","back",["biceps"],"dumbbell",["Single-arm dumbbell row","Chest-supported row"]],
- ["face-pull","Face pull","shoulders",["back"],"cable",["Band pull-apart"]]
+ ["face-pull","Face pull","shoulders",["back"],"cable",["Band pull-apart"]],
+ ["chest-fly","Cable chest fly","chest",[],"cable",["Pec deck","Dumbbell chest fly"]],
+ ["overhead-triceps","Overhead triceps extension","triceps",[],"dumbbell",["Cable overhead extension"]],
+ ["rdl","Romanian deadlift","hamstrings",["glutes"],"barbell",["Dumbbell Romanian deadlift"]],
+ ["split-squat","Bulgarian split squat","quadriceps",["glutes"],"dumbbell",["Split squat"]],
+ ["hip-thrust","Hip thrust","glutes",["hamstrings"],"barbell",["Machine hip thrust"]],
+ ["seated-calf","Seated calf raise","calves",[],"machine",["Seated machine calf raise"]],
+ ["cable-crunch","Cable crunch","core",[],"cable",["Kneeling cable crunch"]]
 ];
 const normalize=name=>String(name||"").trim().toLowerCase().replace(/\\s+/g," ");
 const lookup=new Map();
