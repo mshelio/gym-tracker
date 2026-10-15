@@ -21,6 +21,6 @@ assert.match(changelog,/v1\.2\.0/);
 assert.match(changelog,/v1\.3\.0 has not been tagged or published/);
 assert.match(readme,/v1\.3\.0 remains unreleased/);
 const draft=fs.readFileSync(path.join(root,'docs/releases/v1.3.0-draft.md'),'utf8');
-assert.match(draft,/draft only/);
-assert.match(draft,/backup format v4/);
+assert.match(draft,/NOT tagged or published/);
+assert.match(draft,/backup exports remain \*\*version 4\*\*/);
 console.log('PASS: v4 schema parity, template, release docs and changelog');
