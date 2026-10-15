@@ -1,6 +1,6 @@
 import { resolveExerciseMetadata } from "./exercise-catalog.js";
 
-const KG=0.45359237;
+const MUSCLE_KG=0.45359237;
 const rounded=n=>Math.round(n*100)/100;
 const weekOf=date=>{
  if(typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
@@ -27,7 +27,7 @@ export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",unit="
    for(const set of exercise.sets||[]){
     const weight=Number(set.w),reps=Number(set.r);
     if(set.completed===false||set.type==="warmup"||!Number.isFinite(weight)||weight<0||!Number.isInteger(reps)||reps<=0)continue;
-    const load=weight*(source===unit?1:source==="lb"?KG:1/KG)*reps;
+    const load=weight*(source===unit?1:source==="lb"?MUSCLE_KG:1/MUSCLE_KG)*reps;
     const hard=set.type==="drop"?0:1;
     hardSets+=hard;volume+=load;
     if(!meta){add(unknown,"unknown",hard,load);row.unknown.hardSets+=hard;row.unknown.volume+=load;continue;}
