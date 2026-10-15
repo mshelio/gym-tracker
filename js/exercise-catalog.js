@@ -30,7 +30,7 @@ const known=[
  ["seated-calf","Seated calf raise","calves",[],"machine",["Seated machine calf raise"]],
  ["cable-crunch","Cable crunch","core",[],"cable",["Kneeling cable crunch"]]
 ];
-const normalize=name=>String(name||"").trim().toLowerCase().replace(/\\s+/g," ");
+const normalize=name=>String(name||"").trim().toLowerCase().replace(/\s+/g," ");
 const lookup=new Map();
 for(const [id,name,primaryMuscle,secondaryMuscles,equipment,aliases] of known){
  const value={id:"catalog:"+id,primaryMuscle,secondaryMuscles,equipment};
