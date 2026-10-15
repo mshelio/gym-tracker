@@ -19,3 +19,5 @@ jobs:
         run: node tests/version-sw.test.cjs
       - name: Regression suite
         run: node tests/schedules.test.cjs
+      - name: Release readiness consistency
+        run: node tests/release-readiness.cjs

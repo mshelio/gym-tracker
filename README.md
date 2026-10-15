@@ -1,5 +1,7 @@
 # Gym Tracker
 
+Release history: [CHANGELOG.md](CHANGELOG.md). The forthcoming v1.2.0 release notes are staged in [docs/releases/v1.2.0-draft.md](docs/releases/v1.2.0-draft.md); no v1.2.0 tag or release has been published.
+
 A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter schedule; you can train with any split.
 
 ## Files and setup
@@ -7,8 +9,8 @@ A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter s
 Keep `index.html`, `ppl-default-workouts.json`, `css/` and `js/` together in your GitHub Pages source. No build step, server or database is required. Serve the app over HTTP(S) (for local testing: `python -m http.server 8000`); ES modules do not load reliably from `file://`.
 
 - `ppl-default-workouts.json`: starter workout definitions, units, exercises, rep ranges, alternatives and notes.
-- `ppl-tracker-data.json`: empty version 3 app-data template with the starter schedule.
-- `ppl-tracker-data.schema.json`: JSON Schema for version 3 app-data backups.
+- `ppl-tracker-data.json`: empty version 4 app-data template with the starter schedule.
+- `ppl-tracker-data.schema.json`: JSON Schema for version 4 app-data backups.
 - `tests/schedules.test.cjs`: dependency-free functional checks; run `node tests/schedules.test.cjs`.
 
 ## Code layout
@@ -19,7 +21,7 @@ Keep `index.html`, `ppl-default-workouts.json`, `css/` and `js/` together in you
 - `js/config.js`: existing persistent storage key constants.
 - `tests/schedules.test.cjs`: dependency-free regression tests, now loading the extracted module source.
 
-This change does not modify stored data or backup formats. To roll back, revert the asset extraction commit; all existing browser data remains under the same storage keys.
+The application is local-first. IndexedDB is authoritative after first-run migration; see the backup and recovery sections before downgrading, clearing site data or switching devices.
 
 ## Flexible workout schedules
 
@@ -42,7 +44,7 @@ The supplied starter order is Pull A → Push A → Legs A → Pull B → Push B
 
 ## Saving and JSON backups
 
-App data saves in browser localStorage. Drafts save automatically. Existing `ppl-tracker-v1` and `ppl-tracker-drafts-v1` storage keys and the `ppl-tracker` backup identifier remain for compatibility on the same website origin.
+App data, including drafts, saves atomically in the browser's IndexedDB `gym-tracker` database (`snapshots/primary`). Existing legacy localStorage records are retained as historical recovery copies, not synchronized mirrors. Drafts save automatically. Existing `ppl-tracker-v1` and `ppl-tracker-drafts-v1` storage keys and the `ppl-tracker` backup identifier remain for compatibility on the same website origin.
 
 **Data → Export app data (.json)** exports sessions, body entries, custom workouts, schedules, schedule progress, drafts and preferences. A copyable text area is also provided.
 
@@ -54,17 +56,17 @@ GitHub Pages never receives your personal workout log. Browser data cannot be ac
 
 ## Verification
 
-Run `node tests/schedules.test.cjs`. Checks cover custom and default workouts, repeating and weekly schedules, reordering, rest days, independent schedule progress, legacy migration, version 3 backup round trips, malformed-import rejection, persistence, and storage-failure rollback, plus existing sessions, units, charts and missing-program recovery. Browser visual QA was unavailable in the execution environment.
+Run `node tests/schedules.test.cjs`. Checks cover custom and default workouts, repeating and weekly schedules, reordering, rest days, independent schedule progress, legacy migration, version 4 backup round trips, malformed-import rejection, persistence, and storage-failure rollback, plus existing sessions, units, charts and missing-program recovery. Cross-browser Playwright tests run in Chromium, Firefox and WebKit through GitHub Actions.
 
 ## Modular architecture and browser tests
 
 `js/app.js` composes independent modules: `state.js` (initial state), `storage.js` (legacy localStorage adapter), `workouts.js` (workout calculations and utilities), `schedules.js` (schedule index), and `render.js` (presentation primitives). Core controller/view routines remain in `app.js` and can be migrated in follow-up refactors without changing the persistence contract.
 
-Run `node tests/schedules.test.cjs` for regression checks. Run `npm install`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Current localStorage keys and v3 backups remain unchanged, so rolling back the code does not require data migration.
+Run `node tests/schedules.test.cjs` for regression checks. Run `npm install`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Existing localStorage recovery keys and v1–v4 backup imports remain supported. Before rolling back to older code, export the latest v4 backup: older builds may not read the new backup version.
 
 ## IndexedDB persistence (GT-02)
 
-On supported browsers, the app copies the existing `ppl-tracker-v1` snapshot (including drafts and schedule cursors) to the `gym-tracker` IndexedDB database in one atomic first-run transaction. Subsequent reads/writes use the IndexedDB `snapshots/primary` record; legacy localStorage is retained untouched for rollback and recovery. If IndexedDB is unavailable, the app falls back to legacy localStorage and displays a warning. If migration encounters malformed source JSON, it fails instead of replacing historical data. Existing v1–v3 backup import/export semantics are unchanged.
+On supported browsers, the app copies the existing `ppl-tracker-v1` snapshot (including drafts and schedule cursors) to the `gym-tracker` IndexedDB database in one atomic first-run transaction. Subsequent reads/writes use the IndexedDB `snapshots/primary` record; legacy localStorage is retained untouched for rollback and recovery. If IndexedDB is unavailable, the app falls back to legacy localStorage and displays a warning. If migration encounters malformed source JSON, it fails instead of replacing historical data. Existing v1–v4 import and migration support is retained.
 
 **Caution:** After migration, localStorage is a *historical recovery copy*, not a live mirror; reverting to a pre-migration build can show older data. Export an up-to-date JSON backup before any rollback. Browser storage and private browsing remain device-local; clearing site data can remove IndexedDB too. The migration suite runs in Playwright against a genuine browser IndexedDB implementation.
 
@@ -144,7 +146,7 @@ Run locally after `npm install` and `npx playwright install chromium` using `nod
 
 ## Installable web app metadata (GT-12 / #13)
 
-The manifest at `./manifest.webmanifest` uses relative `./` start URL, scope, and identity so a GitHub Pages project deployment under `/gym-tracker/` resolves correctly. It includes native PNG 192×192, 512×512, and 512×512 maskable icons, plus an Apple touch icon and theme color. Supported browsers may offer **Install app** or **Add to Home Screen** from their browser menu over HTTPS. This adds install metadata only: **offline startup is not yet supported** until service-worker caching is implemented in later GT-13/GT-14 work. Existing sessions, drafts, schedules and JSON backups remain unchanged. To roll back the installation metadata, revert this change; uninstalling the shortcut does not intentionally modify browser storage, but clearing site data will.
+The manifest at `./manifest.webmanifest` uses relative `./` start URL, scope, and identity so a GitHub Pages project deployment under `/gym-tracker/` resolves correctly. It includes native PNG 192×192, 512×512, and 512×512 maskable icons, plus an Apple touch icon and theme color. Supported browsers may offer **Install app** or **Add to Home Screen** from their browser menu over HTTPS. A versioned service worker now supports offline startup after a successful online visit. See the offline PWA and release-update sections below. Existing sessions, drafts, schedules and JSON backups remain unchanged. To roll back the installation metadata, revert this change; uninstalling the shortcut does not intentionally modify browser storage, but clearing site data will.
 
 ## Offline support (GT-13 / #14)
 
@@ -180,12 +182,12 @@ New exercise defaults for ID-less workout rows are scoped to their workout and r
 
 The optional `calendarEvents` array is saved atomically alongside sessions in IndexedDB and exported in the existing **version 4** JSON backup format. Older v1–v4 backups without this array remain accepted and import as an empty collection. Event entries have a unique `id`, local `YYYY-MM-DD` `date`, `type` (`planned`, `rest`, `skipped`, or `completed`), and ISO-8601 `updatedAt`; `workoutId` and `sessionId` are optional. Completed events require a session reference. Invalid imports are rejected before mutating stored data, and failed writes roll back changes.
 
-Calendar projections are **not** written as events: weekly schedules can project weekdays and rest days from the schedule's fixed seven-day plan. Repeating cycle schedules have no inherently meaningful calendar dates, so no dates are inferred from their cursor. A day without a log is never automatically marked skipped or missed. This establishes a data model for the future calendar interface (issue #17), not a finished calendar UI. Preserve a JSON backup before changing devices or clearing browser storage.
+Calendar projections are **not** written as events: weekly schedules can project weekdays and rest days from the schedule's fixed seven-day plan. Repeating cycle schedules have no inherently meaningful calendar dates, so no dates are inferred from their cursor. A day without a log is never automatically marked skipped or missed. The **Calendar** tab now provides month/week navigation and shows projected weekly workouts, explicit skipped/rest events, saved completed sessions, and an adherence summary. Historical unlogged days are not automatically counted as missed. Preserve a JSON backup before changing devices or clearing browser storage.
 
 
 ### Exercise identity and muscle classification (v1.2)
 
-Recognized exercise names (including selected alternatives and synonyms) resolve to stable `catalog:...` IDs with primary muscle, secondary muscles and equipment metadata. Custom exercises with their own IDs preserve those IDs; unknown exercise names remain valid and **uncategorized**. Existing session names are retained, and old backups are not rewritten retroactively. This is the identity foundation for the optional muscle-group volume analytics in issue #19. Existing JSON v4 backups and v3 imports continue to use the optional `exerciseId` fields. Create and retain a JSON backup before clearing browser storage; the classification catalog contains no private workout data.
+Recognized exercise names (including selected alternatives and synonyms) resolve to stable `catalog:...` IDs with primary muscle, secondary muscles and equipment metadata. Custom exercises with their own IDs preserve those IDs; unknown exercise names remain valid and **uncategorized**. Existing session names are retained, and old backups are not rewritten retroactively. This identity catalog now powers the muscle-group analytics in the Progress tab. Existing JSON v4 backups and v3 imports continue to use the optional `exerciseId` fields. Create and retain a JSON backup before clearing browser storage; the classification catalog contains no private workout data.
 
 
 ### Muscle-group analytics (v1.2)
