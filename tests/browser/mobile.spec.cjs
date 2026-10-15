@@ -144,3 +144,16 @@ test('blue active workout provides accessible editable set cards and previous pe
  await expect(page.locator('.redesigned-workout')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('full-screen rest timer supports open, adjusted countdown and close',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:'Open rest timer'}).click();
+ const dialog=page.getByRole('dialog',{name:'Rest timer'});
+ await expect(dialog).toBeVisible();
+ await expect(dialog.locator('[data-timer="overlay-rest"]')).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'Close rest timer'})).toBeVisible();
+ await dialog.getByRole('button',{name:'Close rest timer'}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Open rest timer'})).toBeFocused();
+});
