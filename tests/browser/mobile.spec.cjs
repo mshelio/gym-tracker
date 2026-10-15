@@ -74,8 +74,8 @@ test('training dashboard action and five-tab navigation remain usable on mobile'
  await action.click();
  await expect(page.locator('#workout-editor')).toBeInViewport();
  const tabs=page.locator('nav.tabs button[data-tab]');
- await expect(tabs).toHaveCount(6);
- for(const tab of ['history','calendar','progress','data','log']){
+ await expect(tabs).toHaveCount(5);
+ for(const tab of ['home','log','progress','plan','more']){
   await page.locator('nav.tabs button[data-tab="'+tab+'"]').click();
   await expect(page.locator('nav.tabs button[data-tab="'+tab+'"]')).toHaveAttribute('aria-current','page');
  }
@@ -175,4 +175,18 @@ test('glass prototype theming and reduced-motion animations remain accessible',a
  const reduced=await page.evaluate(()=>getComputedStyle(document.body,'::before').animationDuration);
  expect(parseFloat(reduced)).toBeLessThanOrEqual(0.001);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
+
+test('Phase 1 nested history and backups use parent navigation and preserve accessible labels',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('nav.tabs button[data-tab]')).toHaveCount(5);
+ await openNested(page,'history');
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await expect(page.getByRole('navigation',{name:'Progress views'})).toBeVisible();
+ await openNested(page,'data');
+ await expect(page.locator('nav.tabs button[data-tab="more"]')).toHaveAttribute('aria-current','page');
+ await expect(page.getByRole('navigation',{name:'More views'})).toBeVisible();
+ await expect(page.locator('[data-act="export"]')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth-window.innerWidth)).toBeLessThanOrEqual(2);
 });
