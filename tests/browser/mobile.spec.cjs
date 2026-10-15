@@ -1,3 +1,9 @@
+async function openNested(page,destination){
+ const parent=destination==='history'?'progress':'more';
+ await page.locator('nav.tabs button[data-tab="'+parent+'"]').click();
+ if(destination==='history')await page.locator('#app .subnav button[data-destination="history"]').click();
+ else await page.locator('#app button[data-destination="data"]').first().click();
+}
 const {test,expect}=require('@playwright/test');
 
 test('mobile viewport, touch navigation, draft recovery and backup',async({page,isMobile})=>{
@@ -10,7 +16,7 @@ test('mobile viewport, touch navigation, draft recovery and backup',async({page,
   await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
   await page.reload();
   await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
-  await page.getByRole('button',{name:/data/i}).first().tap();
+  await openNested(page,'data');
   await page.locator('[data-act="export"]').tap();
   const snapshot=JSON.parse(await page.locator('#exportOut').inputValue());
   expect(snapshot.drafts.pullA.ex[0].sets[0].r).toBe('8');
@@ -25,7 +31,7 @@ test('mobile session completion and IndexedDB cleanup survive reload',async({pag
   await page.getByRole('button',{name:/Finish & save session/}).tap();
   await expect(page.getByText('Session saved')).toBeVisible();
   await page.reload();
-  await page.getByRole('button',{name:/history/i}).first().tap();
+  await openNested(page,'history');
   await expect(page.locator('details.hist')).toHaveCount(1);
   const record=await page.evaluate(async()=>{
     const req=indexedDB.open('gym-tracker',1);
@@ -96,10 +102,10 @@ test('mobile analytics filters, history and calendar remain navigable',async({pa
  await page.locator('nav.tabs button[data-tab="progress"]').click();
  await expect(page.getByRole('group',{name:'Analytics filters'})).toBeVisible();
  await expect(page.locator('#training-analytics-heading')).toBeVisible();
- await page.locator('nav.tabs button[data-tab="calendar"]').click();
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
  await expect(page.getByRole('region',{name:'Training calendar'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Previous month'})).toBeVisible();
- await page.locator('nav.tabs button[data-tab="history"]').click();
+ await openNested(page,'history');
  await expect(page.getByText(/No sessions yet|The work adds up/).first()).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
@@ -107,7 +113,7 @@ test('mobile analytics filters, history and calendar remain navigable',async({pa
 test('backup preferences explain destructive replacement and preserve cancellation',async({page,isMobile})=>{
  expect(isMobile).toBeTruthy();
  await page.goto('/gym-tracker/');
- await page.locator('nav.tabs button[data-tab="data"]').click();
+ await openNested(page,'data');
  await expect(page.getByText('Supports Gym Tracker backup versions 1 through 4.')).toBeVisible();
  await page.locator('#importMode').selectOption('replace');
  await page.locator('#importText').fill('{}');
