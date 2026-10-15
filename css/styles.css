@@ -450,3 +450,7 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
  .session-card .finish-session-action{min-height:52px}
 }
 @media(prefers-reduced-motion:reduce){.focused-chevron{transition:none}}
+
+.rest-mini{position:fixed;z-index:28;right:20px;bottom:100px;display:none;align-items:center;gap:10px;padding:10px 16px;min-height:48px;border:1px solid var(--line);border-radius:999px;background:var(--overlay);color:var(--ink);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-weight:650}
+.rest-mini strong{font-family:'Geist Mono',ui-monospace,monospace;color:var(--blue);font-variant-numeric:tabular-nums}
+@media(max-width:600px){.rest-mini{display:flex;bottom:calc(99px + env(safe-area-inset-bottom));right:18px}}
