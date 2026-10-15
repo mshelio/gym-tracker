@@ -644,3 +644,30 @@ test('known exercises carry semantic IDs while custom names remain valid after r
  await expect(page.locator('details.hist')).toHaveCount(1);
  expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
 });
+
+test('muscle analytics updates after session corrections and excludes warmups',async({page})=>{
+ const fixture={sessions:[{id:'muscle-test',dayId:'pushA',dayName:'Push A',type:'push',date:'2026-03-30',createdAt:1,notes:'',exercises:[
+  {name:'Barbell bench press',unit:'kg',sets:[{w:100,r:10,type:'working',completed:true},{w:40,r:8,type:'warmup',completed:true}]},
+  {name:'Mystery lift',unit:'kg',sets:[{w:20,r:10,type:'working',completed:true}]}
+ ]}],body:[],custom:[],drafts:{},preferences:{},schedules:[]};
+ await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.locator('.muscle-analytics')).toBeVisible();
+ await expect(page.locator('.muscle-analytics')).toContainText('2');
+ await expect(page.locator('.muscle-analytics')).toContainText('Primary');
+ await expect(page.locator('.muscle-analytics')).toContainText('Secondary (0.5)');
+ await expect(page.locator('.muscle-analytics')).toContainText('Unknown');
+ await expect(page.locator('.muscle-analytics .chart svg').first()).toHaveAttribute('tabindex','0');
+ await page.getByRole('button',{name:/history/i}).first().click();
+ await page.locator('details.hist').first().evaluate(el=>el.open=true);
+ await page.getByRole('button',{name:'Edit session'}).click();
+ await page.getByRole('spinbutton',{name:/Barbell bench press set 1 reps/}).fill('12');
+ await page.getByRole('button',{name:'Save changes'}).click();
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.locator('.muscle-analytics')).toContainText('1200');
+ await page.reload();
+ await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.locator('.muscle-analytics')).toContainText('1200');
+});
