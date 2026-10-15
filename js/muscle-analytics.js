@@ -11,7 +11,7 @@ const muscleWeekOf=date=>{
 };
 // Primary hard sets are exclusive. Secondary credits are a separately reported
 // dimension; they must never be added to primary totals as if they were sets.
-export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",unit="kg",secondaryCredit=0.5}={}){
+export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",exercise="",unit="kg",secondaryCredit=0.5}={}){
  if(!Number.isFinite(secondaryCredit)||secondaryCredit<0||secondaryCredit>1)throw Error("Invalid secondary credit");
  const weeks=new Map(),primary=new Map(),secondary=new Map(),unknown=new Map();
  const add=(map,key,sets,volume)=>{const x=map.get(key)||{hardSets:0,volume:0};x.hardSets+=sets;x.volume+=volume;map.set(key,x);};
@@ -20,11 +20,12 @@ export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",unit="
   const date=session.date,week=muscleWeekOf(date);
   if(!week||(from&&date<from)||(to&&date>to)||(workout&&session.dayId!==workout))continue;
   let row=weeks.get(week);if(!row){row={week,primary:new Map(),secondary:new Map(),unknown:{hardSets:0,volume:0}};weeks.set(week,row);}
-  for(const exercise of session.exercises||[]){
-   const meta=resolveExerciseMetadata(exercise.name);
-   const source=exercise.unit||session.unit||"lb";
+  for(const item of session.exercises||[]){
+   if(exercise&&item.name!==exercise)continue;
+   const meta=resolveExerciseMetadata(item.name);
+   const source=item.unit||session.unit||"lb";
    if(source!=="kg"&&source!=="lb")continue;
-   for(const set of exercise.sets||[]){
+   for(const set of item.sets||[]){
     const weight=Number(set.w),reps=Number(set.r);
     if(set.completed===false||set.type==="warmup"||!Number.isFinite(weight)||weight<0||!Number.isInteger(reps)||reps<=0)continue;
     const load=weight*(source===unit?1:source==="lb"?MUSCLE_KG:1/MUSCLE_KG)*reps;
