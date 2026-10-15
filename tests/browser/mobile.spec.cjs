@@ -157,3 +157,16 @@ test('full-screen rest timer supports open, adjusted countdown and close',async(
  await expect(dialog).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Open rest timer'})).toBeFocused();
 });
+
+test('glass prototype theming and reduced-motion animations remain accessible',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="home"]').click();
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+ const glass=await page.locator('.home-week').evaluate(el=>({blur:getComputedStyle(el).backdropFilter,animation:getComputedStyle(el).animationDuration}));
+ expect(glass.blur).toContain('blur');
+ const reduced=await page.evaluate(()=>getComputedStyle(document.body,'::before').animationDuration);
+ expect(parseFloat(reduced)).toBeLessThanOrEqual(0.001);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
