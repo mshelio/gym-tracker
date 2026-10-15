@@ -25,12 +25,12 @@ for(const icon of pwaManifest.icons){
 }
 assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
 
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','progression.js','records.js','analytics.js','calendar.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','exercise-catalog.js','progression.js','records.js','analytics.js','calendar.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,resolveExerciseMetadata,resolveExerciseIdentity,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -47,6 +47,14 @@ function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
 async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
 (async()=>{
   const c=setup(); await settle(); const {api:a,node}=c;
+  assert.equal(a.resolveExerciseMetadata("  Lat PULLDOWN ")?.primaryMuscle,"back");
+  assert.equal(a.resolveExerciseMetadata("bench press")?.exerciseId,"catalog:bench-press");
+  assert.equal(a.resolveExerciseIdentity("Unknown made-up exercise"),null);
+  assert.equal(a.resolveExerciseMetadata("Unknown made-up exercise"),null);
+  assert.equal(a.resolveExerciseIdentity("Barbell bench press","ex-custom-1"),"ex-custom-1");
+  assert.equal(a.resolveExerciseMetadata("Machine chest press")?.primaryMuscle,"chest");
+  assert.notEqual(a.resolveExerciseMetadata("Leg press")?.exerciseId,a.resolveExerciseMetadata("Barbell bench press")?.exerciseId);
+  assert.equal(a.parseProgram(canonical).workouts.find(w=>w.id==="pullA").ex[0].exerciseId,"catalog:lat-pulldown");
   assert.equal(a.isLocalDate("2026-03-29"),true);
   assert.equal(a.isLocalDate("2026-02-30"),false);
   const calendarWeekPlan={mode:"weekly",days:["pullA",null,"pushA",null,"legsA",null,null],cursor:0};
