@@ -3,9 +3,12 @@
 ## [Unreleased] — v1.3.0 release candidate
 
 ### Added
-- Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#88).
-- Exercise-specific primary/secondary anatomical previews and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.
+- Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#90).
+- Exercise-specific primary/secondary anatomical previews, selected-muscle contributing-exercise drilldowns, and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.
 - Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.
+
+### Accessibility
+- Improved keyboard focus retention, mobile touch/table selection, screen-reader instructions, and forced-colors styling (PRs #89–#90).
 
 ### Preserved
 - Read-only visualizations continue using existing accurate muscle hard-set and volume aggregation, with warm-up exclusions, volume-only drop sets, and separate 0.5-credit secondary reporting.
