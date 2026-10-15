@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased] — v1.2.0 release candidate
+## [Unreleased] — v1.3.0 release candidate\n\n### Added\n- Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#88).\n- Exercise-specific primary/secondary anatomical previews and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.\n- Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.\n\n### Preserved\n- Read-only visualizations continue using existing accurate muscle hard-set and volume aggregation, with warm-up exclusions, volume-only drop sets, and separate 0.5-credit secondary reporting.\n- Local IndexedDB atomic saves, version 4 JSON backup import/export, and offline service-worker operation without account or cloud sync.\n\n### Release gate\n- v1.3.0 has not been tagged or published. Complete regression, cross-browser, keyboard/touch, responsive, Pages deployment, and installed/offline PWA verification at the final commit before authorization.\n\n## [v1.2.0] — released
 
-This section documents merged changes; **v1.2.0 has not been tagged or published**.
+This section records the v1.2.0 release.
 
 ### Added
 - Month and week training calendar, schedule projections, completed/rest/skipped status and adherence that never invents missed historical days (#16, #17; PRs #76, #77).
@@ -18,7 +18,7 @@ This section documents merged changes; **v1.2.0 has not been tagged or published
 - Export format remains **JSON backup v4**, retaining imports from older backup versions. Calendar event data is optional; historical no-session dates are not backfilled.
 - Service worker precaches all current application modules and is regenerated from the Git object hashes of its assets.
 
-### Verification before publishing
+### Historical v1.2.0 release checklist
 - Confirm release-candidate regression, cross-browser Playwright, GitHub Pages deployment and production PWA smoke checks all pass at the intended release SHA.
 - Export a recent v4 backup, test restore/merge and replace, verify offline update behavior and inspect Settings → Pages deployment SHA.
-- Merge the release-readiness PR first; then publish v1.2.0 only through a separately authorized release action. Do not reuse the v1.1.0 tag.
+- v1.2.0 release actions were completed separately; this historical checklist is retained for provenance.
