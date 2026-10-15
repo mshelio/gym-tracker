@@ -103,3 +103,16 @@ test('mobile analytics filters, history and calendar remain navigable',async({pa
  await expect(page.getByText(/No sessions yet|The work adds up/).first()).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('backup preferences explain destructive replacement and preserve cancellation',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="data"]').click();
+ await expect(page.getByText('Supports Gym Tracker backup versions 1 through 4.')).toBeVisible();
+ await page.locator('#importMode').selectOption('replace');
+ await page.locator('#importText').fill('{}');
+ page.once('dialog',dialog=>dialog.dismiss());
+ await page.locator('[data-act="import"]').click();
+ await expect(page.locator('#importResult')).toContainText('cancelled');
+ await expect(page.locator('#importMode')).toHaveValue('replace');
+});

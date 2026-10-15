@@ -80,7 +80,7 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
   await stale.put(new URL('./old-script.js',location.href).href,new Response('outdated'));
   await navigator.serviceWorker.register('./sw-update-fixture.js',{scope:'./',updateViaCache:'none'});
  });
- await expect(page.locator('#pwa-status')).toContainText('Update available.');
+ await expect(page.locator('#pwa-status')).toContainText('App update ready.');
  const before=await page.evaluate(async()=>({
   waiting:!!(await navigator.serviceWorker.getRegistration()).waiting,
   controller:navigator.serviceWorker.controller.scriptURL,
@@ -89,7 +89,7 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
  expect(before.waiting).toBe(true);
  expect(before.controller.endsWith('/sw.js')).toBe(true);
  expect(before.oldCache).toBe(true);
- await page.locator('#pwa-status button').click();
+ await page.locator('#pwa-status .pwa-status-action').click();
  await expect.poll(async()=>{try{return await page.evaluate(async()=>!(await caches.has('gt-shell-stale')))}catch{return false}},{timeout:15000}).toBe(true);
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
 });

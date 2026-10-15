@@ -270,6 +270,7 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
  original.preferences.progressionEnabled=false;
  await page.locator('#importText').fill(JSON.stringify(original));
  await page.locator('#importMode').selectOption('replace');
+ page.once('dialog',dialog=>dialog.accept());
  await page.locator('[data-act="import"]').click();
  await expect(page.locator('#importResult')).toContainText('Replaced local data');
  await page.reload();
@@ -468,7 +469,7 @@ test('service worker caches app shell and preserves draft on offline reload',asy
  await page.reload();
  await expect(page.getByText('Make every rep count.')).toBeVisible();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
- await expect(page.locator('#pwa-status')).toContainText('Offline');
+ await expect(page.locator('#pwa-status')).toContainText(/offline/i);
  await context.setOffline(false);
 });
 

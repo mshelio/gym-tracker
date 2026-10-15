@@ -150,3 +150,13 @@ nav.tabs button{min-height:48px}
  .calendar-toolbar{gap:.5rem}
 }
 @media (prefers-reduced-motion:reduce){.responsive-table{scroll-behavior:auto}}
+
+/* v1.4: clear backup controls and non-blocking offline notices */
+.data-grid .section.stack{min-width:0}
+.data-grid .section.stack input,.data-grid .section.stack textarea,.data-grid .section.stack select{max-width:100%}
+.data-grid .section.stack .btn{min-height:44px}
+#import-mode-help{border-left:3px solid var(--push);padding-left:.7rem}
+#importResult:not([hidden]){padding:.75rem;border-radius:10px;background:var(--sunk);color:var(--ink)}
+.pwa-status-dismiss{margin-left:12px;min-height:44px;padding:7px 10px;background:var(--sunk);color:var(--ink);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.pwa-status-banner{max-width:min(calc(100vw - 24px),420px);overflow-wrap:anywhere}
+@media(max-width:600px){.pwa-status-banner{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(90px + env(safe-area-inset-bottom))}}
