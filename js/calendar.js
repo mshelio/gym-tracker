@@ -45,3 +45,52 @@ export function projectWeeklyCalendar(schedule,from,to,events=[]){
  }
  return projection;
 }
+
+export function shiftCalendarMonth(month,delta){
+ if(typeof month!=="string"||!/^\d{4}-\d{2}$/.test(month)||!Number.isInteger(delta))throw Error("Invalid month");
+ const [year,number]=month.split("-").map(Number);
+ if(number<1||number>12)throw Error("Invalid month");
+ const d=new Date(Date.UTC(year,number-1+delta,1,12));
+ return d.toISOString().slice(0,7);
+}
+export function calendarPeriod(month,mode="month"){
+ if(!/^[0-9]{4}-[0-9]{2}$/.test(month)||!isLocalDate(month+"-01"))throw Error("Invalid month");
+ if(mode!=="month"&&mode!=="week")throw Error("Invalid calendar view");
+ const start=new Date(month+"-01T12:00:00Z");
+ const end=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+1,0,12));
+ return {from:start.toISOString().slice(0,10),to:end.toISOString().slice(0,10)};
+}
+export function calendarDays(from,to,sessions=[],events=[],schedule=null){
+ if(!isLocalDate(from)||!isLocalDate(to)||from>to)throw Error("Invalid date range");
+ validateCalendarEvents(events);
+ const start=Date.parse(from+"T12:00:00Z"),end=Date.parse(to+"T12:00:00Z");
+ if((end-start)/86400000>366)throw Error("Calendar range too large");
+ const byDate=new Map(),explicit=new Map(), projected=new Map();
+ for(const s of sessions)if(isLocalDate(s.date)&&s.date>=from&&s.date<=to){
+  const a=byDate.get(s.date)||[];a.push(s);byDate.set(s.date,a);
+ }
+ for(const e of events)if(e.date>=from&&e.date<=to){
+  const a=explicit.get(e.date)||[];a.push(e);explicit.set(e.date,a);
+ }
+ for(const p of projectWeeklyCalendar(schedule,from,to,events))projected.set(p.date,p);
+ const out=[];
+ for(let ms=start;ms<=end;ms+=86400000){
+  const date=new Date(ms).toISOString().slice(0,10);
+  const logged=byDate.get(date)||[],declared=explicit.get(date)||[],planned=projected.get(date);
+  const hasCompleted=logged.length>0||declared.some(e=>e.type==="completed");
+  const type=hasCompleted?"completed":declared.some(e=>e.type==="skipped")?"skipped":declared.find(e=>e.type==="rest"||e.type==="planned")?.type||planned?.type||"none";
+  out.push({date,type,sessions:logged,events:declared,workoutId:declared.find(e=>e.workoutId)?.workoutId||planned?.workoutId||null});
+ }
+ return out;
+}
+// Only explicit skipped events and actual completed sessions count towards
+// adherence; projected historical days are not retroactive missed workouts.
+export function calendarAdherence(days){
+ let completed=0,skipped=0;
+ for(const d of days){
+  if(d.type==="completed")completed++;
+  else if(d.type==="skipped")skipped++;
+ }
+ const total=completed+skipped;
+ return {completed,skipped,scheduled:total,percent:total?Math.round(completed*100/total):null};
+}
