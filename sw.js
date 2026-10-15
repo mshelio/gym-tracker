@@ -1,5 +1,5 @@
 // Versioned app shell only. Never cache IndexedDB, API mutations or user backups.
-const VERSION='gt-shell-98a8c986';
+const VERSION='gt-shell-02fcdbbf';
 const SHELL=['./','./index.html','./manifest.webmanifest','./css/styles.css','./ppl-default-workouts.json',
  './js/app.js','./js/theme.js','./js/pwa.js','./js/config.js','./js/state.js','./js/workouts.js','./js/render.js',
  './js/schedules.js','./js/storage.js','./js/timers.js','./js/exercise-settings.js',
