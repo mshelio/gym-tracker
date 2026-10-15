@@ -1,5 +1,7 @@
 # Gym Tracker
 
+Release history: [CHANGELOG.md](CHANGELOG.md). The forthcoming v1.2.0 release notes are staged in [docs/releases/v1.2.0-draft.md](docs/releases/v1.2.0-draft.md); no v1.2.0 tag or release has been published.
+
 A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter schedule; you can train with any split.
 
 ## Files and setup
