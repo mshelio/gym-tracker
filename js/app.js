@@ -263,7 +263,7 @@ function render(){
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
 function timerPanel(d){
  const rest=d.restTimer,seconds=timerTools.remaining(rest),elapsed=timerTools.elapsed(d.startedAt);
- return `<div class="timer-panel" aria-label="Workout timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><button class="btn small" data-act="saveglobalrest">Save global rest default</button><div class="timer-actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
+ return `<div class="timer-panel" role="group" aria-label="Workout and rest timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest" aria-label="Rest time remaining">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><button class="btn small" data-act="saveglobalrest">Save global rest default</button><div class="timer-actions" role="group" aria-label="Rest timer actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
 }
 function updateTimers(){
  if(!S.ready||S.tab!=="log"||S.editing||S.scheduleEditing||S.manageSchedules)return;
@@ -277,18 +277,18 @@ document.addEventListener("visibilitychange",updateTimers);
 function setRows(i, prefix, name, sets, last, lo, hi, unit){
   return sets.map((s, j) => {
     const ph = last && last.sets[j] ? { w: tidy(conv(last.sets[j].w ?? 0, last.unit, unit), unit), r: last.sets[j].r } : null;
-    return `<div class="setrow"><span>Set ${j+1}</span>
+    return `<div class="setrow" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">Set ${j+1}</span>
       <input type="number" inputmode="decimal" step="any" min="0" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
       <input type="number" inputmode="numeric" step="1" min="0" aria-label="${esc(name)} set ${j+1} reps" data-f="r" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}r-${i}-${j}" value="${esc(s.r)}" placeholder="${ph ? esc(ph.r ?? "") : (lo ? lo+"–"+hi : "reps")}">
       <select aria-label="${esc(name)} set ${j+1} type" data-act="settype" data-g="${prefix}" data-i="${i}" data-j="${j}">${["working","warmup","drop"].map(t=>`<option value="${t}" ${(s.type||"working")===t?"selected":""}>${t}</option>`).join("")}</select>
       <input type="number" min="0" max="10" step="1" inputmode="numeric" aria-label="${esc(name)} set ${j+1} RIR" data-f="rir" data-g="${prefix}" data-i="${i}" data-j="${j}" value="${s.rir??""}" placeholder="RIR">
-      <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}">${s.completed===true ? "✓ Done" : "○ Done"}</button>
+      <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}" title="${s.completed===true?"Mark set incomplete":"Complete set and start rest timer"}">${s.completed===true ? "✓ Done" : "○ Done"}</button>
     </div>`; }).join("");
 }
 function lastBlock(name, e, unit){
   const last = lastFor(name);
   if (!last || !name) return { last:null, html:`<p class="last">No history yet for this exercise. Start light and focus on form.</p>` };
-  let html = `<p class="last">Last time (${esc(fmtDate(last.date))}): ${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;${last.unit} × ${esc(s.r)}`).join(", ")}${last.unit !== unit ? ` <span>(grey targets converted to ${unit})</span>` : ""}</p>`;
+  let html = `<p class="last" aria-label="Previous performance">Last time (${esc(fmtDate(last.date))}): ${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;${last.unit} × ${esc(s.r)}`).join(", ")}${last.unit !== unit ? ` <span>(grey targets converted to ${unit})</span>` : ""}</p>`;
   if (e) {
     const allTop = last.sets.length >= e.s && last.sets.every(s => (num(s.r)||0) >= e.hi);
     html += allTop ? `<p class="hint">Every set hit ${e.hi} reps. Add ${unit === "kg" ? "2.5 kg" : "5 lb"} today, or the smallest jump available.</p>` : `<p class="hint">Aim to beat it by one rep on any set.</p>`;
@@ -314,10 +314,10 @@ function exerciseNameSuggestions(){
  return `<datalist id="exercise-name-suggestions">${names.map(n=>`<option value="${esc(n)}"></option>`).join("")}</datalist>`;
 }
 function exerciseSearchBox(){
- return `<div class="section"><label for="exercise-search">Search exercises</label>
- <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Filter exercises by name" value="${esc(exerciseQuery)}" autocomplete="off">
+ return `<div class="section exercise-search-panel" role="search" aria-label="Find an exercise"><label for="exercise-search">Search exercises</label>
+ <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Search current exercises and alternatives" value="${esc(exerciseQuery)}" autocomplete="off">
  <button class="btn small" type="button" data-act="clearexercisesearch">Clear search</button>
- <p id="exercise-search-count" class="muted" data-exercise-search-count role="status"></p>
+ <p id="exercise-search-count" class="muted" data-exercise-search-count role="status" aria-live="polite"></p>
  <p class="muted" data-exercise-search-empty hidden>No matching exercises. Clear search to show all.</p></div>`;
 }
 function applyExerciseFilter(){
@@ -397,7 +397,7 @@ function viewLog(){
     </div><aside class="session-sidebar">
       <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        ${timerPanel(d)}<button class="btn primary" data-act="save">Finish & save session ${icon("arrow")}</button><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
+        ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
       <div class="guide-card"><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
     </aside></div>`;

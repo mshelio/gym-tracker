@@ -75,3 +75,17 @@ test('training dashboard action and five-tab navigation remain usable on mobile'
  }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('workout set entry, search and timer controls retain accessible mobile presentation',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ const search=page.getByRole('search',{name:'Find an exercise'});
+ await expect(search).toBeVisible();
+ await expect(search.getByRole('searchbox')).toHaveAttribute('aria-describedby','exercise-search-count');
+ const set=page.locator('.setrow').first();
+ await expect(set).toHaveAttribute('role','group');
+ await expect(set.locator('.set-complete')).toHaveAttribute('aria-pressed',/true|false/);
+ await expect(page.getByRole('group',{name:'Workout and rest timers'})).toBeVisible();
+ await expect(page.locator('.finish-session-action')).toHaveAttribute('aria-describedby','session-save-help');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
