@@ -241,6 +241,31 @@ function unitFor(name, day){ const l = name ? lastFor(name) : null; return l ? l
 function unitSeg(g, i, u){ return `<span class="seg" role="group" aria-label="Weight unit">${["kg","lb"].map(x => `<button type="button" data-act="unit" data-g="${g}" data-i="${i}" data-u="${x}" aria-pressed="${u===x}">${x}</button>`).join("")}</span>`; }
 function draftHasData(d){ return [...d.ex, ...(d.extra||[])].some(e => e.sets.some(s => String(s.w).trim() !== "" || String(s.r).trim() !== "")) || (d.notes||"").trim() !== ""; }
 
+function viewHome(){
+ const scheduled=nextSlot(), selected=S.dayId&&getDay(S.dayId)?S.dayId:nextDayId();
+ const drafts=Object.entries(S.drafts).filter(([id,d])=>getDay(id)&&d&&Array.isArray(d.ex)&&draftHasData(d));
+ const resume=drafts.find(([id])=>id===selected)||drafts[0];
+ const resumeDay=resume?getDay(resume[0]):null;
+ const thisWeek=new Date(today()+"T00:00:00");thisWeek.setDate(thisWeek.getDate()-(thisWeek.getDay()+6)%7);
+ const sessionsThisWeek=S.sessions.filter(x=>x.date>=thisWeek.toISOString().slice(0,10)&&x.date<=today()).length;
+ const plan=activeSchedule();
+ const planned=plan?plan.days.filter(Boolean).length:0;
+ return `<section class="home-dashboard" aria-label="Home dashboard">
+ <div class="home-primary"><p class="eyebrow">YOUR NEXT MOVE</p><h2>${resumeDay?"Pick up where you left off":"Ready for your next workout?"}</h2>
+ <p>${resumeDay?esc(resumeDay.name)+" — your locally saved draft is waiting.":esc(nextScheduleLabel())+" is next. Your progress is saved on this device."}</p>
+ <div class="home-actions">${resumeDay?`<button type="button" class="btn primary" data-act="homecontinue" data-id="${esc(resume[0])}">Continue Workout →</button>`:""}
+ <button type="button" class="btn ${resumeDay?"":"primary"}" data-act="homestart">Start New Workout →</button></div></div>
+ <section class="section home-week"><div class="home-section-head"><div><p class="eyebrow">THIS WEEK</p><h3>Training consistency</h3></div><span class="home-count">${sessionsThisWeek}${planned?"/"+planned:""} workouts</span></div>
+ <div class="home-progress" role="progressbar" aria-label="Weekly workout progress" aria-valuemin="0" aria-valuemax="${Math.max(planned,1)}" aria-valuenow="${Math.min(sessionsThisWeek,Math.max(planned,1))}"><span style="width:${planned?Math.min(100,Math.round(sessionsThisWeek/planned*100)):0}%"></span></div>
+ <p class="muted">Completed sessions this week${planned?" · "+planned+" planned training days":""}.</p></section>
+ <div class="home-metrics"><section class="section"><span class="eyebrow">ALL-TIME</span><strong>${S.sessions.length}</strong><span class="muted">Workouts logged</span></section><section class="section"><span class="eyebrow">UP NEXT</span><strong class="home-metric-name">${esc(nextScheduleLabel())}</strong><span class="muted">According to your schedule</span></section></div>
+ <section class="section home-shortcuts"><h3>Quick access</h3><div class="home-shortcut-grid">
+ <button type="button" class="btn" data-act="homeschedule">View schedule →</button>
+ <button type="button" class="btn" data-act="homeprogress">See progress →</button>
+ <button type="button" class="btn" data-act="homehistory">Workout history →</button>
+ </div></section></section>`;
+}
+
 /* ---------- render ---------- */
 function render(){
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === S.tab ? "page" : "false"));
@@ -249,11 +274,11 @@ function render(){
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
-  const intro = {log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], calendar:["TRAINING CALENDAR", "Your training at a glance.", "See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
+  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], calendar:["TRAINING CALENDAR", "Your training at a glance.", "See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
   const weekStart = new Date(today()+"T00:00:00"); weekStart.setDate(weekStart.getDate() - (weekStart.getDay()+6)%7);
   const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${intro[0]}</p><h1>${intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
-    <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "calendar" ? viewCalendar() : S.tab === "progress" ? viewProgress() : viewData());
+    <div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? viewHistory() : S.tab === "calendar" ? viewCalendar() : S.tab === "progress" ? viewProgress() : viewData());
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -725,6 +750,10 @@ $("#app").addEventListener("click", async e => {
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(["homestart","homecontinue","homeschedule","homeprogress","homehistory"].includes(act)){
+   if(act==="homeprogress")S.tab="progress";else if(act==="homehistory")S.tab="history";else {S.tab="log";if(act==="homecontinue"&&getDay(b.dataset.id))S.dayId=b.dataset.id;if(act==="homeschedule")S.manageSchedules=true;}
+   render();window.scrollTo({top:0});return;
+  }
   if(act==="recoverbackup"){S.tab="data";render();await exportJSON();return;}
   if(act==="reloadconflict"){window.location.reload();return;}
   if(["manageschedules","closeschedules","newschedule","editschedule","cancelschedule","activateschedule","skipscheduled","movescheduleday","addscheduleday","removescheduleday","saveschedule","deleteschedule"].includes(act)){await scheduleAction(b);return;}
