@@ -47,3 +47,15 @@ test('mobile exercise search keeps filtering accessible and non-destructive',asy
  await page.getByRole('button',{name:'Clear search'}).click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toBeVisible();
 });
+
+test('mobile appearance control remains operable and saved after reload',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const selector=page.locator('#theme-preference');
+ await expect(selector).toBeVisible();
+ await selector.selectOption('dark');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await page.reload();
+ await expect(selector).toHaveValue('dark');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
+});
