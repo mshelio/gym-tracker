@@ -302,7 +302,7 @@ document.addEventListener("visibilitychange",updateTimers);
 function setRows(i, prefix, name, sets, last, lo, hi, unit){
   return sets.map((s, j) => {
     const ph = last && last.sets[j] ? { w: tidy(conv(last.sets[j].w ?? 0, last.unit, unit), unit), r: last.sets[j].r } : null;
-    return `<div class="setrow" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">Set ${j+1}</span>
+    return `<div class="setrow workout-set-row ${s.completed===true?"is-complete":""}" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">Set ${j+1}</span>
       <input type="number" inputmode="decimal" step="any" min="0" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
       <input type="number" inputmode="numeric" step="1" min="0" aria-label="${esc(name)} set ${j+1} reps" data-f="r" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}r-${i}-${j}" value="${esc(s.r)}" placeholder="${ph ? esc(ph.r ?? "") : (lo ? lo+"–"+hi : "reps")}">
       <select aria-label="${esc(name)} set ${j+1} type" data-act="settype" data-g="${prefix}" data-i="${i}" data-j="${j}">${["working","warmup","drop"].map(t=>`<option value="${t}" ${(s.type||"working")===t?"selected":""}>${t}</option>`).join("")}</select>
@@ -313,7 +313,7 @@ function setRows(i, prefix, name, sets, last, lo, hi, unit){
 function lastBlock(name, e, unit){
   const last = lastFor(name);
   if (!last || !name) return { last:null, html:`<p class="last">No history yet for this exercise. Start light and focus on form.</p>` };
-  let html = `<p class="last" aria-label="Previous performance">Last time (${esc(fmtDate(last.date))}): ${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;${last.unit} × ${esc(s.r)}`).join(", ")}${last.unit !== unit ? ` <span>(grey targets converted to ${unit})</span>` : ""}</p>`;
+  let html = `<p class="last workout-previous" aria-label="Previous performance"><strong>Previous performance</strong> · Last time (${esc(fmtDate(last.date))}): ${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;${last.unit} × ${esc(s.r)}`).join(", ")}${last.unit !== unit ? ` <span>(grey targets converted to ${unit})</span>` : ""}</p>`;
   if (e) {
     const allTop = last.sets.length >= e.s && last.sets.every(s => (num(s.r)||0) >= e.hi);
     html += allTop ? `<p class="hint">Every set hit ${e.hi} reps. Add ${unit === "kg" ? "2.5 kg" : "5 lb"} today, or the smallest jump available.</p>` : `<p class="hint">Aim to beat it by one rep on any set.</p>`;
@@ -383,11 +383,11 @@ function viewLog(){
     const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
     const lb = lastBlock(de.name, e, de.unit);
     const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
-    return `<section class="ex ${esc(day.type)}" data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
-      <div class="ex-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
+    return `<section class="ex active-exercise ${esc(day.type)}" data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
+      <div class="ex-head workout-exercise-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
       ${exerciseActivationInfo(de.name)}
-      <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
+      <div class="colhead workout-set-heading"><span>Set</span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
        ${exerciseDefaultControls(de,i,"",d)}
       ${progressionHint(de,e)}<div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
@@ -395,7 +395,7 @@ function viewLog(){
   }).join("");
   const extras = d.extra.map((x, i) => {
     const lb = lastBlock(x.name.trim(), null, x.unit);
-    return `<section class="ex other" data-exercise-search-item="${esc(x.name)}">
+    return `<section class="ex active-exercise other" data-exercise-search-item="${esc(x.name)}">
       <div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
       ${x.name.trim()?exerciseActivationInfo(x.name):""}
@@ -410,7 +410,7 @@ function viewLog(){
     <section class="workout-hero" aria-label="Today\'s workout"><div><p class="eyebrow">READY WHEN YOU ARE</p><h2>${esc(day.name)}</h2><p class="muted">${inProgress?"Your workout draft is saved on this device.":"Select a workout or start logging your sets."}</p></div><a class="btn primary workout-hero__action" href="#workout-editor">${inProgress?"Continue Workout":"Start Workout"} ${icon("arrow")}</a></section>
     ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label><div class="program-label"><h2>Workout library</h2><span>Any workout, any split</span></div>
     <div class="plates" role="group" aria-label="Choose workout">${plates}</div>
-    <div class="workout-layout" id="workout-editor" tabindex="-1"><div class="workout-main">
+    <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
       <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
       <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
       <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
