@@ -186,3 +186,8 @@ Calendar projections are **not** written as events: weekly schedules can project
 ### Exercise identity and muscle classification (v1.2)
 
 Recognized exercise names (including selected alternatives and synonyms) resolve to stable `catalog:...` IDs with primary muscle, secondary muscles and equipment metadata. Custom exercises with their own IDs preserve those IDs; unknown exercise names remain valid and **uncategorized**. Existing session names are retained, and old backups are not rewritten retroactively. This is the identity foundation for the optional muscle-group volume analytics in issue #19. Existing JSON v4 backups and v3 imports continue to use the optional `exerciseId` fields. Create and retain a JSON backup before clearing browser storage; the classification catalog contains no private workout data.
+
+
+### Muscle-group analytics (v1.2)
+
+In **Progress → Muscle-group volume**, completed working sets contribute exactly one primary-muscle hard set. Warm-up sets and incomplete sets are excluded. Drop sets contribute load × repetitions to volume but not hard sets. Recognized secondary muscles are **reported separately as 0.5-credit estimates**; secondary credits are never added to overall primary hard-set counts. Unrecognized exercise names appear in **Unknown**, not automatically assigned to a muscle. Weekly dates use ISO Monday boundaries and local YYYY-MM-DD log dates without local-time arithmetic. Historic session edits and deletions automatically recompute metrics from current saved sessions. Switching display units converts volume without changing set counts. This is calculated data only; no changes to IndexedDB or the version 4 backup schema are required.
