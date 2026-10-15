@@ -442,7 +442,7 @@ function viewCalendar(){
  const monthDays=days.filter(d=>d.date.slice(0,7)===month);
  const stats=calendarAdherence(monthDays);
  const label=new Date(month+"-01T12:00:00Z").toLocaleDateString(undefined,{month:"long",year:"numeric",timeZone:"UTC"});
- const activeDays=calendarMode==="week" ? days.filter(d=>d.date>=today().slice(0,7)+"-01").slice(0,7) : days;
+ const activeDays=calendarMode==="week" ? days.slice(0,7) : days;
  const cards=activeDays.map(d=>`<div class="calendar-day ${d.date.slice(0,7)===month?"":"outside"}" data-calendar-date="${d.date}" aria-label="${esc(d.date)} ${esc(d.type)}">
   <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state state-${d.type}">${d.type==="none"?"—":esc(d.type)}</span>
   ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
