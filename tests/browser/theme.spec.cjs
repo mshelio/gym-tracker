@@ -13,7 +13,7 @@ test('System, Light and Dark appearance persists independently of workout data',
  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
  await selector.selectOption('system');
  await expect(page.locator('html')).toHaveAttribute('data-theme-preference','system');
- await expect(page.evaluate(()=>localStorage.getItem('gt-color-theme'))).toBe('system');
+ await expect(await page.evaluate(()=>localStorage.getItem('gt-color-theme'))).toBe('system');
 });
 test('System mode follows OS color preference; PWA status and muscle map inherit theme',async({page})=>{
  await page.emulateMedia({colorScheme:'dark'});
