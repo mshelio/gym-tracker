@@ -15,7 +15,7 @@ import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,shiftCal
 (() => {
 "use strict";
 const S = createInitialState();
-let calendarMonth=null,calendarMode="month";
+let calendarMonth=null,calendarMode="month",calendarWeekOffset=0;
 const timerTools=createTimers();
 let timerTicker=null;
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
@@ -442,7 +442,7 @@ function viewCalendar(){
  const monthDays=days.filter(d=>d.date.slice(0,7)===month);
  const stats=calendarAdherence(monthDays);
  const label=new Date(month+"-01T12:00:00Z").toLocaleDateString(undefined,{month:"long",year:"numeric",timeZone:"UTC"});
- const activeDays=calendarMode==="week" ? days.slice(0,7) : days;
+ const activeDays=calendarMode==="week" ? days.slice(calendarWeekOffset*7,calendarWeekOffset*7+7) : days;
  const cards=activeDays.map(d=>`<div class="calendar-day ${d.date.slice(0,7)===month?"":"outside"}" data-calendar-date="${d.date}" aria-label="${esc(d.date)} ${esc(d.type)}">
   <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state state-${d.type}">${d.type==="none"?"—":esc(d.type)}</span>
   ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
@@ -621,12 +621,13 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
 });
 
 $("#app").addEventListener("change",e=>{
- if(e.target.matches("[data-calendar-mode]")){calendarMode=e.target.value;render();}
+ if(e.target.matches("[data-calendar-mode]")){calendarMode=e.target.value;calendarWeekOffset=0;render();}
 });
 $("#app").addEventListener("click",e=>{
  const b=e.target.closest("button[data-act]");
  if(!b||!["calendarprev","calendarnext","calendartoday"].includes(b.dataset.act))return;
- if(b.dataset.act==="calendartoday")calendarMonth=today().slice(0,7);
+ if(b.dataset.act==="calendartoday"){calendarMonth=today().slice(0,7);calendarWeekOffset=0;}
+ else if(calendarMode==="week"){calendarWeekOffset+=b.dataset.act==="calendarprev"?-1:1;if(calendarWeekOffset<0){calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),-1);calendarWeekOffset=4;}if(calendarWeekOffset>4){calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),1);calendarWeekOffset=0;}}
  else calendarMonth=shiftCalendarMonth(calendarMonth||today().slice(0,7),b.dataset.act==="calendarprev"?-1:1);
  render();
 });
