@@ -41,3 +41,19 @@
 .muscle-map__region.is-selected{stroke:var(--ink);stroke-width:.26}
 .muscle-map__activation{stroke:#fff;stroke-width:.13;stroke-linejoin:round}
 @media(forced-colors:active){.muscle-map__anatomy-base{fill:Canvas;stroke:CanvasText}.muscle-map__region{fill:Highlight;stroke:CanvasText}}
+
+/* Accessible alternative to precise, narrow anatomical touch targets. */
+.muscle-map__instructions{font-size:.85rem;color:var(--muted);margin:0}
+.muscle-map__contributors{overflow-x:auto}
+.muscle-map__contributors table{width:100%;border-collapse:collapse;text-align:left}
+.muscle-map__contributors th,.muscle-map__contributors td{padding:.55rem;border-bottom:1px solid var(--line)}
+.muscle-map__contributors summary,.muscle-map__table summary{cursor:pointer;min-height:44px;display:list-item;padding:.65rem .35rem}
+.muscle-map__table button{min-height:44px;padding:.6rem .5rem;color:inherit}
+.muscle-map__region:focus-visible{stroke:#151515;stroke-width:.45;filter:brightness(.8)}
+@media(forced-colors:active){
+ .muscle-map__region{fill:Canvas;stroke:CanvasText}
+ .muscle-map__region.is-selected,.muscle-map__region:focus-visible{fill:Highlight;stroke:HighlightText;stroke-width:.45}
+ .muscle-map__table button:focus-visible{outline:3px solid Highlight;outline-offset:2px}
+ .muscle-map__activation--primary{fill:Highlight;stroke:CanvasText}
+ .muscle-map__activation--secondary{fill:Mark;stroke:CanvasText}
+}
