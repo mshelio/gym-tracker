@@ -57,3 +57,10 @@
  .muscle-map__activation--primary{fill:Highlight;stroke:CanvasText}
  .muscle-map__activation--secondary{fill:Mark;stroke:CanvasText}
 }
+
+:root[data-theme="dark"] .muscle-map__region{stroke:var(--surface);fill:color-mix(in srgb,#bca7ff calc(var(--muscle-intensity)*85%),#52655a)}
+:root[data-theme="dark"] .muscle-map__region.is-selected,:root[data-theme="dark"] .muscle-map__region:focus-visible{stroke:var(--focus);filter:brightness(1.13)}
+:root[data-theme="dark"] .muscle-map__anatomy-base{fill:#54675c;stroke:#a5bdb0}
+:root[data-theme="dark"] .muscle-map__activation--inactive{fill:#54675c}
+:root[data-theme="dark"] .muscle-map__activation--primary{fill:#ad91ff}
+:root[data-theme="dark"] .muscle-map__activation--secondary{fill:#79c9ea}
