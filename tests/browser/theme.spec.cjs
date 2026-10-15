@@ -1,0 +1,31 @@
+const {test,expect}=require('@playwright/test');
+test('System, Light and Dark appearance persists independently of workout data',async({page})=>{
+ await page.goto('/gym-tracker/');
+ const selector=page.locator('#theme-preference');
+ await expect(selector).toHaveValue('system');
+ await selector.selectOption('dark');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await expect(page.locator('html')).toHaveAttribute('data-theme-preference','dark');
+ await page.reload();
+ await expect(selector).toHaveValue('dark');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await selector.selectOption('light');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await selector.selectOption('system');
+ await expect(page.locator('html')).toHaveAttribute('data-theme-preference','system');
+ await expect(page.evaluate(()=>localStorage.getItem('gt-color-theme'))).toBe('system');
+});
+test('System mode follows OS color preference; PWA status and muscle map inherit theme',async({page})=>{
+ await page.emulateMedia({colorScheme:'dark'});
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await expect(page.locator('#theme-preference')).toHaveValue('system');
+ await page.getByRole('button',{name:/Progress/}).first().click();
+ await expect(page.locator('.muscle-map')).toBeVisible();
+ expect(await page.locator('.muscle-map').evaluate(el=>getComputedStyle(el).color)).toBeTruthy();
+ await page.emulateMedia({colorScheme:'light'});
+ await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await page.locator('#theme-preference').selectOption('dark');
+ await page.emulateMedia({colorScheme:'light'});
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+});
