@@ -22,6 +22,7 @@ const regionId=(side,p)=>{
  // Keep selectors used by existing smoke tests stable.
  if(p.id==="chest-upper-left")return "front-chest-left";
  if(p.id==="gluteus-maximus-left")return "back-glutes-left";
+ if(p.id==="triceps-long-left")return "back-triceps-left";
  return side+"-"+p.id;
 };
 
