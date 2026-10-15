@@ -1,4 +1,8 @@
 const {test,expect}=require('@playwright/test');
+const fs=require('node:fs'),path=require('node:path');
+const workerSource=fs.readFileSync(path.join(__dirname,'../../sw.js'),'utf8');
+const currentShell=workerSource.match(/const VERSION='(gt-shell-[a-f0-9]{8})';/)?.[1];
+if(!currentShell)throw Error('Service worker version missing or malformed');
 test.skip(({browserName})=>browserName!=='chromium','Service-worker lifecycle checks run in Chromium; browser matrix covers remaining engines.');
 
 async function controlled(page){
@@ -9,11 +13,11 @@ async function controlled(page){
 }
 test('installability metadata and shell cache are repository scoped',async({page})=>{
  await controlled(page);
- const info=await page.evaluate(async()=>{
+ const info=await page.evaluate(async(currentShell)=>{
   const manifest=await (await fetch('./manifest.webmanifest')).json();
-  const cache=await caches.open('gt-shell-386a8aea');
+  const cache=await caches.open(currentShell);
   return {manifest,keys:(await cache.keys()).map(x=>x.url),scope:(await navigator.serviceWorker.ready).scope};
- });
+ },currentShell);
  expect(info.manifest.start_url).toBe('./');
  expect(info.manifest.scope).toBe('./');
  expect(info.manifest.icons.some(x=>x.purpose==='maskable')).toBe(true);
@@ -52,7 +56,7 @@ test('old worker remains active until an explicit update and drafts survive',asy
  const reg=await page.evaluate(()=>navigator.serviceWorker.getRegistration());
  expect(reg).toBeTruthy();
  expect(before).toMatch(/\/gym-tracker\/sw\.js$/);
- const preserved=await page.evaluate(async()=>{const cache=await caches.open('gt-shell-386a8aea');return !!(await cache.match(new URL('./js/app.js',location.href).href))});
+ const preserved=await page.evaluate(async(currentShell)=>{const cache=await caches.open(currentShell);return !!(await cache.match(new URL('./js/app.js',location.href).href))},currentShell);
  expect(preserved).toBe(true);
  await page.reload();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('7');

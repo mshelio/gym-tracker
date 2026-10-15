@@ -9,6 +9,8 @@ import { recommendProgression } from "./progression.js";
 import { calculateRecords } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { muscleVolumeSummary } from "./muscle-analytics.js";
+import { muscleMapData } from "./muscle-map-data.js";
+import { renderMuscleMap } from "./muscle-map-view.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
 import { resolveExerciseMetadata,resolveExerciseIdentity } from "./exercise-catalog.js";
@@ -18,6 +20,7 @@ import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,shiftCal
 "use strict";
 const S = createInitialState();
 let calendarMonth=null,calendarMode="month",calendarWeekOffset=0;
+let muscleMapMetric="hardSets",muscleMapSelected="chest";
 const timerTools=createTimers();
 let timerTicker=null;
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
@@ -539,9 +542,12 @@ function viewProgress(){
   const analyticsHTML=`<section class="section analytics-dashboard"><h3>Training analytics</h3>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div><h4>Weekly volume</h4>${weekPts.length?chartSVG(weekPts,"var(--push)",summary.unit+"·reps"):'<p class="empty">No training sessions match these filters.</p>'}<h4>Weekly hard sets</h4>${hardPts.length?chartSVG(hardPts,"var(--pull)","hard sets"):'<p class="empty">No hard-set trend available.</p>'}${summary.weekly.length?`<details><summary>Weekly data table</summary><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></details>`:""}</section>`;
 
   const muscle=muscleVolumeSummary(filtered,{unit:S.bodyUnit||"kg",exercise:filter.exercise||"",secondaryCredit:0.5});
+  const mapData=muscleMapData(muscle,{metric:muscleMapMetric});
+  const muscleMapHTML=`<div class="muscle-map-controls"><label>Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected})}`;
   const muscleRows=(entries,kind)=>entries.map(entry=>`<tr><td>${esc(entry.muscle)}</td><td>${entry.hardSets}</td><td>${entry.volume}</td><td>${kind}</td></tr>`).join("");
   const muscleHTML=`<section class="section muscle-analytics" aria-label="Muscle-group volume"><h3>Muscle-group volume</h3>
     <p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p>
+    ${muscleMapHTML}
     <div class="stats"><div class="stat"><b>${muscle.hardSets}</b><small>Total hard sets</small></div><div class="stat"><b>${muscle.unknown.hardSets}</b><small>Unclassified hard sets</small></div></div>
     <table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
     <h4>Primary hard-set trend</h4>${muscle.weekly.length?chartSVG(muscle.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.primary.reduce((sum,m)=>sum+m.hardSets,0)})),"var(--pull)","primary hard sets"):""}
@@ -668,6 +674,7 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", e => {
+  if(e.target.matches("[data-muscle-map-metric]")){muscleMapMetric=e.target.value==="volume"?"volume":"hardSets";render();return;}
   if(e.target.dataset.analytics){S.analyticsFilter={...(S.analyticsFilter||{}),[e.target.dataset.analytics]:e.target.value};render();return;}
   if(e.target.dataset.act==="progressiontoggle"){S.progressionEnabled=e.target.checked;saveDrafts();render();return;}
   if(e.target.dataset.act==="incrementunit"){const t=e.target;(t.dataset.g==="x"?getDraft(S.dayId).extra:getDraft(S.dayId).ex)[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
@@ -685,7 +692,10 @@ $("#app").addEventListener("change", e => {
   if (t.id === "importFile" && t.files && t.files[0]) { t.files[0].text().then(txt => { $("#importText").value = txt; toast("File loaded. Tap Import JSON."); }); }
 });
 
+$("#app").addEventListener("keydown",e=>{if(S.tab!=="progress"||!["Enter"," "].includes(e.key))return;const region=e.target.closest?.("[data-muscle]");if(!region||!region.closest?.(".muscle-map"))return;e.preventDefault();muscleMapSelected=region.dataset.muscle;render();});
 $("#app").addEventListener("click", async e => {
+  const muscleRegion=e.target.closest?.("[data-muscle]");
+  if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
   if(act==="recoverbackup"){S.tab="data";render();await exportJSON();return;}

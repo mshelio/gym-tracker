@@ -3,7 +3,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const workerSource=fs.readFileSync(path.join(root,'sw.js'),'utf8');
-assert.match(workerSource,/gt-shell-386a8aea/);
+assert.match(workerSource,/const VERSION='gt-shell-[a-f0-9]{8}';/);
 assert.match(workerSource,/ppl-default-workouts.json/);
 assert.match(workerSource,/SKIP_WAITING/);
 assert(!workerSource.includes('indexedDB.deleteDatabase'));
@@ -25,12 +25,12 @@ for(const icon of pwaManifest.icons){
 }
 assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
 
-const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','exercise-catalog.js','progression.js','records.js','analytics.js','calendar.js','muscle-analytics.js','app.js'];
+const moduleFiles = ['config.js','state.js','workouts.js','render.js','schedules.js','storage.js','timers.js','exercise-settings.js','exercise-catalog.js','progression.js','records.js','analytics.js','calendar.js','muscle-analytics.js','muscle-map-data.js','muscle-map-view.js','app.js'];
 const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path.join(root,'js',f),'utf8')]));
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,resolveExerciseMetadata,resolveExerciseIdentity,muscleVolumeSummary,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,resolveExerciseMetadata,resolveExerciseIdentity,muscleVolumeSummary,muscleMapData,renderMuscleMap,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -61,6 +61,10 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
    {name:"Mystery lift",unit:"kg",sets:[{w:30,r:10,type:"working",completed:true}]}
   ]},{date:"2026-03-30",dayId:"pushA",exercises:[{name:"Barbell bench press",unit:"kg",sets:[{w:90,r:5,type:"working",completed:true}]}]}];
   const muscleResult=a.muscleVolumeSummary(muscleSessions,{unit:"kg"});
+  const map=a.muscleMapData(muscleResult);
+  assert.match(a.renderMuscleMap(map),/Front view/);
+  assert.equal(map.muscles.find(m=>m.id==="chest").primaryHardSets,2);
+  assert.equal(map.muscles.find(m=>m.id==="triceps").secondaryHardSets,1);
   assert.equal(muscleResult.hardSets,3);
   assert.equal(a.muscleVolumeSummary(muscleSessions,{exercise:"Barbell bench press"}).hardSets,2);
   assert.equal(a.muscleVolumeSummary(muscleSessions,{exercise:"Barbell bench press"}).unknown.hardSets,0);
