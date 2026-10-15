@@ -304,3 +304,14 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{border-color:var
  .workout-exercise-head{gap:.5rem}
 }
 @media(prefers-reduced-motion:reduce){.workout-set-row{transition:none}}
+
+/* Phase 4: immersive rest timer with no new timer state or persistence format. */
+.rest-overlay{position:fixed;inset:0;z-index:100;background:rgba(6,19,43,.84);display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));overflow-y:auto}
+.rest-overlay__card{position:relative;width:min(100%,500px);padding:clamp(24px,5vw,48px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:28px;box-shadow:0 25px 100px rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+.rest-overlay__card h2{font-size:clamp(1.5rem,5vw,2.1rem)}
+.rest-overlay__close{position:absolute;right:16px;top:16px;min-width:44px;min-height:44px}
+.rest-overlay__count{font-size:clamp(4.5rem,19vw,7rem);font-variant-numeric:tabular-nums;line-height:1.1;color:var(--blue);font-weight:800;letter-spacing:-.06em;margin:14px 0 2px}
+.rest-overlay__state{color:var(--muted);font-weight:650}
+.rest-overlay__adjust,.rest-overlay__buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin-top:10px}
+.rest-overlay__adjust .btn,.rest-overlay__buttons .btn{min-height:56px}
+@media(max-width:600px){.rest-overlay__card{min-height:min(640px,90dvh);justify-content:center;padding:28px 18px}.rest-overlay__count{font-size:clamp(4.5rem,20vw,6.5rem)}}
