@@ -1,6 +1,20 @@
 # Changelog
 
-## [Unreleased] — v1.3.0 release candidate\n\n### Added\n- Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#88).\n- Exercise-specific primary/secondary anatomical previews and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.\n- Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.\n\n### Preserved\n- Read-only visualizations continue using existing accurate muscle hard-set and volume aggregation, with warm-up exclusions, volume-only drop sets, and separate 0.5-credit secondary reporting.\n- Local IndexedDB atomic saves, version 4 JSON backup import/export, and offline service-worker operation without account or cloud sync.\n\n### Release gate\n- v1.3.0 has not been tagged or published. Complete regression, cross-browser, keyboard/touch, responsive, Pages deployment, and installed/offline PWA verification at the final commit before authorization.\n\n## [v1.2.0] — released
+## [Unreleased] — v1.3.0 release candidate
+
+### Added
+- Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#88).
+- Exercise-specific primary/secondary anatomical previews and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.
+- Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.
+
+### Preserved
+- Read-only visualizations continue using existing accurate muscle hard-set and volume aggregation, with warm-up exclusions, volume-only drop sets, and separate 0.5-credit secondary reporting.
+- Local IndexedDB atomic saves, version 4 JSON backup import/export, and offline service-worker operation without account or cloud sync.
+
+### Release gate
+- v1.3.0 has not been tagged or published. Complete regression, cross-browser, keyboard/touch, responsive, Pages deployment, and installed/offline PWA verification at the final commit before authorization.
+
+## [v1.2.0] — released
 
 This section records the v1.2.0 release.
 
