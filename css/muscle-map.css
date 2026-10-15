@@ -22,3 +22,13 @@
 .muscle-map__table button{border:0;background:transparent;text-decoration:underline;cursor:pointer}
 @media(max-width:540px){.muscle-map__diagrams{gap:.35rem}.muscle-map__details dl{grid-template-columns:1fr 1fr}.muscle-map__view svg{max-width:185px}}
 @media(prefers-reduced-motion:reduce){.muscle-map__region{transition:none}}
+
+.exercise-activation{margin:.5rem 0;border:1px solid var(--line);border-radius:.65rem;padding:.45rem .7rem}
+.exercise-activation summary{cursor:pointer;font-weight:600}
+.muscle-map__exercise p{margin:.4rem 0;font-size:.85rem}
+.muscle-map__exercise-figures{display:flex;justify-content:center;align-items:start;gap:.6rem}
+.muscle-map__exercise-figures svg{width:45%;max-width:120px;height:auto}
+.muscle-map__activation{stroke:var(--surface);stroke-width:2;fill:#d8ddda}
+.muscle-map__activation--primary{fill:#7056cc}
+.muscle-map__activation--secondary{fill:#6da5d3}
+@media (forced-colors:active){.muscle-map__activation--primary{fill:Highlight;stroke:CanvasText}.muscle-map__activation--secondary{fill:Mark;stroke:CanvasText}.muscle-map__activation--inactive{fill:Canvas}}

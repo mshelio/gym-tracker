@@ -53,3 +53,20 @@ export function bindMuscleMap(container,onSelect){
  container.addEventListener("keydown",select);
  return ()=>{container.removeEventListener("click",select);container.removeEventListener("keydown",select);};
 }
+
+// Training-plan anatomical preview. Illustrative only: it does not invent hard sets
+// or infer exercise identity and never replaces the saved-session analytics.
+export function renderExerciseMusclePreview(metadata) {
+ if(!metadata||!metadata.primaryMuscle||!Object.hasOwn(MUSCLE_REGIONS,metadata.primaryMuscle))return '<p class="muted">Muscle classification unavailable for this exercise.</p>';
+ const secondary=new Set((metadata.secondaryMuscles||[]).filter(m=>Object.hasOwn(MUSCLE_REGIONS,m)&&m!==metadata.primaryMuscle));
+ const labelled=m=>humanize(m);
+ const diagrams=sides.map(side=>{
+  const regions=Object.entries(shapes).filter(([id])=>id.startsWith(side+"-")).map(([id,[x,y,rx,ry]])=>{
+   const muscle=Object.keys(MUSCLE_REGIONS).find(m=>MUSCLE_REGIONS[m].includes(id));
+   const kind=muscle===metadata.primaryMuscle?"primary":secondary.has(muscle)?"secondary":"inactive";
+   return `<ellipse id="activation-${id}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="muscle-map__activation muscle-map__activation--${kind}"><title>${escapeText(labelled(muscle||"unknown"))}: ${kind}</title></ellipse>`;
+  }).join("");
+  return `<svg viewBox="0 0 240 462" role="img" aria-label="${side==="front"?"Front":"Back"}: primary ${escapeText(labelled(metadata.primaryMuscle))}; secondary ${escapeText([...secondary].map(labelled).join(", ")||"none")}" xmlns="http://www.w3.org/2000/svg"><g class="muscle-map__silhouette" aria-hidden="true"><circle cx="120" cy="35" r="24"/><path d="M95 62 Q65 67 61 92 L32 212 L48 220 L78 133 L86 238 L79 336 L87 450 L109 450 L120 270 L131 450 L153 450 L161 336 L154 238 L162 133 L192 220 L208 212 L179 92 Q175 67 145 62Z"/></g>${regions}</svg>`;
+ }).join("");
+ return `<div class="muscle-map__exercise"><p><strong>Primary:</strong> ${escapeText(labelled(metadata.primaryMuscle))}. <strong>Secondary:</strong> ${escapeText([...secondary].map(labelled).join(", ")||"None recorded")}.</p><div class="muscle-map__exercise-figures">${diagrams}</div><p class="muted">Illustrative muscle involvement, not measured activation or recovery.</p></div>`;
+}
