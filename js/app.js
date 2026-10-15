@@ -544,6 +544,7 @@ function viewProgress(){
     <p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p>
     <div class="stats"><div class="stat"><b>${muscle.hardSets}</b><small>Total hard sets</small></div><div class="stat"><b>${muscle.unknown.hardSets}</b><small>Unclassified hard sets</small></div></div>
     <table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
+    <h4>Primary hard-set trend</h4>${muscle.weekly.length?chartSVG(muscle.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.primary.reduce((sum,m)=>sum+m.hardSets,0)})),"var(--pull)","primary hard sets"):""}
     <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}
   </section>`;
   const names = [...new Set(filtered.flatMap(s => (s.exercises||[]).map(e => e.name)).filter(n=>!filter.exercise||n===filter.exercise))].sort();
