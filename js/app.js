@@ -380,10 +380,12 @@ function viewLog(){
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </section>`;
   }).join("");
+  const inProgress=draftHasData(d);
   return `
+    <section class="workout-hero" aria-label="Today\'s workout"><div><p class="eyebrow">READY WHEN YOU ARE</p><h2>${esc(day.name)}</h2><p class="muted">${inProgress?"Your workout draft is saved on this device.":"Select a workout or start logging your sets."}</p></div><a class="btn primary workout-hero__action" href="#workout-editor">${inProgress?"Continue Workout":"Start Workout"} ${icon("arrow")}</a></section>
     ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label><div class="program-label"><h2>Workout library</h2><span>Any workout, any split</span></div>
     <div class="plates" role="group" aria-label="Choose workout">${plates}</div>
-    <div class="workout-layout"><div class="workout-main">
+    <div class="workout-layout" id="workout-editor" tabindex="-1"><div class="workout-main">
       <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
       <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
       <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
