@@ -669,7 +669,7 @@ $("#app").addEventListener("change", e => {
   if(t.hasAttribute?.("data-schedule-cursor") && S.scheduleEditing){S.scheduleEditing.cursor=+t.value;return;}
   if (t.id === "programFile" && t.files?.[0]) { useProgramFile(t.files[0]); return; }
   if (t.dataset.ed === "type" && S.editing) { S.editing.type = t.value; return; }
-  if (t.dataset.act === "variant") { const de = getDraft(S.dayId).ex[+t.dataset.i]; de.name = t.value; de.unit = unitFor(t.value, getDay(S.dayId)); saveDrafts(); render(); }
+  if (t.dataset.act === "variant") { const de = getDraft(S.dayId).ex[+t.dataset.i]; if(de.name!==t.value){de.name=t.value;de.exerciseId=resolveExerciseIdentity(t.value)||undefined;} de.unit = unitFor(t.value, getDay(S.dayId)); saveDrafts(); render(); }
   if (t.id === "bUnit") { S.bodyUnit = t.value; return; }
   if (t.dataset.act === "progressEx") { S.progressEx = t.value; render(); }
   if (t.id === "importFile" && t.files && t.files[0]) { t.files[0].text().then(txt => { $("#importText").value = txt; toast("File loaded. Tap Import JSON."); }); }
