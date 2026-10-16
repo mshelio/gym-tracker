@@ -470,3 +470,12 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
 .progress-jump a:hover,.progress-jump a:focus-visible{border-color:var(--blue);color:var(--blue)}
 #progress-training,#progress-muscles,#progress-lifts,#progress-body{scroll-margin-top:20px}
 @media(max-width:600px){.progress-jump{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.progress-jump a{padding:8px 4px;font-size:12px}}
+
+/* Phase 4: clear plan summary and task-oriented More navigation. */
+.plan-overview-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.plan-overview-head h2{margin:5px 0 7px}
+.more-link{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;min-height:74px;text-align:left;white-space:normal}
+.more-link strong{display:flex;align-items:center;gap:8px}
+.more-link span{font-size:12px;line-height:1.45;color:var(--muted)}
+.more-privacy{margin-top:18px}
+@media(max-width:600px){.plan-overview-head>.btn{width:100%}.more-link{width:100%}}
