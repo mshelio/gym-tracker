@@ -319,6 +319,7 @@ function updateTimers(){
  const elapsed=document.querySelector('[data-timer="workout"]'),remaining=document.querySelector('[data-timer="rest"]');
  if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
  if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
+ const mini=document.querySelector("[data-timer=mini-rest]");if(mini)mini.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
  const overlay=document.querySelector("[data-timer=overlay-rest]");if(overlay)overlay.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
 }
 if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
@@ -389,6 +390,8 @@ function exerciseActivationInfo(name){
  const metadata=resolveExerciseMetadata(name);
  return `<details class="exercise-activation"><summary>Muscles worked</summary>${renderExerciseMusclePreview(metadata)}</details>`;
 }
+const workoutExpanded = new Set();
+const workoutOptionsExpanded = new Set();
 function viewLog(){
   if(S.scheduleEditing)return viewScheduleEditor();
   if(S.manageSchedules)return viewScheduleManager();
@@ -407,27 +410,27 @@ function viewLog(){
     const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
     const lb = lastBlock(de.name, e, de.unit);
     const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
-    return `<section class="ex active-exercise ${esc(day.type)}" data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
-      <div class="ex-head workout-exercise-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
+    return `<details class="ex active-exercise focused-exercise ${esc(day.type)}" data-exercise-id="base-${i}" ${workoutExpanded.size ? (workoutExpanded.has("base-"+i)?"open":"") : (i===Math.max(0,d.ex.findIndex(x=>x.sets.some(z=>!z.completed)))?"open":"")} data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
+      <summary class="focused-exercise-summary"><span class="ex-number">${String(i+1).padStart(2,"0")}</span><span class="focused-exercise-summary-title">${esc(de.name)}<small>${de.sets.filter(z=>z.completed===true).length}/${de.sets.length} sets complete · ${e.lo}–${e.hi} reps</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="ex-head workout-exercise-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
       ${lb.html}
-      ${exerciseActivationInfo(de.name)}
       <div class="colhead workout-set-heading"><span>Set</span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
+      <details class="exercise-options" data-options-id="base-${i}" ${workoutOptionsExpanded.has("base-"+i)?"open":""}><summary>Advanced options · Set type, RIR & defaults</summary>${exerciseActivationInfo(de.name)}
        ${exerciseDefaultControls(de,i,"",d)}
-      ${progressionHint(de,e)}<div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
+      ${progressionHint(de,e)}</details><div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
-    </section>`;
+    </div></details>`;
   }).join("");
   const extras = d.extra.map((x, i) => {
     const lb = lastBlock(x.name.trim(), null, x.unit);
-    return `<section class="ex active-exercise other" data-exercise-search-item="${esc(x.name)}">
-      <div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
+    return `<details class="ex active-exercise focused-exercise other" data-exercise-id="extra-${i}" ${workoutExpanded.has("extra-"+i)?"open":""} data-exercise-search-item="${esc(x.name)}">
+      <summary class="focused-exercise-summary"><span class="ex-number">+</span><span class="focused-exercise-summary-title">${esc(x.name||"Extra exercise")}<small>${x.sets.filter(z=>z.completed===true).length}/${x.sets.length} sets complete</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
-      ${x.name.trim()?exerciseActivationInfo(x.name):""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
+      <details class="exercise-options" data-options-id="extra-${i}" ${workoutOptionsExpanded.has("extra-"+i)?"open":""}><summary>Advanced options · Set type, RIR & defaults</summary>${x.name.trim()?exerciseActivationInfo(x.name):""}
        ${exerciseDefaultControls(x,i,"x",d)}
-      ${progressionHint(x,null)}<div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
+      ${progressionHint(x,null)}</details><div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
-    </section>`;
+    </div></details>`;
   }).join("");
   const inProgress=draftHasData(d);
   return `
@@ -448,8 +451,8 @@ function viewLog(){
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
         ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
-      <div class="guide-card"><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
-    </aside></div>`;
+      <details class="guide-card workout-guidance"><summary>Workout guidance</summary><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></details>
+    </aside></div>${d.restTimer?`<button class="rest-mini" type="button" data-act="timeropen" aria-label="Open rest timer"><span>Rest</span> <strong data-timer="mini-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></button>`:""}`;
 
 }
 
@@ -718,6 +721,18 @@ $("#app").addEventListener("click",e=>{
  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
  S.tab=link.dataset.destination;S.armedDelete=null;render();window.scrollTo({top:0});
 });
+
+document.addEventListener("toggle",e=>{
+ const n=e.target;
+ if(n?.matches?.("details[data-exercise-id]")){
+   const id=n.dataset.exerciseId;
+   if(n.open){workoutExpanded.add(id);}else{workoutExpanded.delete(id);}
+ }
+ if(n?.matches?.("details[data-options-id]")){
+   if(n.open)workoutOptionsExpanded.add(n.dataset.optionsId);
+   else workoutOptionsExpanded.delete(n.dataset.optionsId);
+ }
+},true);
 
 $("#app").addEventListener("change",e=>{
  if(e.target.matches("[data-calendar-mode]")){calendarMode=e.target.value;calendarWeekOffset=0;render();}

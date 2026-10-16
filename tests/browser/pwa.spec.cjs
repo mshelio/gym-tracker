@@ -37,7 +37,8 @@ test('offline logging, draft persistence and session completion survive reload',
  await page.getByRole('button',{name:/Finish & save session/}).click();
  await expect(page.getByText('Session saved')).toBeVisible();
  await page.reload();
- await page.getByRole('button',{name:/history/i}).first().click();
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await page.locator('#app .subnav button[data-destination="history"]').click();
  await expect(page.locator('details.hist')).toHaveCount(1);
  await context.setOffline(false);
 });

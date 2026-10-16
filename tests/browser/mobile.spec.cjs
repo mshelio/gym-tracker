@@ -190,3 +190,29 @@ test('Phase 1 nested history and backups use parent navigation and preserve acce
  await expect(page.locator('[data-act="export"]')).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth-window.innerWidth)).toBeLessThanOrEqual(2);
 });
+
+test('focused workout cards expose sets and advanced settings by disclosure',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ const cards=page.locator('details.focused-exercise');
+ await expect(cards.first()).toHaveAttribute('open','');
+ await expect(cards.nth(1)).not.toHaveAttribute('open','');
+ await expect(cards.first().locator('.exercise-options')).not.toHaveAttribute('open','');
+ await cards.first().locator('.exercise-options > summary').click();
+ await expect(cards.first().locator('.exercise-options')).toHaveAttribute('open','');
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/})).toBeVisible();
+ await cards.nth(1).locator('summary').first().click();
+ await expect(cards.nth(1)).toHaveAttribute('open','');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
+});
+
+test('mobile rest countdown stays accessible outside fullscreen dialog',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ const timer=page.locator('.rest-mini');
+ await expect(timer).toBeVisible();
+ await expect(timer.locator('[data-timer="mini-rest"]')).toContainText(/\d\d:\d\d/);
+ await timer.click();
+ await expect(page.getByRole('dialog',{name:'Rest timer'})).toBeVisible();
+});
