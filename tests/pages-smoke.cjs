@@ -87,7 +87,9 @@ async function verify(){
   if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
    throw Error('Service-worker update check discarded an active draft');
   console.log('PASS deployed PWA: scope, cache revision, offline startup, IndexedDB draft and update check');
-  await page.getByRole('button',{name:/history/i}).first().click();
+  // History is nested under Progress in the five-tab navigation.
+  await page.locator('nav.tabs button[data-tab="progress"]').click();
+  await page.locator('#app .subnav button[data-destination="history"]').click();
   await page.getByText('The work adds up.').waitFor({timeout:10000});
   if(failures.length)throw Error('Browser errors: '+failures.join('; '));
   console.log('PASS production startup, navigation and native modules on isolated profile');
