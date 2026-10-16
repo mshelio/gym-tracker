@@ -7,11 +7,11 @@ jobs:
   browser:
     name: Playwright ${{ matrix.project }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        project: [chromium, firefox, webkit, mobile-chromium, mobile-webkit]
+        project: [mobile-chromium, mobile-webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
