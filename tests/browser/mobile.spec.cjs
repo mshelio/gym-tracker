@@ -258,3 +258,23 @@ test('Phase 4 Plan and More give direct access to schedules and backups',async({
  await more.getByRole('button',{name:/Data & Backups/}).click();
  await expect(page.getByRole('region',{name:'Backup and restore settings'})).toBeVisible();
 });
+
+test('keyboard skip link bypasses navigation and mobile controls retain accessible targets',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.keyboard.press('Tab');
+ const skip=page.getByRole('link',{name:'Skip to main content'});
+ await expect(skip).toBeFocused();
+ await expect(skip).toBeVisible();
+ await page.keyboard.press('Enter');
+ await expect(page).toHaveURL(/#app$/);
+ await expect(page.locator('main#app')).toHaveCount(1);
+ for(const name of ['home','log','progress','plan','more']){
+  const tab=page.locator('nav.tabs button[data-tab="'+name+'"]');
+  const box=await tab.boundingBox();
+  expect(box,'Primary tab '+name+' should have a touch target').not.toBeNull();
+  expect(box.height).toBeGreaterThanOrEqual(44);
+ }
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
+});
