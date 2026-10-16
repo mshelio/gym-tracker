@@ -5,18 +5,6 @@ async function openNested(page,destination){
  else await page.locator('#app button[data-destination="data"]').first().click();
 }
 const {test,expect}=require('@playwright/test');
-// Diagnostic WebKit profile: remove expensive animated glass compositor layers in
-// reduced-motion mode while preserving layout, hit targets and app behavior.
-// This tests interaction correctness independently from WebKit compositing.
-test.beforeEach(async ({page,browserName})=>{
- if(browserName!=='webkit')return;
- await page.route('**/css/styles.css',async route=>{
-  const response=await route.fetch();
-  const body=await response.text();
-  await route.fulfill({response,body:body+'\n@media(prefers-reduced-motion:reduce){body::before,body::after,.wrap::before{display:none!important;animation:none!important}nav.tabs,.section,.active-exercise,.workout-hero,.home-primary,.session-card,.guide-card,.schedule-panel,.rest-overlay__card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}}'});
- });
-});
-
 test('mobile viewport, touch navigation, draft recovery and backup',async({page,isMobile})=>{
   expect(isMobile).toBeTruthy();
   await page.goto('/gym-tracker/');
