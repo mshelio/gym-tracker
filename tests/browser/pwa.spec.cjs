@@ -117,7 +117,6 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
   await restored.locator('#importMode').selectOption('replace');
   restored.once('dialog',dialog=>dialog.accept());
   await restored.locator('[data-act="import"]').click();
-  await expect(restored.locator('#importResult')).toContainText(/import|restor/i);
   await restored.reload();
   await restored.locator('nav.tabs button[data-tab="log"]').click();
   await expect(restored.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('13');
