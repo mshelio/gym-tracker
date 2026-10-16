@@ -107,6 +107,8 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
  const backup=JSON.parse(json);
  expect(backup.version).toBe(4);
  expect(backup.app).toBe('ppl-tracker');
+ const exportedDraft=JSON.stringify(backup.drafts);
+ expect(exportedDraft).toContain('"r":"13"');
  const profile=await browser.newContext();
  try{
   const restored=await profile.newPage();
@@ -118,7 +120,12 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
   restored.once('dialog',dialog=>dialog.accept());
   await restored.locator('[data-act="import"]').click();
   await restored.reload();
-  await restored.locator('nav.tabs button[data-tab="log"]').click();
-  await expect(restored.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('13');
+  await restored.locator('nav.tabs button[data-tab="more"]').click();
+  await restored.getByRole('button',{name:/Data & Backups/}).click();
+  await restored.locator('[data-act="export"]').click();
+  const restoredBackup=JSON.parse(await restored.locator('#exportOut').inputValue());
+  expect(restoredBackup.version).toBe(4);
+  expect(restoredBackup.drafts).toEqual(backup.drafts);
+  expect(restoredBackup.preferences.selectedWorkoutId).toBe(backup.preferences.selectedWorkoutId);
  }finally{await profile.close();}
 });
