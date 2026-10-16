@@ -725,19 +725,30 @@ async function useProgramFile(file){
 }
 
 /* ---------- events ---------- */
+// Browsing between views should behave like navigation without a network request.
+const NAV_VIEWS=new Set(["home","log","progress","plan","more","history","data","calendar"]);
+function navigateView(tab,{record=true}={}){
+ if(!NAV_VIEWS.has(tab)||tab===S.tab)return;
+ if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
+ if(record)history.pushState({...history.state,gtView:tab},"",location.href);
+ S.tab=tab;S.armedDelete=null;render();window.scrollTo({top:0});
+}
+if(!history.state?.gtView)history.replaceState({...history.state,gtView:S.tab},"",location.href);
+window.addEventListener("popstate",event=>{
+ const tab=event.state?.gtView;
+ if(NAV_VIEWS.has(tab))navigateView(tab,{record:false});
+});
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   // Keep navigation intent even while IndexedDB is still hydrating.
   // render() shows a loading state until ready, then initStore renders the
   // selected tab. Dropping early clicks caused intermittent Firefox failures.
-  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
-  S.tab = b.dataset.tab; S.armedDelete = null; render(); window.scrollTo({top:0});
+  navigateView(b.dataset.tab);
 });
 
 $("#app").addEventListener("click",e=>{
  const link=e.target.closest("button[data-destination]");if(!link)return;
- if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
- S.tab=link.dataset.destination;S.armedDelete=null;render();window.scrollTo({top:0});
+ navigateView(link.dataset.destination);
 });
 
 document.addEventListener("toggle",e=>{
