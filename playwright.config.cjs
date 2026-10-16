@@ -6,9 +6,9 @@ module.exports = defineConfig({
   projects: [
     {name:'chromium',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Chrome']}},
     {name:'firefox',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Firefox']}},
-    {name:'webkit',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Safari']}},
+    {name:'webkit',testIgnore:'**/mobile.spec.cjs',use:{...devices['Desktop Safari'],reducedMotion:'reduce'}},
     {name:'mobile-chromium',testMatch:['**/mobile.spec.cjs','**/pwa.spec.cjs'],use:{...devices['Pixel 7']}},
-    {name:'mobile-webkit',testMatch:'**/mobile.spec.cjs',use:{...devices['iPhone 13']}}
+    {name:'mobile-webkit',testMatch:'**/mobile.spec.cjs',use:{...devices['iPhone 13'],reducedMotion:'reduce'}}
   ],
   use: { baseURL:'http://127.0.0.1:8765/gym-tracker/' },
   webServer:{command:'node tests/serve.cjs',url:'http://127.0.0.1:8765/gym-tracker/',reuseExistingServer:!process.env.CI,timeout:15000}
