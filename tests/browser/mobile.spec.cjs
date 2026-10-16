@@ -322,3 +322,19 @@ test('schedule deletion has contextual accessible confirmation before mutation',
   await expect(page.getByRole('status').filter({hasText:/confirm deletion|delete this schedule/i}).last()).toBeVisible();
  }
 });
+
+test('Phase B browser Back and Forward restore tabs and nested views',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await page.locator('#app .subnav button[data-destination="history"]').click();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await page.goBack();
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
+ await page.goBack();
+ await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
+ await page.goForward();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
+});
