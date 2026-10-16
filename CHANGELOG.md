@@ -7,8 +7,13 @@
 - Exercise-specific primary/secondary anatomical previews, selected-muscle contributing-exercise drilldowns, and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.
 - Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.
 
+- Five-tab mobile-first navigation: Home, Train, Progress, Plan and More, with History under Progress and Data & Backups under More (PR #112).
+- Focused training layout, redesigned Home/Progress summaries, and clearer schedule/data entry points (PRs #113, #117–#119).
+- More robust mobile Chromium and WebKit CI, pinned Playwright dependencies, and Safari coverage for recent UX and accessibility flows (PRs #114, #116 and #125).
+
 ### Accessibility
 - Improved keyboard focus retention, mobile touch/table selection, screen-reader instructions, and forced-colors styling (PRs #89–#90).
+- Skip navigation, accessible mobile touch targets, rest-dialog focus and Escape behavior, accessible validation alerts, and contextual destructive-action confirmations (PRs #120–#124).
 
 ### Preserved
 - Read-only visualizations continue using existing accurate muscle hard-set and volume aggregation, with warm-up exclusions, volume-only drop sets, and separate 0.5-credit secondary reporting.
