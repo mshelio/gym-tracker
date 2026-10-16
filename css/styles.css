@@ -459,3 +459,14 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
 .focused-exercise:not(:has(.exercise-options[open])) .workout-set-row{grid-template-columns:36px minmax(0,1fr) minmax(0,.75fr) minmax(60px,.85fr)}
 .focused-exercise:has(.exercise-options[open]) .workout-set-row{grid-template-columns:36px minmax(0,1fr) minmax(0,.75fr) minmax(75px,.9fr)}
 @media(max-width:600px){.focused-exercise .workout-set-row{gap:5px}}
+
+/* UX Phase 3: action-first Home and scannable Progress anchors. */
+.home-secondary{padding:14px 16px}
+.home-secondary>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:700;min-height:44px}
+.home-secondary>summary .muted{font-size:12px;font-weight:500}
+.home-secondary[open]>summary{margin-bottom:12px}
+.progress-jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.progress-jump a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--glass);color:var(--ink);text-decoration:none;font-size:13px;font-weight:650}
+.progress-jump a:hover,.progress-jump a:focus-visible{border-color:var(--blue);color:var(--blue)}
+#progress-training,#progress-muscles,#progress-lifts,#progress-body{scroll-margin-top:20px}
+@media(max-width:600px){.progress-jump{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.progress-jump a{padding:8px 4px;font-size:12px}}
