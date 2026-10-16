@@ -294,3 +294,14 @@ test('rest timer dialog traps keyboard focus and Escape restores trigger focus',
  await expect(dialog).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Open rest timer'})).toBeFocused();
 });
+
+test('workout save validation announces the error and moves focus to reps',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.locator('#session-validation')).toContainText('Enter reps for at least one set first.');
+ await expect(page.locator('#session-validation')).toHaveAttribute('role','alert');
+ const invalid=page.locator('#app [data-f="r"][aria-invalid="true"]').first();
+ await expect(invalid).toBeFocused();
+ await expect(invalid).toHaveAttribute('aria-describedby','session-validation');
+});
