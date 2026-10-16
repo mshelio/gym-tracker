@@ -730,10 +730,10 @@ const NAV_VIEWS=new Set(["home","log","progress","plan","more","history","data",
 function navigateView(tab,{record=true}={}){
  if(!NAV_VIEWS.has(tab)||tab===S.tab)return;
  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
- if(record)history.pushState({...history.state,gtView:tab},"",location.href);
+ if(record&&typeof history!=="undefined")history.pushState({...history.state,gtView:tab},"",location.href);
  S.tab=tab;S.armedDelete=null;render();window.scrollTo({top:0});
 }
-if(!history.state?.gtView)history.replaceState({...history.state,gtView:S.tab},"",location.href);
+if(typeof history!=="undefined"&&!history.state?.gtView)history.replaceState({...history.state,gtView:S.tab},"",location.href);
 window.addEventListener("popstate",event=>{
  const tab=event.state?.gtView;
  if(NAV_VIEWS.has(tab))navigateView(tab,{record:false});
