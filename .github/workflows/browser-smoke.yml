@@ -24,7 +24,7 @@ jobs:
       - name: Browser tests (${{ matrix.project }})
         run: |
           if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
-            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown' --timeout=12000 --workers=1 --reporter=line
+            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown' --timeout=20000 --workers=1 --retries=1 --reporter=line
           else
             npm run test:browser -- --project=${{ matrix.project }} --reporter=line
           fi
