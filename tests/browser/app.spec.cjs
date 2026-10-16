@@ -117,6 +117,7 @@ test('set types, RIR, and exercise rest survive autosave and session export',asy
  await expect(page.locator('[data-timer="rest"]')).toContainText('02:');
  await page.waitForTimeout(500);
  await page.reload();
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await expect(page.getByRole('combobox',{name:/Lat pulldown set 1 type/})).toHaveValue('warmup');
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/})).toHaveValue('3');
  await page.getByRole('button',{name:/Finish & save session/}).click();
@@ -136,6 +137,7 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
  await page.reload();
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('135');
  await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
+ await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.getByRole('combobox',{name:/Lat pulldown set 1 type/}).selectOption('warmup');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await page.getByRole('button',{name:/Finish & save session/}).click();
@@ -180,6 +182,10 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
  await page.getByLabel('Exercise 2 name').fill('Row');
  await page.locator('[data-act="edsave"]').click();
  await expect(page.locator('.workout-main')).toContainText('Two same names');
+ await page.locator('.focused-exercise').nth(0).evaluate(el=>{el.open=true});
+ await page.locator('.focused-exercise').nth(1).evaluate(el=>{el.open=true});
+ await page.locator('.exercise-options').nth(0).evaluate(el=>{el.open=true});
+ await page.locator('.exercise-options').nth(1).evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').nth(0).fill('180');
  await page.locator('[data-act="savedefault"]').nth(0).click();
  await expect(page.getByText('Exercise defaults saved')).toBeVisible();
@@ -199,6 +205,10 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
    });
  })).toEqual([true,true]);
  await page.reload();
+ await page.locator('.focused-exercise').nth(0).evaluate(el=>{el.open=true});
+ await page.locator('.focused-exercise').nth(1).evaluate(el=>{el.open=true});
+ await page.locator('.exercise-options').nth(0).evaluate(el=>{el.open=true});
+ await page.locator('.exercise-options').nth(1).evaluate(el=>{el.open=true});
  await expect(page.locator('[data-f="exrest"]').nth(0)).toHaveValue('180');
  await expect(page.locator('[data-f="exrest"]').nth(1)).toHaveValue('75');
 });
@@ -410,10 +420,11 @@ test('navigation clicked during startup is honored after IndexedDB hydration', a
  });
  await page.goto('/gym-tracker/',{waitUntil:'domcontentloaded'});
  await requested;
- await openNested(page,'history');
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
  await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  unblockProgram();
  await expect(page.locator('.overview')).toBeVisible();
+ await page.locator('#app .subnav button[data-destination="history"]').click();
  await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  await expect(page.locator('#app')).toContainText('No sessions yet');
 });
