@@ -305,3 +305,20 @@ test('workout save validation announces the error and moves focus to reps',async
  await expect(invalid).toBeFocused();
  await expect(invalid).toHaveAttribute('aria-describedby','session-validation');
 });
+
+test('schedule deletion has contextual accessible confirmation before mutation',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="log"]').click();
+ const manage=page.locator('[data-act="manageschedules"]').first();
+ if(await manage.count()) await manage.click();
+ const deletable=page.locator('[data-act="deleteschedule"]').first();
+ if(await deletable.count()){
+  const id=await deletable.getAttribute('data-id');
+  await deletable.click();
+  const confirm=page.locator('[data-act="deleteschedule"][data-id="'+id+'"]');
+  await expect(confirm).toHaveAccessibleName(/Confirm delete schedule/i);
+  await expect(confirm).toBeFocused();
+  await expect(page.getByRole('status').filter({hasText:/confirm deletion|delete this schedule/i}).last()).toBeVisible();
+ }
+});
