@@ -466,7 +466,7 @@ function viewLog(){
     </div><aside class="session-sidebar">
       <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
+        ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p id="session-validation" role="alert" hidden></p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
       <details class="guide-card workout-guidance"><summary>Workout guidance</summary><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></details>
     </aside></div>${d.restTimer?`<button class="rest-mini" type="button" data-act="timeropen" aria-label="Open rest timer"><span>Rest</span> <strong data-timer="mini-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></button>`:""}`;
@@ -909,14 +909,22 @@ $("#app").addEventListener("click", async e => {
 let sessionSavePending=false;
 let savedSessionEdit=null;
 let savedSessionEditPending=false;
+function reportSessionValidation(message, field){
+ const notice=document.querySelector('#session-validation');
+ if(notice){notice.hidden=false;notice.textContent=message;}
+ if(field){field.setAttribute('aria-invalid','true');field.setAttribute('aria-describedby','session-validation');field.focus({preventScroll:true});}
+ toast(message);
+}
 async function saveSession(btn){
   if(sessionSavePending)return;
+ const notice=document.querySelector('#session-validation');if(notice){notice.hidden=true;notice.textContent='';}
+ document.querySelectorAll('#app [aria-invalid="true"][data-f]').forEach(input=>{input.removeAttribute('aria-invalid');if(input.getAttribute('aria-describedby')==='session-validation')input.removeAttribute('aria-describedby');});
   const day = getDay(S.dayId), d = getDraft(S.dayId);
-  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){toast("Use non-negative weights and whole-number reps.");return;}
+  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
   const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
-  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){toast("RIR must be a whole number from 0 to 10.");return;}
-  if (!exercises.length) { toast("Enter reps for at least one set first."); return; }
-  if (!validDataDate(d.date)) { toast("Pick a valid date for this session."); return; }
+  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){reportSessionValidation("RIR must be a whole number from 0 to 10.",document.querySelector("#app [data-f=rir]"));return;}
+  if (!exercises.length) { reportSessionValidation("Enter reps for at least one set first.",document.querySelector("#app [data-f=r]")); return; }
+  if (!validDataDate(d.date)) { reportSessionValidation("Pick a valid date for this session.",document.querySelector("#app [data-f=date]")); return; }
   const s = { id: uid("s"), dayId: day.id, dayName: day.name, type: day.type, date: d.date, notes: (d.notes||"").trim(), exercises, createdAt: Date.now() };
   sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {
