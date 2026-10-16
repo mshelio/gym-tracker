@@ -221,3 +221,23 @@ test('mobile rest countdown stays accessible outside fullscreen dialog',async({p
  await timer.click();
  await expect(page.getByRole('dialog',{name:'Rest timer'})).toBeVisible();
 });
+
+test('Phase 3 Home disclosure and Progress anchors keep mobile actions accessible',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="home"]').click();
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+ const schedule=page.locator('details.home-secondary');
+ await expect(schedule).not.toHaveAttribute('open','');
+ await schedule.locator('summary').click();
+ await expect(schedule).toHaveAttribute('open','');
+ await expect(schedule.getByRole('button',{name:/Manage schedule/})).toBeVisible();
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ const navigation=page.getByRole('navigation',{name:'Progress sections'});
+ await expect(navigation.getByRole('link')).toHaveCount(4);
+ for(const section of ['training','lifts','muscles','body']){
+  await expect(page.locator('#progress-'+section)).toHaveCount(1);
+  await expect(navigation.getByRole('link',{name:new RegExp(section,'i')})).toHaveAttribute('href','#progress-'+section);
+ }
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
