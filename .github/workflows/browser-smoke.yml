@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps ${{ contains(matrix.project, 'webkit') && 'webkit' || contains(matrix.project, 'firefox') && 'firefox' || 'chromium' }}
       - run: node tests/version-sw.cjs --check
       - run: npm run test:regression
@@ -49,6 +49,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: node tests/pages-smoke.cjs
