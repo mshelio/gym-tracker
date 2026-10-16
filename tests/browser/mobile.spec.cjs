@@ -5,7 +5,6 @@ async function openNested(page,destination){
  else await page.locator('#app button[data-destination="data"]').first().click();
 }
 const {test,expect}=require('@playwright/test');
-
 test('mobile viewport, touch navigation, draft recovery and backup',async({page,isMobile})=>{
   expect(isMobile).toBeTruthy();
   await page.goto('/gym-tracker/');
@@ -209,8 +208,14 @@ test('focused workout cards expose sets and advanced settings by disclosure',asy
 test('mobile rest countdown stays accessible outside fullscreen dialog',async({page,isMobile})=>{
  expect(isMobile).toBeTruthy();
  await page.goto('/gym-tracker/');
- await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ const complete=page.getByRole('button',{name:/Lat pulldown set 1 mark complete/});
  const timer=page.locator('.rest-mini');
+ await complete.click();
+ await expect(timer).toHaveCount(0);
+ await expect(page.getByText('Enter reps before completing a set.')).toBeVisible();
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await complete.click();
+ await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
  await expect(timer).toBeVisible();
  await expect(timer.locator('[data-timer="mini-rest"]')).toContainText(/\d\d:\d\d/);
  await timer.click();

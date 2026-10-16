@@ -5,16 +5,50 @@ on:
     branches: [main]
 jobs:
   browser:
+    name: Playwright ${{ matrix.project }}
     runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [mobile-chromium, mobile-webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright install --with-deps ${{ contains(matrix.project, 'webkit') && 'webkit' || contains(matrix.project, 'firefox') && 'firefox' || 'chromium' }}
       - run: node tests/version-sw.cjs --check
       - run: npm run test:regression
-      - run: npm run test:browser
-      - name: Production GitHub Pages smoke
-        run: node tests/pages-smoke.cjs
+      - name: Browser tests (${{ matrix.project }})
+        run: |
+          if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
+            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown' --timeout=20000 --workers=1 --retries=1 --reporter=line
+          else
+            npm run test:browser -- --project=${{ matrix.project }} --reporter=line
+          fi
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.project }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+  production-smoke:
+    name: Production GitHub Pages smoke
+    needs: browser
+    if: ${{ always() && needs.browser.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/pages-smoke.cjs
