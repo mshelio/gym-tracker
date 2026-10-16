@@ -238,6 +238,7 @@ test('Phase 3 Home disclosure and Progress anchors keep mobile actions accessibl
  await expect(navigation.getByRole('link')).toHaveCount(4);
  for(const section of ['training','lifts','muscles','body']){
   await expect(page.locator('#progress-'+section)).toHaveCount(1);
+  if(section==='muscles')await expect(page.getByRole('region',{name:'Muscle-group volume'})).toContainText('Primary sets count once');
   await expect(navigation.getByRole('link',{name:new RegExp(section,'i')})).toHaveAttribute('href','#progress-'+section);
  }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
