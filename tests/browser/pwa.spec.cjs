@@ -29,7 +29,7 @@ test('offline logging, draft persistence and session completion survive reload',
  await controlled(page);
  await context.setOffline(true);
  await page.reload();
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.reload();
@@ -46,7 +46,7 @@ test('program fetch failure does not discard cached workout configuration',async
  await controlled(page);
  await page.route('**/ppl-default-workouts.json',route=>route.abort());
  await page.reload();
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await expect(page.getByText('Pull A').first()).toBeVisible();
 });
 test('old worker remains active until an explicit update and drafts survive',async({page})=>{
@@ -67,7 +67,7 @@ test('mobile PWA viewport and offline startup',async({page,context,isMobile})=>{
  await controlled(page);
  await context.setOffline(true);
  await page.reload();
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
  await context.setOffline(false);
 });

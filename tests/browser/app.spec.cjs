@@ -1,3 +1,7 @@
+async function openAnalyticsFilters(page){
+ const panel=page.locator('.analytics-filters');
+ if(await panel.getAttribute('open')===null)await panel.locator('summary').click();
+}
 async function openNested(page,destination){
  const parent=destination==='history'?'progress':'more';
  await page.locator('nav.tabs button[data-tab="'+parent+'"]').click();
@@ -8,12 +12,12 @@ const {test,expect} = require('@playwright/test');
 test('boots native ES modules at GitHub Pages project subpath and persists drafts', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/gym-tracker/');
-  await expect(page.getByText('Make every rep count.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
   await expect(page.getByText('Pull A').first()).toBeVisible();
   await openNested(page,'history');
   await expect(page.getByText('The work adds up.')).toBeVisible();
   await page.reload();
-  await expect(page.getByText('Make every rep count.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('missing program provides recovery interface',async ({page})=>{
@@ -32,7 +36,7 @@ test('migrates legacy history and schedules once without removing localStorage',
   };
   await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),legacy);
   await page.goto('/gym-tracker/');
-  await expect(page.getByText('Make every rep count.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
   await expect(page.locator('#status')).toContainText('IndexedDB');
   await expect(page.locator('#app')).toContainText('1');
   const original=await page.evaluate(()=>localStorage.getItem('ppl-tracker-v1'));
@@ -93,15 +97,17 @@ test('rest and workout timers recover from reload and support controls',async({p
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first().fill('8');
  await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
  await expect(page.locator('[data-timer="rest"]')).toContainText(':');
- await page.getByRole('button',{name:'Pause'}).click();
- await expect(page.getByRole('button',{name:'Resume'})).toBeEnabled();
+ await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
+ await page.getByRole('button',{name:'Pause rest',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Resume rest',exact:true})).toBeEnabled();
  await page.waitForTimeout(500);
  await page.reload();
- await expect(page.getByRole('button',{name:'Resume'})).toBeEnabled();
- await page.getByRole('button',{name:'Resume'}).click();
+ await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Resume rest',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Resume rest',exact:true}).click();
  await page.locator('[data-act="timerskip"]').click();
  await expect(page.locator('[data-timer="rest"]')).toHaveText('—');
- await page.locator('[data-act="timerreset"]').click();
+ await page.locator('[data-act="clockreset"]').click();
  await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
 });
 
@@ -160,7 +166,9 @@ test('invalid exercise increment cannot replace a saved default', async ({page})
 
 test('global rest default persists and restores for future drafts', async ({page})=>{
  await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
  await page.getByRole('combobox',{name:'Rest duration'}).selectOption('120');
+ await page.locator('.rest-preferences > summary').click();
  await page.getByRole('button',{name:'Save global rest default'}).click();
  await expect(page.getByText('Global rest default saved')).toBeVisible();
  await page.reload();
@@ -175,13 +183,14 @@ test('global rest default persists and restores for future drafts', async ({page
 test('exercise defaults stay isolated for same-name rows in a custom workout', async ({page})=>{
  await page.goto('/gym-tracker/');
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
+ await page.locator('.workout-options > summary').click();
  await page.locator('[data-act="newworkout"]').click();
  await page.locator('[data-ed="name"]').fill('Two same names');
  await page.getByLabel('Exercise 1 name').fill('Row');
  await page.locator('[data-act="edaddex"]').click();
  await page.getByLabel('Exercise 2 name').fill('Row');
  await page.locator('[data-act="edsave"]').click();
- await expect(page.locator('.workout-main')).toContainText('Two same names');
+ await expect(page.locator('.workout-hero h2')).toHaveText('Two same names');
  await page.locator('.focused-exercise').nth(0).evaluate(el=>{el.open=true});
  await page.locator('.focused-exercise').nth(1).evaluate(el=>{el.open=true});
  await page.locator('.exercise-options').nth(0).evaluate(el=>{el.open=true});
@@ -231,6 +240,7 @@ test('copying previous sets requires explicit action',async ({page})=>{
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await page.getByRole('button',{name:/Finish & save session/}).click();
  await page.getByRole('button',{name:/train/i}).first().click();
+ await page.locator('.workout-options > summary').click();
  await page.getByRole('button',{name:/Pull A/}).first().click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('');
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
@@ -240,6 +250,7 @@ test('copying previous sets requires explicit action',async ({page})=>{
 test('progression hints can be disabled without changing draft',async({page})=>{
  await page.goto('/gym-tracker/');
  await expect(page.locator('.progression-hint').first()).toContainText('No completed working sets');
+ await page.locator('.workout-options > summary').click();
  const toggle=page.locator('[data-act="progressiontoggle"]');
  await toggle.uncheck();
  await expect(page.locator('.progression-hint').first()).toContainText('disabled');
@@ -251,16 +262,17 @@ test('historical personal records appear without modifying sessions',async({page
  await page.addInitScript(()=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions:[{id:'pr1',date:'2026-10-01',dayId:'pullA',dayName:'Pull A',type:'pull',createdAt:1,notes:'',exercises:[{name:'Lat pulldown',unit:'lb',sets:[{w:100,r:8,completed:true,type:'working'}]}]}],body:[],custom:[],schedules:[],drafts:{},preferences:{}})));
  await page.goto('/gym-tracker/');
  await page.getByRole('button',{name:/progress/i}).first().click();
- await expect(page.getByText('Personal records')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Personal records',exact:true})).toBeVisible();
  await expect(page.locator('.pr-summary')).toContainText('Heaviest');
 });
 
 test('dashboard filters training data and displays empty states',async({page})=>{
  await page.goto('/gym-tracker/');
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await page.getByRole('button',{name:/progress/i}).first().click();
  await expect(page.getByText('Training analytics')).toBeVisible({timeout:15000});
  await expect(page.getByText('No training sessions match these filters.')).toBeVisible();
+ await openAnalyticsFilters(page);
  await page.locator('[data-analytics="from"]').fill('2026-10-01');
  await expect(page.locator('[data-analytics="from"]')).toHaveValue('2026-10-01');
 });
@@ -273,7 +285,9 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('2');
  await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
  await page.locator('[data-act="timerpause"]').click();
+ await page.getByRole('button',{name:'Close timer controls'}).click();
  await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
  const backup=JSON.parse(await page.locator('#exportOut').inputValue());
@@ -308,12 +322,16 @@ test('date, workout and exercise filters scope both PR and volume metrics',async
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
  await page.getByRole('button',{name:/progress/i}).first().click();
+ await openAnalyticsFilters(page);
  await page.locator('[data-analytics="from"]').fill('2026-10-01');
+ await openAnalyticsFilters(page);
  await page.locator('[data-analytics="workout"]').selectOption('pushA');
+ await openAnalyticsFilters(page);
  await page.locator('[data-analytics="exercise"]').selectOption('Bench');
  await expect(page.locator('.analytics-dashboard')).toContainText('500');
  await expect(page.locator('.pr-summary')).toContainText('500');
  await expect(page.locator('.pr-summary')).not.toContainText('1000');
+ await openAnalyticsFilters(page);
  await page.locator('[data-analytics="exercise"]').selectOption('');
  await expect(page.locator('.analytics-dashboard')).toContainText('1500');
 });
@@ -380,6 +398,7 @@ for(const count of [1000,10000]){
   const circles=await page.locator('.chart circle').count();
   expect(circles).toBeLessThanOrEqual(720);
   await expect(page.locator('.chart svg').first()).toHaveAttribute('tabindex','0');
+ await openAnalyticsFilters(page);
   await page.locator('[data-analytics="exercise"]').selectOption('Lat pulldown');
   await expect(stats.nth(1)).toHaveText(String(count));
   await expect(stats.nth(2)).toHaveText(String(count*740));
@@ -423,7 +442,7 @@ test('navigation clicked during startup is honored after IndexedDB hydration', a
  await page.locator('nav.tabs button[data-tab="progress"]').click();
  await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  unblockProgram();
- await expect(page.locator('.overview')).toBeVisible();
+ await expect(page.locator('.page-intro')).toBeVisible();
  await page.locator('#app .subnav button[data-destination="history"]').click();
  await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
  await expect(page.locator('#app')).toContainText('No sessions yet');
@@ -453,7 +472,7 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
  await page.getByRole('button',{name:/train/i}).first().click();
- await expect(page.locator('.workout-main')).toContainText('Push A');
+ await expect(page.locator('.workout-hero h2')).toHaveText('Push A');
 });
 
 test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page})=>{
@@ -477,12 +496,12 @@ test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page
    expect(bytes.readUInt32BE(16)).toBe(width);
    expect(bytes.readUInt32BE(20)).toBe(height);
  }
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
 });
 
 test('service worker caches app shell and preserves draft on offline reload',async({page,context})=>{
  await page.goto('/gym-tracker/');
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await page.evaluate(()=>navigator.serviceWorker.ready);
  await page.reload();
  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy();
@@ -490,7 +509,7 @@ test('service worker caches app shell and preserves draft on offline reload',asy
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await context.setOffline(true);
  await page.reload();
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
  await expect(page.locator('#pwa-status')).toContainText(/offline/i);
  await context.setOffline(false);
@@ -603,6 +622,7 @@ test('exercise search filters default workouts without modifying saved drafts',a
 });
 test('workout editor supports searchable rows and exercise suggestions',async({page})=>{
  await page.goto('/gym-tracker/');
+ await page.locator('.workout-options > summary').click();
  await page.locator('[data-act="newworkout"]').click();
  const exercise=page.getByLabel('Exercise 1 name');
  await exercise.fill('Lat pulldown');
@@ -648,7 +668,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
 
 test('known exercises carry semantic IDs while custom names remain valid after reload',async({page})=>{
  await page.goto('/gym-tracker/');
- await expect(page.getByText('Make every rep count.')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.getByRole('button',{name:/Finish & save session/}).click();
