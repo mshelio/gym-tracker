@@ -23,6 +23,8 @@ let calendarMonth=null,calendarMode="month",calendarWeekOffset=0;
 let muscleMapMetric="hardSets",muscleMapSelected="chest";
 const timerTools=createTimers();
 let timerTicker=null;
+let timerControlsOpen=false, timerWorkoutId=null;
+let analyticsFiltersOpen=false;
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
 let programSource = "JSON file";
@@ -104,7 +106,11 @@ function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
   const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
-  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId(); render();
+  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId();
+  const migratedClocks=Object.keys(S.drafts).filter(id=>getDay(id)&&!S.drafts[id].workoutTimer);
+  Object.keys(S.drafts).filter(id=>getDay(id)).forEach(id=>getDraft(id));
+  if(migratedClocks.length&&!await writeLocal())setSaveStatus("error");
+  render();
 }
 async function persist(field, value){
   const previous = S[field]; S[field] = value;
@@ -121,6 +127,7 @@ async function putSession(s,advance=false){
   }
   // One full-snapshot commit: session, schedule cursor, draft deletion and selection.
   if(!await writeLocal()){Object.assign(S,previous);throw new Error(hasConflict()?"Another tab changed your data":"Browser storage unavailable");}
+  if(advance){timerWorkoutId=null;timerControlsOpen=false;restOverlayOpen=false;}
 }
 async function saveCalendarEvent(event){
  const next=upsertCalendarEvent(S.calendarEvents,event);
@@ -190,7 +197,7 @@ function newSchedule(mode){
   S.scheduleEditing={id:uid("schedule"),name:"",mode,days:mode==="weekly"?Array(7).fill(null):[allDays()[0].id],cursor:0};S.manageSchedules=false;render();
 }
 function viewScheduleManager(){
-  return `<div class="section stack"><h2>Your schedules</h2><p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts with + Custom in Train, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}">${S.armedDelete===s.id?"Tap again to delete":"Delete"}</button>`:""}</div></div>`).join("")}<button class="btn" data-act="closeschedules">Back to training</button></div>`;
+  return `<div class="section stack"><h2>Your schedules</h2><p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts with + Custom in Train, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}">${S.armedDelete===s.id?"Tap again to delete":"Delete"}</button>`:""}</div></div>`).join("")}<button class="btn" data-act="closeschedules">Back to plan</button></div>`;
 }
 function viewScheduleEditor(){
   const s=S.scheduleEditing;
@@ -202,7 +209,7 @@ function viewScheduleEditor(){
 async function scheduleAction(b){
   const act=b.dataset.act,s=S.scheduleEditing;
   try{
-    if(act==="manageschedules"){S.manageSchedules=true;S.editing=null;S.armedDelete=null;render();}
+    if(act==="manageschedules"){S.tab="plan";S.manageSchedules=true;S.editing=null;S.armedDelete=null;render();}
     else if(act==="closeschedules"){S.manageSchedules=false;render();}
     else if(act==="newschedule")newSchedule(b.dataset.mode);
     else if(act==="editschedule"){S.scheduleEditing=JSON.parse(JSON.stringify(S.schedules.find(w=>w.id===b.dataset.id)));S.manageSchedules=false;render();}
@@ -227,7 +234,12 @@ function getDraft(dayId){
   }
   if (!Array.isArray(d.extra)) d.extra = [];
   if(d.sig!==sig || d.ex.length!==day.ex.length)d.recoveryWarning=true;
-  if(!Number.isFinite(d.startedAt))d.startedAt=Date.now();
+  if(!d.workoutTimer){
+    // Legacy drafts started timing merely by being opened. Freeze those clocks.
+    d.workoutTimer=Number.isFinite(d.startedAt)&&draftHasData(d)
+      ? {state:"paused",elapsedMs:timerTools.elapsed(d.startedAt)*1000,startedAt:null}
+      : timerTools.idleWorkout();
+  }
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=S.globalRestSeconds||90;
   d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"",dayId)?.restSeconds; });
   d.extra.forEach((e,i) => { if (!e.unit) e.unit = day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"x",dayId)?.restSeconds; });
@@ -262,29 +274,28 @@ function viewHome(){
  <div class="home-primary ${esc(nextWorkout?.type||"other")}"><div class="home-hero-heading"><div><p class="eyebrow">${resumeDay?"IN PROGRESS":"UP NEXT"}${plan?" · "+esc(plan.name):""}</p><h2>${esc(nextWorkout?.name||"Your next workout")}</h2><p class="muted">${resumeDay?"Your locally saved draft is waiting.":scheduled==null?"Rest day. Train when you’re ready.":`${nextWorkout?.ex.length||0} exercises · ${nextWorkout?.ex.reduce((n,e)=>n+e.s,0)||0} working sets`}</p></div><span class="workout-tag ${esc(nextWorkout?.type||"other")}">${esc(nextWorkout?.type||"workout")}</span></div>
  <ul class="home-exercise-preview">${preview}</ul>${nextWorkout?.ex.length>3?`<p class="home-more muted">+ ${nextWorkout.ex.length-3} more</p>`:""}
  <div class="home-actions">${resumeDay?`<button type="button" class="btn primary" data-act="homecontinue" data-id="${esc(resume[0])}">Continue Workout ${icon("arrow")}</button>`:""}
- <button type="button" class="btn ${resumeDay?"":"primary"}" data-act="homestart">Start New Workout ${icon("arrow")}</button></div></div>
- <section class="home-cycle" aria-label="Schedule preview"><div class="home-section-head"><p class="eyebrow">${esc(plan?.name||"Your schedule")}</p><button class="btn small" data-act="homeschedule">Manage schedule →</button></div><div class="schedule-preview">${plan?.days.map((id,i)=>`<span class="schedule-step ${i===scheduleIndex(plan)?"current":""}"><i class="type-dot" style="--accent:var(--${esc(getDay(id)?.type||"other")})"></i>${esc(id?getDay(id)?.name||"Workout":"Rest")}</span>`).join("")||""}</div></section>
+ <button type="button" class="btn ${resumeDay?"":"primary"}" data-act="homestart">${resumeDay?"Choose another workout":"Start New Workout"} ${icon("arrow")}</button></div></div>
+ <section class="home-cycle" aria-label="Schedule preview"><div class="home-section-head"><p class="eyebrow">${esc(plan?.name||"Your schedule")}</p><button class="btn small" data-act="homeschedule">View schedule →</button></div><div class="schedule-preview">${plan?.days.map((id,i)=>`<span class="schedule-step ${i===scheduleIndex(plan)?"current":""}"><i class="type-dot" style="--accent:var(--${esc(getDay(id)?.type||"other")})"></i>${esc(id?getDay(id)?.name||"Workout":"Rest")}</span>`).join("")||""}</div></section>
  <div class="home-metrics"><section class="section home-week"><p class="eyebrow">THIS WEEK</p><div class="home-stat-value"><strong>${sessionsThisWeek}</strong><span class="muted">sessions</span></div><div class="week-days" aria-label="Days trained this week">${weekDays}</div><div class="home-progress" role="progressbar" aria-label="Weekly workout progress" aria-valuemin="0" aria-valuemax="${Math.max(planned,1)}" aria-valuenow="${Math.min(sessionsThisWeek,Math.max(planned,1))}"><span style="width:${planned?Math.min(100,Math.round(sessionsThisWeek/planned*100)):0}%"></span></div></section>
  <section class="section"><p class="eyebrow">${esc(new Date(today()+"T12:00:00").toLocaleDateString(undefined,{month:"long"}))}</p><div class="home-stat-value"><strong>${monthSessions.length}</strong><span class="muted">sessions</span></div><p class="eyebrow home-volume-label">VOLUME THIS WEEK</p><span class="mono home-volume">${Math.round(volume).toLocaleString()} <small>${esc(DEFAULT_UNIT)}·reps</small></span></section></div>
  <section class="home-recent"><div class="home-section-head"><h3>Recent sessions</h3><button class="btn small" data-act="homehistory">See all →</button></div><div class="section">${recent||'<p class="muted">Your story starts with your first session.</p>'}</div></section>
- <section class="section home-shortcuts"><h3>Quick access</h3><div class="home-shortcut-grid"><button type="button" class="btn" data-act="homeschedule">View schedule →</button><button type="button" class="btn" data-act="homeprogress">See progress →</button><button type="button" class="btn" data-act="homehistory">Workout history →</button></div></section></section>`;
+</section>`;
 }
 
 /* ---------- render ---------- */
 function render(){
   document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === ({history:"progress",data:"more",calendar:"plan"}[S.tab] || S.tab) ? "page" : "false"));
-  const active = document.activeElement, key = active && active.dataset ? active.dataset.key : null;
+  const active = document.activeElement, clockFocus=active?.dataset?.act, key = active && active.dataset ? active.dataset.key : null;
   const mapFocus = S.tab==="progress" && active?.matches?.(".muscle-map [data-muscle]") ? {muscle:active.dataset.muscle,id:active.id} : null;
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
   if(document.documentElement)document.documentElement.dataset.view=S.tab;
-  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Make every rep count.", "A little stronger, one session at a time."], plan:["TRAINING CALENDAR","Your training at a glance.","See completed sessions, rest and planned days."], calendar:["TRAINING CALENDAR","Your training at a glance.","See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], more:["SETTINGS AND DATA","Your training settings.","Manage your preferences and keep your data safe."],data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
-  const weekStart = new Date(today()+"T00:00:00"); weekStart.setDate(weekStart.getDate() - (weekStart.getDay()+6)%7);
-  const weekCount = S.sessions.filter(s => new Date(s.date+"T12:00:00") >= weekStart && s.date <= today()).length;
+  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Train", "Log your sets, one exercise at a time."], plan:["YOUR PLAN","Plan your training.","Your schedule and calendar, in one place."], calendar:["TRAINING CALENDAR","Your training at a glance.","See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], more:["SETTINGS AND DATA","Your training settings.","Manage your preferences and keep your data safe."],data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
   app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${S.tab==="home"?esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})):intro[0]}</p><h1>${S.tab==="home"?'Small steps.<br><span>Stronger every day.</span>':intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
-    ${S.tab==="home"||S.tab==="log"?"":`<div class="overview"><div><span class="stat-icon">${icon("activity")}</span><p><b>${S.sessions.length}</b><span>Total sessions</span></p></div><div><span class="stat-icon lime">${icon("calendar")}</span><p><b>${weekCount}</b><span>This week</span></p></div><div><span class="stat-icon peach">${icon("arrow")}</span><p><b>${esc(nextScheduleLabel())}</b><span>${activeSchedule()?.mode==="weekly"?"Scheduled today":"Next in schedule"}</span></p></div></div>`}` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress">Overview</button><button type="button" data-destination="history" aria-current="page">History</button></nav>${viewHistory()}` : (S.tab === "calendar" || S.tab === "plan") ? viewCalendar() : S.tab === "progress" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress" aria-current="page">Overview</button><button type="button" data-destination="history">History</button></nav>${viewProgress()}` : S.tab === "more" ? `<section class="section more-hub" aria-label="More settings"><h2>More</h2><p class="muted">Manage your training and data.</p><div class="more-links"><button class="btn" type="button" data-destination="data">${icon("calendar")} Data & Backups</button><button class="btn" type="button" data-destination="log">${icon("activity")} Workout settings</button></div></section>` : S.tab === "data" ? `<nav class="subnav" aria-label="More views"><button type="button" data-destination="more">More</button><button type="button" data-destination="data" aria-current="page">Data & Backups</button></nav>${viewData()}` : viewData());
-  if(restOverlayOpen&&S.tab==="log"&&!S.editing&&!S.scheduleEditing&&!S.manageSchedules){const d=getDraft(S.dayId);app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
+    ` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress">Overview</button><button type="button" data-destination="history" aria-current="page">History</button></nav>${viewHistory()}` : (S.tab === "calendar" || S.tab === "plan") ? (S.scheduleEditing?viewScheduleEditor():S.manageSchedules?viewScheduleManager():`${schedulePanel()}${viewCalendar()}`) : S.tab === "progress" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress" aria-current="page">Overview</button><button type="button" data-destination="history">History</button></nav>${viewProgress()}` : S.tab === "more" ? `<section class="section more-hub" aria-label="More settings"><h2>More</h2><p class="muted">Manage your training and data.</p><div class="more-links"><button class="btn" type="button" data-destination="data">${icon("calendar")} Data & Backups</button><button class="btn" type="button" data-act="workoutsettings">${icon("activity")} Workout preferences</button></div></section>` : S.tab === "data" ? `<nav class="subnav" aria-label="More views"><button type="button" data-destination="more">More</button><button type="button" data-destination="data" aria-current="page">Data & Backups</button></nav>${viewData()}` : viewData()) + timerDockMarkup();
+  if(restOverlayOpen){const {draft:d}=timerContext();app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
+  if(timerControlsOpen&&!restOverlayOpen){const target=clockFocus&&app.querySelector(`.timer-popover [data-act="${CSS.escape(clockFocus)}"]`);(target||app.querySelector("[data-act=clockclose]"))?.focus({preventScroll:true});}
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -300,7 +311,7 @@ function restOverlayMarkup(d){
  <p class="eyebrow">RECOVER AND RESET</p><h2>Rest timer</h2>
  <p class="muted" id="rest-timer-instructions">Your countdown stays accurate when the app is in the background.</p>
  <strong class="rest-overlay__count" data-timer="overlay-rest" role="timer" aria-label="Remaining rest time">${rest?timerLabel(remaining):"00:00"}</strong>
- <span class="rest-overlay__state" data-rest-state>${!rest?"Timer is not running":paused?"Paused":"Time to recover"}</span>
+ <span class="rest-overlay__state" data-rest-state>${!rest?"Timer is not running":remaining===0?"Rest complete":paused?"Paused":"Time to recover"}</span>
  <div class="rest-overlay__adjust" role="group" aria-label="Adjust rest duration">
  <button type="button" class="btn" data-act="timeradjust" data-seconds="-15" ${!rest?"disabled":""}>−15 sec</button>
  <button type="button" class="btn" data-act="timeradjust" data-seconds="15" ${!rest?"disabled":""}>+15 sec</button></div>
@@ -309,18 +320,52 @@ function restOverlayMarkup(d){
  <button type="button" class="btn" data-act="timerskip" ${!rest?"disabled":""}>Skip rest</button></div>
  </div></div>`;
 }
-function timerPanel(d){
- const rest=d.restTimer,seconds=timerTools.remaining(rest),elapsed=timerTools.elapsed(d.startedAt);
- return `<div class="timer-panel" role="group" aria-label="Workout and rest timers"><div><span>Workout time</span><strong data-timer="workout">${timerLabel(elapsed)}</strong></div><div><span>Rest time</span><strong data-timer="rest" aria-label="Rest time remaining">${rest?timerLabel(seconds):"—"}</strong></div><label>Rest <select data-act="restpreset" aria-label="Rest duration">${[30,60,90,120,180,240,300].map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n}s</option>`).join("")}</select></label><button class="btn small" data-act="saveglobalrest">Save global rest default</button><button class="btn primary" type="button" data-act="timeropen">Open rest timer</button><div class="timer-actions" role="group" aria-label="Rest timer actions"><button class="btn small" data-act="timerpause" ${!rest||rest.pausedRemainingMs!=null?"disabled":""}>Pause</button><button class="btn small" data-act="timerresume" ${!rest||rest.pausedRemainingMs==null?"disabled":""}>Resume</button><button class="btn small" data-act="timerskip" ${!rest?"disabled":""}>Skip</button><button class="btn small" data-act="timerreset">Reset</button></div></div>`;
+function timerContext(){
+ const valid=id=>id&&getDay(id)&&S.drafts[id];
+ if(valid(timerWorkoutId)&&S.drafts[timerWorkoutId].workoutTimer?.state==="idle"&&!S.drafts[timerWorkoutId].restTimer&&S.tab==="log"&&getDay(S.dayId))timerWorkoutId=S.dayId;
+ if(!valid(timerWorkoutId)){
+  timerWorkoutId=Object.keys(S.drafts).find(id=>valid(id)&&(S.drafts[id].workoutTimer?.state==="running"||S.drafts[id].restTimer))
+   ||Object.keys(S.drafts).find(id=>valid(id)&&S.drafts[id].workoutTimer?.state==="paused")
+   ||S.dayId||nextDayId();
+ }
+ return {id:timerWorkoutId,draft:getDraft(timerWorkoutId)};
+}
+function startWorkoutFor(id){
+ for(const [otherId,other] of Object.entries(S.drafts)){
+  if(otherId===id)continue;
+  if(other.workoutTimer?.state==="running")other.workoutTimer=timerTools.pauseWorkout(other.workoutTimer);
+  if(other.restTimer?.pausedRemainingMs==null&&other.restTimer)other.restTimer=timerTools.pause(other.restTimer);
+ }
+ const d=getDraft(id);
+ d.workoutTimer=timerTools.startWorkout(d.workoutTimer);
+ if(d.restTimer?.pausedRemainingMs!=null)d.restTimer=timerTools.resume(d.restTimer);
+ timerWorkoutId=id;saveDrafts();
+}
+function timerDockMarkup(){
+ const {id,draft:d}=timerContext(),clock=d.workoutTimer,rest=d.restTimer;
+ const status={idle:"Ready",running:"Training",paused:"Paused",stopped:"Stopped"}[clock.state];
+ const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
+ const startAction=clock.state==="running"?'clockpause':'clockstart';
+ const startLabel=clock.state==="running"?'Pause workout':clock.state==="paused"?'Resume workout':clock.state==="stopped"?'Restart workout timer':'Start workout timer';
+ return `<aside class="timer-dock" aria-label="Persistent workout timer"><button class="timer-dock-toggle" type="button" data-act="clocktoggle" aria-label="Workout timer controls" aria-expanded="${timerControlsOpen}" aria-controls="workout-clock-controls">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 2h6"/></svg><span class="timer-dock-state" data-clock-state>${status}</span><strong data-timer="workout" role="timer" aria-label="Workout elapsed time">${timerLabel(timerTools.workoutElapsed(clock))}</strong><span class="timer-dock-rest">Rest <strong data-timer="rest" aria-label="Rest time remaining">${restText}</strong></span></button></aside>
+ ${timerControlsOpen?`<section class="timer-popover" id="workout-clock-controls" role="dialog" aria-modal="false" aria-label="Workout timer controls"><div class="timer-popover-heading"><div><p class="eyebrow">WORKOUT TIMER</p><h2>${esc(getDay(id).name)}</h2></div><button type="button" class="btn small" data-act="clockclose" aria-label="Close timer controls">✕</button></div>
+ <div class="clock-readout"><span>${status}</span><strong data-timer="workout-panel">${timerLabel(timerTools.workoutElapsed(clock))}</strong></div>
+ <div class="clock-actions"><button type="button" class="btn primary" data-act="${startAction}">${startLabel}</button><button type="button" class="btn" data-act="clockstop" ${clock.state==="idle"||clock.state==="stopped"?'disabled':''}>Stop timer</button><button type="button" class="btn small" data-act="clockreset">Reset timer</button></div><p class="muted timer-hint">Stopping the timer keeps your workout draft.</p>
+ <section class="rest-controls" aria-label="Rest timer controls"><div class="rest-controls-heading"><h3>Rest</h3><strong data-timer="rest-panel">${restText}</strong></div><label>Rest duration<select data-act="restpreset" aria-label="Rest duration">${[...new Set([30,60,90,120,180,240,300,d.restSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${d.restSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><div class="clock-actions"><button type="button" class="btn" data-act="reststart">Start rest</button>${rest?`<button type="button" class="btn" data-act="${rest.pausedRemainingMs!=null?'timerresume':'timerpause'}">${rest.pausedRemainingMs!=null?'Resume rest':'Pause rest'}</button><button type="button" class="btn" data-act="timerskip">Skip rest</button>`:''}</div><button type="button" class="btn small" data-act="timeropen">Open rest timer</button><details class="rest-preferences"><summary>Rest preferences</summary><button type="button" class="btn small" data-act="saveglobalrest">Save global rest default</button></details></section><button type="button" class="btn small" data-act="clockreturn">Back to ${esc(getDay(id).name)} →</button></section>`:''}`;
 }
 function updateTimers(){
- if(!S.ready||S.tab!=="log"||S.editing||S.scheduleEditing||S.manageSchedules)return;
- const d=getDraft(S.dayId),rest=d.restTimer;
- const elapsed=document.querySelector('[data-timer="workout"]'),remaining=document.querySelector('[data-timer="rest"]');
- if(elapsed)elapsed.textContent=timerLabel(timerTools.elapsed(d.startedAt));
- if(remaining)remaining.textContent=rest?timerLabel(timerTools.remaining(rest)):"—";
- const mini=document.querySelector("[data-timer=mini-rest]");if(mini)mini.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
- const overlay=document.querySelector("[data-timer=overlay-rest]");if(overlay)overlay.textContent=rest?timerLabel(timerTools.remaining(rest)):"00:00";
+ if(!S.ready)return;
+ const {draft:d}=timerContext(),rest=d.restTimer;
+ const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
+ const restState=document.querySelector('[data-rest-state]');
+ if(restState){const text=!rest?"Timer is not running":timerTools.remaining(rest)===0?"Rest complete":rest.pausedRemainingMs!=null?"Paused":"Time to recover";if(restState.textContent!==text)restState.textContent=text;}
+ for(const el of document.querySelectorAll('[data-timer]')){
+  const key=el.dataset.timer;
+  const value=key==="workout"||key==="workout-panel"?timerLabel(timerTools.workoutElapsed(d.workoutTimer))
+   :key==="rest"||key==="rest-panel"?restText:key==="overlay-rest"?rest?timerLabel(timerTools.remaining(rest)):"00:00":null;
+  if(value!=null&&el.textContent!==value)el.textContent=value;
+ }
 }
 if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
 document.addEventListener("visibilitychange",updateTimers);
@@ -365,7 +410,7 @@ function exerciseNameSuggestions(){
 }
 function exerciseSearchBox(){
  return `<div class="section exercise-search-panel" role="search" aria-label="Find an exercise"><label for="exercise-search">Search exercises</label>
- <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Search current exercises and alternatives" value="${esc(exerciseQuery)}" autocomplete="off">
+ <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Search exercises" value="${esc(exerciseQuery)}" autocomplete="off">
  <button class="btn small" type="button" data-act="clearexercisesearch">Clear search</button>
  <p id="exercise-search-count" class="muted" data-exercise-search-count role="status" aria-live="polite"></p>
  <p class="muted" data-exercise-search-empty hidden>No matching exercises. Clear search to show all.</p></div>`;
@@ -382,7 +427,8 @@ function applyExerciseFilter(){
   if(match)shown++;
  }
  const count=document.querySelector('[data-exercise-search-count]');
- if(count)count.textContent=shown+' of '+items.length+' exercises shown';
+ if(count){count.textContent=shown+' of '+items.length+' exercises shown';count.hidden=!needle;}
+ const clear=document.querySelector('[data-act=clearexercisesearch]');if(clear)clear.hidden=!needle;
  const empty=document.querySelector('[data-exercise-search-empty]');
  if(empty)empty.hidden=shown!==0;
 }
@@ -393,8 +439,6 @@ function exerciseActivationInfo(name){
 const workoutExpanded = new Set();
 const workoutOptionsExpanded = new Set();
 function viewLog(){
-  if(S.scheduleEditing)return viewScheduleEditor();
-  if(S.manageSchedules)return viewScheduleManager();
   if (S.editing) return viewEditor();
   const next = nextSlot();
   const day = getDay(S.dayId) || getDay(nextDayId());
@@ -434,25 +478,24 @@ function viewLog(){
   }).join("");
   const inProgress=draftHasData(d);
   return `
-    <section class="workout-hero" aria-label="Today\'s workout"><div><p class="eyebrow">READY WHEN YOU ARE</p><h2>${esc(day.name)}</h2><p class="muted">${inProgress?"Your workout draft is saved on this device.":"Select a workout or start logging your sets."}</p></div><a class="btn primary workout-hero__action" href="#workout-editor">${inProgress?"Continue Workout":"Start Workout"} ${icon("arrow")}</a></section>
-    ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label><div class="program-label"><h2>Workout library</h2><span>Any workout, any split</span></div>
-    <div class="plates" role="group" aria-label="Choose workout">${plates}</div>
+    <section class="workout-hero" aria-label="Today's workout"><div><p class="eyebrow">${d.workoutTimer.state==="running"?"WORKOUT IN PROGRESS":d.workoutTimer.state==="paused"?"WORKOUT PAUSED":"YOUR WORKOUT"}</p><h2>${esc(day.name)}</h2><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets${day.id===next?" · Next in your schedule":""}</p></div><button type="button" class="btn primary workout-hero__action" data-act="workoutbegin">${d.workoutTimer.state==="running"?"Continue Workout":d.workoutTimer.state==="paused"?"Resume Workout":"Start Workout"} ${icon("arrow")}</button></section>
+    <details class="workout-options"><summary>Workout options <span>Change workout, schedule & preferences</span></summary>
+    <div class="program-label"><h3>Choose a workout</h3><span>Any workout, any split</span></div><div class="plates" role="group" aria-label="Choose workout">${plates}</div>
+    ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label></details>
     <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
-      <div class="dayline"><div><p class="eyebrow">${isCustom ? "CUSTOM WORKOUT" : "TODAY’S WORKOUT"}</p><h2>${esc(day.name)} <span class="workout-tag ${esc(day.type)}">${esc(day.type)}</span></h2>${isCustom ? `<button class="btn small" style="margin-top:8px" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>` : ""}</div>
-      <label>Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label></div>
-      <p class="workout-help">Choose an alternative from each exercise menu. Faded targets show your previous set; switch lb/kg below.</p>
+      <div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span>${isCustom?`<button class="btn small" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>`:""}</div>
       ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
       ${exerciseSearchBox()}${exerciseNameSuggestions()}${cards}${extras}
       <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
-      <div class="section notes-card"><label for="notes"><h3>Session notes</h3></label><p class="muted">How did you feel today?</p>
-        <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></div>
+      <details class="section notes-card"><summary>Session notes & date</summary><label class="session-date">Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label><label for="notes">How did you feel today?</label>
+        <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></details>
     </div><aside class="session-sidebar">
-      <div class="session-card"><p class="eyebrow">SESSION OVERVIEW</p><h3>${esc(day.name)}</h3><p class="muted">${day.ex.length + d.extra.length} exercises · <span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets</p>
+      <div class="session-card"><h3>Ready to finish?</h3><p class="muted"><span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets in this workout</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        ${timerPanel(d)}<button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
+        <button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
       <details class="guide-card workout-guidance"><summary>Workout guidance</summary><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></details>
-    </aside></div>${d.restTimer?`<button class="rest-mini" type="button" data-act="timeropen" aria-label="Open rest timer"><span>Rest</span> <strong data-timer="mini-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></button>`:""}`;
+    </aside></div>`;
 
 }
 
@@ -598,10 +641,10 @@ function viewProgress(){
   const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
   const {filtered,summary}=cachedAnalytics(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
   const workoutOptions=[...new Map(S.sessions.map(s=>[s.dayId,s.dayName||s.dayId])).entries()];
-  const analyticsControls=`<div class="analytics-controls" role="group" aria-label="Analytics filters"><label>From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label>To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label>Workout <select data-analytics="workout"><option value="">All workouts</option>${workoutOptions.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label>Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div>`;
+  const analyticsControls=`<details class="analytics-filters" ${analyticsFiltersOpen?"open":""}><summary>Filter history${Object.values(filter).some(Boolean)?" · Active":""}</summary><div class="analytics-controls" role="group" aria-label="Analytics filters"><label>From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label>To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label>Workout <select data-analytics="workout"><option value="">All workouts</option>${workoutOptions.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label>Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div></details>`;
   const weekPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.volume}));
   const hardPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.hardSets}));
-  const analyticsHTML=`<section class="section analytics-dashboard" aria-labelledby="training-analytics-heading"><h3 id="training-analytics-heading">Training analytics</h3><p class="muted">Filter the trends and weekly totals below. All numbers use your saved training history.</p>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div><h4>Weekly volume</h4>${weekPts.length?chartSVG(weekPts,"var(--push)",summary.unit+"·reps"):'<p class="empty">No training sessions match these filters.</p>'}<h4>Weekly hard sets</h4>${hardPts.length?chartSVG(hardPts,"var(--pull)","hard sets"):'<p class="empty">No hard-set trend available.</p>'}${summary.weekly.length?`<details class="analytics-table-details"><summary>Weekly data table (exact values)</summary><div class="responsive-table" tabindex="0" role="region" aria-label="Exact weekly training analytics"><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></div></details>`:""}</section>`;
+  const analyticsHTML=`<section class="section analytics-dashboard" aria-labelledby="training-analytics-heading"><h3 id="training-analytics-heading">Training analytics</h3><p class="muted">Your completed training, at a glance.</p>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div>${weekPts.length?`<h4>Weekly volume</h4>${chartSVG(weekPts,"var(--push)",summary.unit+"·reps")}`:'<p class="empty">No training sessions match these filters.</p>'}${hardPts.length?`<h4>Weekly hard sets</h4>${chartSVG(hardPts,"var(--pull)","hard sets")}`:""}${summary.weekly.length?`<details class="analytics-table-details"><summary>Weekly data table (exact values)</summary><div class="responsive-table" tabindex="0" role="region" aria-label="Exact weekly training analytics"><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></div></details>`:""}</section>`;
 
   const muscle=muscleVolumeSummary(filtered,{unit:S.bodyUnit||"kg",exercise:filter.exercise||"",secondaryCredit:0.5});
   const mapData=muscleMapData(muscle,{metric:muscleMapMetric});
@@ -625,12 +668,12 @@ function viewProgress(){
   const muscleMapHTML=`<div class="muscle-map-controls"><label>Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected,contributors})}`;
   const muscleRows=(entries,kind)=>entries.map(entry=>`<tr><td>${esc(entry.muscle)}</td><td>${entry.hardSets}</td><td>${entry.volume}</td><td>${kind}</td></tr>`).join("");
   const muscleHTML=`<section class="section muscle-analytics" aria-label="Muscle-group volume"><h3>Muscle-group volume</h3>
-    <p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p>
+    <details class="analytics-explanation"><summary>How muscle estimates work</summary><p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p></details>
     ${muscleMapHTML}
     <div class="stats"><div class="stat"><b>${muscle.hardSets}</b><small>Total hard sets</small></div><div class="stat"><b>${muscle.unknown.hardSets}</b><small>Unclassified hard sets</small></div></div>
-    <table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
+    <details class="analytics-breakdown"><summary>Detailed totals & weekly trends</summary><table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
     <h4>Primary hard-set trend</h4>${muscle.weekly.length?chartSVG(muscle.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.primary.reduce((sum,m)=>sum+m.hardSets,0)})),"var(--pull)","primary hard sets"):""}
-    <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}
+    <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}</details>
   </section>`;
   const names = [...new Set(filtered.flatMap(s => (s.exercises||[]).map(e => e.name)).filter(n=>!filter.exercise||n===filter.exercise))].sort();
   let exHtml;
@@ -661,8 +704,8 @@ function viewProgress(){
   const wpts = visibleBody.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
   const recent = visibleBody.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
     <button class="btn small danger" data-act="delbody" data-id="${esc(b.id)}">${S.armedDelete===b.id?"Tap again":"Delete"}</button></li>`).join("");
-  return `${analyticsHTML}${muscleHTML}<div class="section"><h3>Lifts</h3>${exHtml}</div>
-    <div class="section"><h3>Body</h3>
+  return `${analyticsHTML}${muscleHTML}<details class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
+    <details class="section progress-body"><summary>Body measurements</summary>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
         <label><span>Weight <select id="bUnit" aria-label="Body weight unit" style="min-height:28px;padding:2px 6px">${["kg","lb"].map(u=>`<option ${u===(S.bodyUnit||bu)?"selected":""}>${u}</option>`).join("")}</select></span><input type="number" inputmode="decimal" step="any" id="bWeight" placeholder="${(S.bodyUnit||bu)==="kg"?"87":"192"}"></label>
@@ -673,7 +716,7 @@ function viewProgress(){
       ${bpts.length ? `<p style="margin:12px 0 0;font-weight:600">Body weight</p>${chartSVG(bpts,"var(--ink)",bu)}` : ""}
       ${wpts.length ? `<p style="margin:12px 0 0;font-weight:600">Waist</p>${chartSVG(wpts,"var(--muted)","cm")}` : ""}
       ${recent ? `<ul class="list">${recent}</ul>` : `<div class="empty">No body entries yet.</div>`}
-    </div>`;
+    </details>`;
 }
 
 function viewData(){
@@ -709,6 +752,7 @@ async function useProgramFile(file){
 /* ---------- events ---------- */
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
+  timerControlsOpen=false;restOverlayOpen=false;
   // Keep navigation intent even while IndexedDB is still hydrating.
   // render() shows a loading state until ready, then initStore renders the
   // selected tab. Dropping early clicks caused intermittent Firefox failures.
@@ -718,12 +762,14 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
 
 $("#app").addEventListener("click",e=>{
  const link=e.target.closest("button[data-destination]");if(!link)return;
+ timerControlsOpen=false;restOverlayOpen=false;
  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
  S.tab=link.dataset.destination;S.armedDelete=null;render();window.scrollTo({top:0});
 });
 
 document.addEventListener("toggle",e=>{
  const n=e.target;
+ if(n?.matches?.("details.analytics-filters"))analyticsFiltersOpen=n.open;
  if(n?.matches?.("details[data-exercise-id]")){
    const id=n.dataset.exerciseId;
    if(n.open){workoutExpanded.add(id);}else{workoutExpanded.delete(id);}
@@ -776,7 +822,7 @@ $("#app").addEventListener("change", e => {
   if(e.target.dataset.act==="progressiontoggle"){S.progressionEnabled=e.target.checked;saveDrafts();render();return;}
   if(e.target.dataset.act==="incrementunit"){const t=e.target;(t.dataset.g==="x"?getDraft(S.dayId).extra:getDraft(S.dayId).ex)[+t.dataset.i].incrementUnit=t.value;saveDrafts();return;}
   if(e.target.dataset.act==="settype"){const t=e.target;const d=getDraft(S.dayId);(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].type=t.value;saveDrafts();return;}
-  if(e.target.dataset.act==="restpreset"){getDraft(S.dayId).restSeconds=Number(e.target.value);saveDrafts();return;}
+  if(e.target.dataset.act==="restpreset"){timerContext().draft.restSeconds=Number(e.target.value);saveDrafts();return;}
   const t = e.target;
   if(t.dataset.act==="useschedule"){useSchedule(t.value).catch(err=>toast(err.message));return;}
   if(t.dataset.scheduleDay!=null && S.scheduleEditing){S.scheduleEditing.days[+t.dataset.scheduleDay]=t.value || null;render();return;}
@@ -789,18 +835,41 @@ $("#app").addEventListener("change", e => {
   if (t.id === "importFile" && t.files && t.files[0]) { t.files[0].text().then(txt => { $("#importText").value = txt; toast("File loaded. Tap Import JSON."); }); }
 });
 
+$("#app").addEventListener("keydown",e=>{
+ if(e.key==="Escape"&&(timerControlsOpen||restOverlayOpen)){e.preventDefault();timerControlsOpen=false;restOverlayOpen=false;render();document.querySelector('[data-act=clocktoggle]')?.focus({preventScroll:true});}
+ if(e.key==="Tab"&&restOverlayOpen){const controls=[...document.querySelectorAll('.rest-overlay button:not(:disabled)')];const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}
+});
 $("#app").addEventListener("keydown",e=>{if(S.tab!=="progress"||!["Enter"," "].includes(e.key))return;const region=e.target.closest?.("[data-muscle]");if(!region||!region.closest?.(".muscle-map"))return;e.preventDefault();muscleMapSelected=region.dataset.muscle;render();});
 $("#app").addEventListener("click", async e => {
   const muscleRegion=e.target.closest?.("[data-muscle]");
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
-  if(act==="timeropen"){restOverlayOpen=true;render();return;}
-  if(act==="timerclose"){restOverlayOpen=false;render();document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});return;}
-  if(act==="timeradjust"){const d=getDraft(S.dayId),t=d.restTimer,delta=Number(b.dataset.seconds);if(t&&Number.isFinite(delta)){const ms=Math.max(0,(t.pausedRemainingMs!=null?t.pausedRemainingMs:t.deadline-Date.now())+delta*1000);d.restTimer={...t,deadline:Date.now()+ms,pausedRemainingMs:t.pausedRemainingMs!=null?ms:null,durationSeconds:Math.max(0,(t.durationSeconds||0)+delta)};saveDrafts();render();}return;}
+  if(act==="workoutsettings"){S.tab="log";S.editing=null;render();document.querySelector(".workout-options").open=true;document.querySelector(".workout-options")?.scrollIntoView({block:"start"});return;}
+  if(act==="workoutbegin"){
+   if(getDraft(S.dayId).workoutTimer.state!=="running")startWorkoutFor(S.dayId);
+   timerWorkoutId=S.dayId;render();document.querySelector('#workout-editor')?.scrollIntoView?.({behavior:'smooth',block:'start'});return;
+  }
+  if(act==="clocktoggle"||act==="clockclose"){
+   timerControlsOpen=act==="clocktoggle"?!timerControlsOpen:false;
+   render();if(!timerControlsOpen)document.querySelector('[data-act=clocktoggle]')?.focus({preventScroll:true});return;
+  }
+  if(act==="clockreturn"){S.dayId=timerContext().id;S.tab="log";timerControlsOpen=false;render();window.scrollTo({top:0});return;}
+  if(["clockstart","clockpause","clockstop","clockreset","reststart"].includes(act)){
+   const {id,draft:d}=timerContext();
+   if(act==="clockstart")startWorkoutFor(id);
+   if(act==="clockpause"){d.workoutTimer=timerTools.pauseWorkout(d.workoutTimer);if(d.restTimer&&d.restTimer.pausedRemainingMs==null)d.restTimer=timerTools.pause(d.restTimer);}
+   if(act==="clockstop"){d.workoutTimer=timerTools.stopWorkout(d.workoutTimer);d.restTimer=null;}
+   if(act==="clockreset"){d.workoutTimer=timerTools.idleWorkout();d.restTimer=null;delete d.startedAt;}
+   if(act==="reststart")d.restTimer=timerTools.start(d.restSeconds);
+   saveDrafts();render();return;
+  }
+  if(act==="timeropen"){restOverlayOpen=true;timerControlsOpen=false;render();return;}
+  if(act==="timerclose"){restOverlayOpen=false;timerControlsOpen=true;render();return;}
+  if(act==="timeradjust"){const {draft:d}=timerContext(),t=d.restTimer,delta=Number(b.dataset.seconds);if(t&&Number.isFinite(delta)){const ms=Math.max(0,(t.pausedRemainingMs!=null?t.pausedRemainingMs:t.deadline-Date.now())+delta*1000);d.restTimer={...t,deadline:Date.now()+ms,pausedRemainingMs:t.pausedRemainingMs!=null?ms:null,durationSeconds:Math.max(0,(t.durationSeconds||0)+delta)};saveDrafts();render();}return;}
 
   if(["homestart","homecontinue","homeschedule","homeprogress","homehistory"].includes(act)){
-   if(act==="homeprogress")S.tab="progress";else if(act==="homehistory")S.tab="history";else {S.tab="log";if(act==="homecontinue"&&getDay(b.dataset.id))S.dayId=b.dataset.id;if(act==="homeschedule")S.manageSchedules=true;}
+   if(act==="homeprogress")S.tab="progress";else if(act==="homehistory")S.tab="history";else {S.tab="log";if(act==="homecontinue"&&getDay(b.dataset.id))S.dayId=b.dataset.id;if(act==="homeschedule")S.tab="plan";else if(act==="homestart"||act==="homecontinue"){if(act==="homestart")S.dayId=getDay(nextSlot())?.id||nextDayId();startWorkoutFor(S.dayId);}}
    render();window.scrollTo({top:0});return;
   }
   if(act==="recoverbackup"){S.tab="data";render();await exportJSON();return;}
@@ -810,9 +879,9 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
-  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
-  if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const d=getDraft(S.dayId);if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.startedAt=Date.now();}saveDrafts();render();return;}
-  if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=getDraft(S.dayId).restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
+  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);if(d.workoutTimer.state==="idle")startWorkoutFor(S.dayId);timerWorkoutId=S.dayId;const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
+  if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const {draft:d}=timerContext();if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.workoutTimer=timerTools.idleWorkout();}saveDrafts();render();return;}
+  if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=timerContext().draft.restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
    if(act==="resetdefault"){const e=grp(),key=settingKey(e,+b.dataset.i,b.dataset.g),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};if(Object.hasOwn(next,exerciseKey(e.name)))next[key]={};else delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;for(const field of ["restSeconds","loadIncrement","incrementUnit"]){if(before[field]===undefined)delete e[field];else e[field]=before[field];}toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
   if(act==="savedefault"){const e=grp();const key=settingKey(e,+b.dataset.i,b.dataset.g);const rawIncrement=e.loadIncrement==null||e.loadIncrement===""?S.exerciseDefaults?.[key]?.loadIncrement:e.loadIncrement;
    if(rawIncrement!=null && rawIncrement!=="" && (!Number.isFinite(Number(rawIncrement))||Number(rawIncrement)<=0||Number(rawIncrement)>100)){e.loadIncrement=S.exerciseDefaults?.[key]?.loadIncrement??"";saveDrafts();if(!await flushDrafts()){toast("Could not restore saved increment; export a backup before reloading.");return;}toast("Load increment must be greater than 0 and no more than 100.");return;}
@@ -939,7 +1008,7 @@ async function addBody(){
   catch { toast("Couldn't save. Try again."); }
 }
 
-const DATA_SCHEMA = {"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Gym Tracker app data","description":"Version 4 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.","type":"object","properties":{"app":{"const":"ppl-tracker"},"version":{"const":4},"exportedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"sessions":{"type":"array","items":{"$ref":"#/$defs/session"}},"body":{"type":"array","items":{"$ref":"#/$defs/body"}},"custom":{"type":"array","items":{"$ref":"#/$defs/custom"}},"drafts":{"type":"object","propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"$ref":"#/$defs/draft"}},"preferences":{"$ref":"#/$defs/preferences"},"schedules":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/schedule"}},"calendarEvents":{"type":"array","items":{"$ref":"#/$defs/calendarEvent"}}},"required":["app","version","exportedAt","sessions","body","custom","drafts","preferences","schedules"],"additionalProperties":false,"$defs":{"id":{"type":"string","pattern":"^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_\\-.~:@+]{1,190}$"},"unit":{"type":"string","enum":["kg","lb"]},"date":{"type":"string","format":"date"},"set":{"type":"object","properties":{"w":{"type":"number","minimum":0},"r":{"type":"integer","minimum":1},"id":{"$ref":"#/$defs/id"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"exercise":{"type":"object","properties":{"name":{"type":"string","minLength":1},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/set"},"minItems":1},"exerciseId":{"$ref":"#/$defs/id"}},"required":["name","unit","sets"],"additionalProperties":false},"session":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"dayId":{"$ref":"#/$defs/id"},"dayName":{"type":"string"},"type":{"type":"string","enum":["pull","push","legs","other"]},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"exercises":{"type":"array","items":{"$ref":"#/$defs/exercise"},"minItems":1},"createdAt":{"type":"integer","minimum":0}},"required":["id","dayId","dayName","type","date","notes","exercises","createdAt"],"additionalProperties":false},"body":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"type":"string","format":"date"},"weight":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"waist":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"unit":{"type":"string","enum":["kg","lb"]},"createdAt":{"type":"integer","minimum":0}},"required":["id","date","weight","waist","unit","createdAt"],"additionalProperties":false},"customExercise":{"type":"object","properties":{"n":{"type":"string","minLength":1},"s":{"type":"integer","minimum":1,"maximum":30},"lo":{"type":"integer","minimum":1,"maximum":100},"hi":{"type":"integer","minimum":1,"maximum":100},"alt":{"type":"array","items":{"type":"string"}},"exerciseId":{"$ref":"#/$defs/id"}},"required":["n","s","lo","hi","alt"],"additionalProperties":false},"custom":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1},"type":{"type":"string","enum":["pull","push","legs","other"]},"unit":{"type":"string","enum":["kg","lb"]},"ex":{"type":"array","items":{"$ref":"#/$defs/customExercise"},"minItems":1}},"required":["id","name","type","unit","ex"],"additionalProperties":false},"draftValue":{"anyOf":[{"type":"string"},{"type":"number"}]},"draftSet":{"type":"object","properties":{"w":{"$ref":"#/$defs/draftValue"},"r":{"$ref":"#/$defs/draftValue"},"id":{"type":"string"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"type":"string","format":"date-time"},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"draftExercise":{"type":"object","properties":{"name":{"type":"string"},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/draftSet"},"minItems":1},"exerciseId":{"type":"string"},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"anyOf":[{"type":"number","exclusiveMinimum":0,"maximum":100},{"type":"string"},{"type":"null"}]},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"required":["name","unit","sets"],"additionalProperties":false},"draft":{"type":"object","properties":{"sig":{"type":"string"},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"ex":{"type":"array","items":{"$ref":"#/$defs/draftExercise"},"minItems":1},"extra":{"type":"array","items":{"$ref":"#/$defs/draftExercise"}},"startedAt":{"type":"number","minimum":0},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"recoveryWarning":{"type":"boolean"},"restTimer":{"anyOf":[{"type":"null"},{"type":"object","properties":{"durationSeconds":{"type":"integer","minimum":0,"maximum":3600},"deadline":{"type":"number"},"pausedRemainingMs":{"anyOf":[{"type":"number","minimum":0},{"type":"null"}]}},"required":["durationSeconds","deadline","pausedRemainingMs"],"additionalProperties":false}]}},"required":["sig","date","notes","ex","extra"],"additionalProperties":false},"preferences":{"type":"object","properties":{"bodyUnit":{"type":"string","enum":["kg","lb"]},"selectedWorkoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"progressExercise":{"anyOf":[{"type":"string"},{"type":"null"}]},"activeScheduleId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"globalRestSeconds":{"type":"integer","minimum":15,"maximum":600},"exerciseDefaults":{"type":"object","propertyNames":{"type":"string","minLength":1,"maxLength":300,"pattern":"^(?!(__proto__|constructor|prototype)$).+$"},"additionalProperties":{"type":"object","properties":{"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"type":"number","exclusiveMinimum":0,"maximum":100},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"additionalProperties":false}},"progressionEnabled":{"type":"boolean"}},"required":["bodyUnit","selectedWorkoutId","progressExercise","activeScheduleId"],"additionalProperties":false},"schedule":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1,"maxLength":80},"mode":{"type":"string","enum":["cycle","weekly"]},"days":{"type":"array","minItems":1,"maxItems":28,"items":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"cursor":{"type":"integer","minimum":0}},"required":["id","name","mode","days","cursor"],"additionalProperties":false},"calendarEvent":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"$ref":"#/$defs/date"},"type":{"type":"string","enum":["planned","rest","skipped","completed"]},"workoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"sessionId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"updatedAt":{"type":"string","format":"date-time"}},"required":["id","date","type","updatedAt"],"additionalProperties":false}}};
+const DATA_SCHEMA = {"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Gym Tracker app data","description":"Version 4 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.","type":"object","properties":{"app":{"const":"ppl-tracker"},"version":{"const":4},"exportedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"sessions":{"type":"array","items":{"$ref":"#/$defs/session"}},"body":{"type":"array","items":{"$ref":"#/$defs/body"}},"custom":{"type":"array","items":{"$ref":"#/$defs/custom"}},"drafts":{"type":"object","propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"$ref":"#/$defs/draft"}},"preferences":{"$ref":"#/$defs/preferences"},"schedules":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/schedule"}},"calendarEvents":{"type":"array","items":{"$ref":"#/$defs/calendarEvent"}}},"required":["app","version","exportedAt","sessions","body","custom","drafts","preferences","schedules"],"additionalProperties":false,"$defs":{"id":{"type":"string","pattern":"^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_\\-.~:@+]{1,190}$"},"unit":{"type":"string","enum":["kg","lb"]},"date":{"type":"string","format":"date"},"set":{"type":"object","properties":{"w":{"type":"number","minimum":0},"r":{"type":"integer","minimum":1},"id":{"$ref":"#/$defs/id"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"exercise":{"type":"object","properties":{"name":{"type":"string","minLength":1},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/set"},"minItems":1},"exerciseId":{"$ref":"#/$defs/id"}},"required":["name","unit","sets"],"additionalProperties":false},"session":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"dayId":{"$ref":"#/$defs/id"},"dayName":{"type":"string"},"type":{"type":"string","enum":["pull","push","legs","other"]},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"exercises":{"type":"array","items":{"$ref":"#/$defs/exercise"},"minItems":1},"createdAt":{"type":"integer","minimum":0}},"required":["id","dayId","dayName","type","date","notes","exercises","createdAt"],"additionalProperties":false},"body":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"type":"string","format":"date"},"weight":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"waist":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"unit":{"type":"string","enum":["kg","lb"]},"createdAt":{"type":"integer","minimum":0}},"required":["id","date","weight","waist","unit","createdAt"],"additionalProperties":false},"customExercise":{"type":"object","properties":{"n":{"type":"string","minLength":1},"s":{"type":"integer","minimum":1,"maximum":30},"lo":{"type":"integer","minimum":1,"maximum":100},"hi":{"type":"integer","minimum":1,"maximum":100},"alt":{"type":"array","items":{"type":"string"}},"exerciseId":{"$ref":"#/$defs/id"}},"required":["n","s","lo","hi","alt"],"additionalProperties":false},"custom":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1},"type":{"type":"string","enum":["pull","push","legs","other"]},"unit":{"type":"string","enum":["kg","lb"]},"ex":{"type":"array","items":{"$ref":"#/$defs/customExercise"},"minItems":1}},"required":["id","name","type","unit","ex"],"additionalProperties":false},"draftValue":{"anyOf":[{"type":"string"},{"type":"number"}]},"draftSet":{"type":"object","properties":{"w":{"$ref":"#/$defs/draftValue"},"r":{"$ref":"#/$defs/draftValue"},"id":{"type":"string"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"type":"string","format":"date-time"},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"draftExercise":{"type":"object","properties":{"name":{"type":"string"},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/draftSet"},"minItems":1},"exerciseId":{"type":"string"},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"anyOf":[{"type":"number","exclusiveMinimum":0,"maximum":100},{"type":"string"},{"type":"null"}]},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"required":["name","unit","sets"],"additionalProperties":false},"draft":{"type":"object","properties":{"sig":{"type":"string"},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"ex":{"type":"array","items":{"$ref":"#/$defs/draftExercise"},"minItems":1},"extra":{"type":"array","items":{"$ref":"#/$defs/draftExercise"}},"startedAt":{"type":"number","minimum":0},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"recoveryWarning":{"type":"boolean"},"restTimer":{"anyOf":[{"type":"null"},{"type":"object","properties":{"durationSeconds":{"type":"integer","minimum":0,"maximum":3600},"deadline":{"type":"number"},"pausedRemainingMs":{"anyOf":[{"type":"number","minimum":0},{"type":"null"}]}},"required":["durationSeconds","deadline","pausedRemainingMs"],"additionalProperties":false}]},"workoutTimer":{"type":"object","properties":{"state":{"type":"string","enum":["idle","running","paused","stopped"]},"elapsedMs":{"type":"number","minimum":0},"startedAt":{"anyOf":[{"type":"null"},{"type":"number","minimum":0}]}},"required":["state","elapsedMs","startedAt"],"additionalProperties":false}},"required":["sig","date","notes","ex","extra"],"additionalProperties":false},"preferences":{"type":"object","properties":{"bodyUnit":{"type":"string","enum":["kg","lb"]},"selectedWorkoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"progressExercise":{"anyOf":[{"type":"string"},{"type":"null"}]},"activeScheduleId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"exerciseDefaults":{"type":"object","propertyNames":{"type":"string","minLength":1,"maxLength":300,"pattern":"^(?!(__proto__|constructor|prototype)$).+$"},"additionalProperties":{"type":"object","properties":{"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"type":"number","exclusiveMinimum":0,"maximum":100},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"additionalProperties":false}},"progressionEnabled":{"type":"boolean"},"globalRestSeconds":{"type":"integer","minimum":15,"maximum":600}},"required":["bodyUnit","selectedWorkoutId","progressExercise","activeScheduleId"],"additionalProperties":false},"schedule":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1,"maxLength":80},"mode":{"type":"string","enum":["cycle","weekly"]},"days":{"type":"array","minItems":1,"maxItems":28,"items":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"cursor":{"type":"integer","minimum":0}},"required":["id","name","mode","days","cursor"],"additionalProperties":false},"calendarEvent":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"$ref":"#/$defs/date"},"type":{"type":"string","enum":["planned","rest","skipped","completed"]},"workoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"sessionId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"updatedAt":{"type":"string","format":"date-time"}},"required":["id","date","type","updatedAt"],"additionalProperties":false}}};
 function validDataDate(date){
   return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date+"T12:00:00Z")) && new Date(date+"T12:00:00Z").toISOString().slice(0,10) === date;
 }
@@ -984,6 +1053,10 @@ function validateAppData(value){
   }
   check(value,DATA_SCHEMA,"data");
   validateCalendarEvents(value.calendarEvents||[]);
+  for(const draft of Object.values(value.drafts||{})){
+    const clock=draft.workoutTimer;if(!clock)continue;
+    if(clock.state==="running"?clock.startedAt===null:clock.startedAt!==null)throw new Error("data.drafts.workoutTimer: only running clocks may have a start timestamp");
+  }
   for (const key of ["sessions","body","custom","schedules"]) {
     if (new Set(value[key].map(x=>x.id)).size !== value[key].length) throw new Error("data."+key+": duplicate IDs");
   }

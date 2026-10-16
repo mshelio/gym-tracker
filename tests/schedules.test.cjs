@@ -255,12 +255,20 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
 
 
   assert(a.viewHistory().includes('hard sets') || a.S.sessions.length===0);
-  assert(a.viewLog().includes('data-act="timerpause"'));
+  assert.equal(a.getDraft(a.S.dayId).workoutTimer.state,'idle');
+  assert.equal(a.getDraft(a.S.dayId).startedAt,undefined);
+  const clockBackup=JSON.parse(JSON.stringify(a.buildAppData()));
+  clockBackup.drafts[a.S.dayId].workoutTimer={state:'paused',elapsedMs:12000,startedAt:null};
+  assert.doesNotThrow(()=>a.validateAppData(clockBackup));
+  clockBackup.drafts[a.S.dayId].workoutTimer.state='running';
+  assert.throws(()=>a.validateAppData(clockBackup),/workoutTimer/);
+  delete clockBackup.drafts[a.S.dayId].workoutTimer;
+  assert.doesNotThrow(()=>a.validateAppData(clockBackup));
   assert(a.viewLog().includes('data-act="settype"'));
   assert(a.viewLog().includes('data-f="rir"'));
   assert(a.viewLog().includes('data-f="exrest"'));
-  assert(a.viewLog().includes('data-act="timerreset"'));
-  assert(a.viewLog().includes('Make every')===false);assert(node('#app').innerHTML.includes('Make every rep count.'));
+  assert(node('#app').innerHTML.includes('data-act="clocktoggle"'));
+  assert(a.viewLog().includes('Make every')===false);assert(node('#app').innerHTML.includes('<h1>Train</h1>'));
   const d=a.getDraft('pullA');d.restSeconds=135;d.restTimer={durationSeconds:135,deadline:Date.now()+135000,pausedRemainingMs:90000};d.startedAt=Date.now()-40000;d.ex[0].restSeconds=120;d.ex[0].loadIncrement='2.5';d.ex[0].incrementUnit='kg';d.ex[0].sets[0]={w:'100',r:'8',type:'working',completed:true,completedAt:'2026-10-14T10:00:00Z',rir:2};assert.equal(a.buildAppData().drafts.pullA.restTimer.pausedRemainingMs,90000);assert.equal(a.buildAppData().drafts.pullA.ex[0].restSeconds,120);assert.equal(a.buildAppData().drafts.pullA.ex[0].sets[0].rir,2);a.updateSessionMeter();assert.equal(node('#loggedSets').textContent,1);
   await a.saveSession({disabled:false,textContent:''});assert.equal(a.S.sessions.length,1);assert.equal(a.nextDayId(),'pushA');assert.equal(a.S.tab,'history');assert.equal(a.S.sessions[0].exercises[0].unit,'lb');assert.equal(a.S.sessions[0].exercises[0].sets[0].w,100);
   assert(JSON.parse(c.storage['ppl-tracker-v1']).sessions.length===1);assert.equal(JSON.parse(c.storage['ppl-tracker-v1']).drafts.pullA,undefined);assert.equal(JSON.parse(c.storage['ppl-tracker-v1']).schedules[0].cursor,1);assert.equal(JSON.parse(c.storage['ppl-tracker-v1']).preferences.selectedWorkoutId,'pushA');

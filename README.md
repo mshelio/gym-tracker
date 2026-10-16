@@ -197,3 +197,11 @@ Recognized exercise names (including selected alternatives and synonyms) resolve
 ### Muscle-group analytics (v1.2)
 
 In **Progress → Muscle-group volume**, completed working sets contribute exactly one primary-muscle hard set. Warm-up sets and incomplete sets are excluded. Drop sets contribute load × repetitions to volume but not hard sets. Recognized secondary muscles are **reported separately as 0.5-credit estimates**; secondary credits are never added to overall primary hard-set counts. Unrecognized exercise names appear in **Unknown**, not automatically assigned to a muscle. Weekly dates use ISO Monday boundaries and local YYYY-MM-DD log dates without local-time arithmetic. Historic session edits and deletions automatically recompute metrics from current saved sessions. Switching display units converts volume without changing set counts. This is calculated data only; no changes to IndexedDB or the version 4 backup schema are required.
+
+### Workout flow and floating timer
+
+Train keeps exercise logging in focus. Use **Workout options** to choose a different workout or adjust preferences, and **Plan** to manage schedules and calendar days. Search is available above the exercise cards; notes/date and advanced exercise settings expand when needed. Progress keeps filters, detailed calculations, and body measurements behind disclosures.
+
+The floating timer on the left remains available on every screen. Opening the app or editing a draft does not start it. **Start Workout** (or completing the first set) starts the clock. Open the timer control to **Pause**, **Resume**, **Stop timer**, or **Reset timer**, and to start, pause, or skip rest. Stop keeps the elapsed time and workout draft; Restart begins a fresh timer. Only one workout clock runs at a time. Paused and running clocks survive reloads, and saving a completed session clears its timer. Legacy automatically started clocks reopen paused when a draft contains data; empty drafts reopen idle.
+
+Backups remain version 4 with optional workout-clock metadata. Existing v1–v4 backups import as before; older application builds may reject newly exported timer fields. See [the screen and flow audit](docs/ux-audit.md) for the findings and changes.

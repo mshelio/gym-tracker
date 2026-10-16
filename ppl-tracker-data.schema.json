@@ -568,6 +568,41 @@
               "additionalProperties": false
             }
           ]
+        },
+        "workoutTimer": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "running",
+                "paused",
+                "stopped"
+              ]
+            },
+            "elapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "elapsedMs",
+            "startedAt"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
