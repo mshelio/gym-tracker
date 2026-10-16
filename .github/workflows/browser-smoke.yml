@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [mobile-chromium, mobile-webkit]
+        project: [mobile-chromium, mobile-webkit, chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,6 +25,8 @@ jobs:
         run: |
           if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
             npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown|Phase 3 Home disclosure and Progress anchors|Phase 4 Plan and More|rest timer dialog traps keyboard focus|workout save validation announces|keyboard skip link bypasses navigation' --timeout=20000 --workers=1 --retries=1 --reporter=line
+          elif [ "${{ matrix.project }}" = "firefox" ] || [ "${{ matrix.project }}" = "webkit" ]; then
+            npm run test:browser -- --project=${{ matrix.project }} --grep 'System, Light and Dark appearance|floating mobile navigation|reduced motion preserves' --workers=1 --retries=1 --reporter=line
           else
             npm run test:browser -- --project=${{ matrix.project }} --reporter=line
           fi
