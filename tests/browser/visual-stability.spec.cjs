@@ -18,7 +18,7 @@ for(const theme of ['light','dark']){
   expect(first.x).toBeGreaterThanOrEqual(0);
   expect(first.x+first.width).toBeLessThanOrEqual(642);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
-  await testInfo.attach('home-'+theme,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'});
+  await testInfo.attach('train-'+theme,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'});
   await nav.locator('[data-tab="progress"]').click();
   await expect(page.locator('#progress-muscles')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
