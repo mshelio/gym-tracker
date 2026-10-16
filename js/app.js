@@ -293,9 +293,26 @@ function render(){
 
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
 let restOverlayOpen=false;
+// Contain keyboard focus in the modal rest timer and restore it on dismissal.
+document.addEventListener("keydown",e=>{
+ if(!restOverlayOpen||S.tab!=="log")return;
+ const dialog=document.querySelector("[data-rest-overlay]");
+ if(!dialog)return;
+ if(e.key==="Escape"){
+  e.preventDefault();restOverlayOpen=false;render();
+  document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});
+  return;
+ }
+ if(e.key!=="Tab")return;
+ const controls=[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),a[href]')].filter(x=>x.getClientRects().length);
+ if(!controls.length)return;
+ const first=controls[0],last=controls[controls.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!dialog.contains(document.activeElement))){e.preventDefault();last.focus();}
+ else if(!e.shiftKey&&(document.activeElement===last||!dialog.contains(document.activeElement))){e.preventDefault();first.focus();}
+},true);
 function restOverlayMarkup(d){
  const rest=d.restTimer,remaining=timerTools.remaining(rest),paused=rest?.pausedRemainingMs!=null;
- return `<div class="rest-overlay" role="dialog" aria-modal="true" aria-label="Rest timer" data-rest-overlay>
+ return `<div class="rest-overlay" role="dialog" aria-modal="true" aria-label="Rest timer" aria-describedby="rest-timer-instructions" data-rest-overlay>
  <div class="rest-overlay__card"><button type="button" class="btn rest-overlay__close" data-act="timerclose" aria-label="Close rest timer">✕</button>
  <p class="eyebrow">RECOVER AND RESET</p><h2>Rest timer</h2>
  <p class="muted" id="rest-timer-instructions">Your countdown stays accurate when the app is in the background.</p>
@@ -682,7 +699,7 @@ function viewData(){
     <p class="muted">Export workouts, schedules, schedule progress, session drafts and preferences in one JSON backup.</p><button class="btn primary" data-act="export">Export app data (.json)</button>
     <textarea id="exportOut" readonly hidden aria-label="Exported JSON"></textarea><button class="btn" data-act="copyexport" id="copyBtn" hidden>Copy JSON instead</button></div>
     <div class="section stack"><span class="panel-icon">${icon("upload")}</span><h3>Restore a backup</h3><p class="muted">Supports Gym Tracker backup versions 1 through 4. Restoring never requires an account or network connection.</p><p class="muted">Choose a backup or paste its JSON. The complete file is validated before saving.</p><label class="file-label">Choose backup file<input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup"></label>
-    <label>Import mode<select id="importMode" aria-describedby="import-mode-help" style="display:block;width:100%"><option value="merge">Merge with existing data</option><option value="replace">Replace all local app data</option></select></label><p id="import-mode-help" class="muted">Merge combines records by ID. Replace deletes local records not included in the backup. Export your current data first.</p><p id="importResult" role="status" hidden></p><textarea id="importText" placeholder='Paste your backup JSON here…' aria-label="Paste JSON backup"></textarea><button class="btn" data-act="import">Review and import backup</button></div></div>
+    <label>Import mode<select id="importMode" aria-describedby="import-mode-help" style="display:block;width:100%"><option value="merge">Merge with existing data</option><option value="replace">Replace all local app data</option></select></label><p id="import-mode-help" class="muted">Merge combines records by ID. Replace deletes local records not included in the backup. Export your current data first.</p><p id="importResult" role="status" aria-live="polite" aria-atomic="true" hidden></p><textarea id="importText" placeholder='Paste your backup JSON here…' aria-label="Paste JSON backup"></textarea><button class="btn" data-act="import">Review and import backup</button></div></div>
     <div class="section program-details"><div><p class="eyebrow">DEFAULT PROGRAM</p><h3>Your workouts, one simple file.</h3><p class="muted">Loaded from <code>ppl-default-workouts.json</code> · ${esc(programSource)}</p><p class="muted">These are starter workouts. Use Manage schedules in Train to choose your own order, rest days and weekly or repeating split.</p><div class="rotation">${ORDER.map(id=>`<span class="chip ${BASE_DAY[id].type}">${esc(BASE_DAY[id].name)}</span>`).join('<span aria-hidden="true">→</span>')}</div></div><div><button class="btn" data-act="reloadprogram">Reload program</button><label class="file-label" style="margin-top:12px">Load program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Load default workout program"></label></div></div>
     <p class="storage-footnote">Saved on this device and browser. Use a JSON backup to transfer data; clearing browser data removes your log.</p>`;
 }
