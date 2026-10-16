@@ -66,7 +66,7 @@ Run `node tests/schedules.test.cjs`. Checks cover custom and default workouts, r
 
 `js/app.js` composes independent modules: `state.js` (initial state), `storage.js` (legacy localStorage adapter), `workouts.js` (workout calculations and utilities), `schedules.js` (schedule index), and `render.js` (presentation primitives). Core controller/view routines remain in `app.js` and can be migrated in follow-up refactors without changing the persistence contract.
 
-Run `node tests/schedules.test.cjs` for regression checks. Run `npm install`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Existing localStorage recovery keys and v1–v4 backup imports remain supported. Before rolling back to older code, export the latest v4 backup: older builds may not read the new backup version.
+Run `node tests/schedules.test.cjs` for regression checks. Run `npm ci`, `npx playwright install chromium`, then `npm run test:browser` for browser smoke testing using the built-in `/gym-tracker/` fixture server. No production build is required. Playwright and its browser revisions are pinned in `package-lock.json`; use `npm ci` locally and in CI. Upgrade the dependency and lockfile together only after checking mobile WebKit: newer WebKit versions can change interaction and rendering behavior. Existing localStorage recovery keys and v1–v4 backup imports remain supported. Before rolling back to older code, export the latest v4 backup: older builds may not read the new backup version.
 
 ## IndexedDB persistence (GT-02)
 
