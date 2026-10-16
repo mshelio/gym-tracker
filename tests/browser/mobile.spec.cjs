@@ -278,3 +278,19 @@ test('keyboard skip link bypasses navigation and mobile controls retain accessib
  await page.locator('nav.tabs button[data-tab="progress"]').click();
  await expect(page.locator('#progress-muscles')).toHaveCount(1);
 });
+
+test('rest timer dialog traps keyboard focus and Escape restores trigger focus',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:'Open rest timer'}).click();
+ const dialog=page.getByRole('dialog',{name:'Rest timer'});
+ await expect(dialog).toBeVisible();
+ await expect(dialog).toHaveAttribute('aria-describedby','rest-timer-instructions');
+ const close=dialog.getByRole('button',{name:'Close rest timer'});
+ await expect(close).toBeFocused();
+ await page.keyboard.press('Shift+Tab');
+ await expect.poll(()=>page.evaluate(()=>!!document.querySelector('[data-rest-overlay]')?.contains(document.activeElement))).toBe(true);
+ await page.keyboard.press('Escape');
+ await expect(dialog).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Open rest timer'})).toBeFocused();
+});
