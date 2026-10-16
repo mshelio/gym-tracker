@@ -131,7 +131,8 @@ test('Home dashboard shows training overview and routes into existing workout fl
  await page.getByRole('button',{name:/Start New Workout/}).click();
  await expect(page.locator('.workout-layout')).toBeVisible();
  await page.locator('nav.tabs button[data-tab="home"]').click();
- await page.getByRole('button',{name:/View schedule/}).click();
+ await page.locator('details.home-secondary summary').click();
+ await page.getByRole('button',{name:/Manage schedule/}).click();
  await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
 });
@@ -240,4 +241,19 @@ test('Phase 3 Home disclosure and Progress anchors keep mobile actions accessibl
   await expect(navigation.getByRole('link',{name:new RegExp(section,'i')})).toHaveAttribute('href','#progress-'+section);
  }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
+
+test('Phase 4 Plan and More give direct access to schedules and backups',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
+ await expect(page.getByRole('region',{name:'Schedule overview'})).toBeVisible();
+ await page.getByRole('button',{name:/Manage schedules/}).click();
+ await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
+ await page.locator('nav.tabs button[data-tab="more"]').click();
+ const more=page.getByRole('region',{name:'More settings'});
+ await expect(more.getByRole('button',{name:/Data & Backups/})).toBeVisible();
+ await expect(more.getByRole('button',{name:/Workout settings/})).toBeVisible();
+ await more.getByRole('button',{name:/Data & Backups/}).click();
+ await expect(page.getByRole('region',{name:'Backup and restore settings'})).toBeVisible();
 });
