@@ -88,3 +88,15 @@ test('Home preview and session totals reflect a saved workout instead of prototy
  await page.locator('[data-tab="home"]').click();
  await expect(page.locator('.home-recent-row strong')).toHaveText('Pull A');
 });
+
+test('200-percent-equivalent desktop viewport keeps navigation and content usable',async({page})=>{
+ // A 1280px desktop viewport at 200% browser zoom has ~640 CSS pixels of layout space.
+ await page.setViewportSize({width:640,height:760});
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('nav.tabs')).toBeVisible();
+ await expect(page.locator('#app')).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.locator('#progress-muscles')).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
