@@ -451,14 +451,41 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
 }
 @media(prefers-reduced-motion:reduce){.focused-chevron{transition:none}}
 
-.rest-mini{position:fixed;z-index:28;right:20px;bottom:100px;display:none;align-items:center;gap:10px;padding:10px 16px;min-height:48px;border:1px solid var(--line);border-radius:999px;background:var(--overlay);color:var(--ink);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-weight:650}
-.rest-mini strong{font-family:'Geist Mono',ui-monospace,monospace;color:var(--blue);font-variant-numeric:tabular-nums}
-@media(max-width:600px){.rest-mini{display:flex;bottom:calc(99px + env(safe-area-inset-bottom));right:18px}}
 
 /* Keep the primary logging row balanced even when advanced metadata is hidden. */
 .focused-exercise:not(:has(.exercise-options[open])) .workout-set-row{grid-template-columns:36px minmax(0,1fr) minmax(0,.75fr) minmax(60px,.85fr)}
 .focused-exercise:has(.exercise-options[open]) .workout-set-row{grid-template-columns:36px minmax(0,1fr) minmax(0,.75fr) minmax(75px,.9fr)}
 @media(max-width:600px){.focused-exercise .workout-set-row{gap:5px}}
+
+/* UX Phase 3: action-first Home and scannable Progress anchors. */
+.home-secondary{padding:14px 16px}
+.home-secondary>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-weight:700;min-height:44px}
+.home-secondary>summary .muted{font-size:12px;font-weight:500}
+.home-secondary[open]>summary{margin-bottom:12px}
+.progress-jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.progress-jump a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:var(--glass);color:var(--ink);text-decoration:none;font-size:13px;font-weight:650}
+.progress-jump a:hover,.progress-jump a:focus-visible{border-color:var(--blue);color:var(--blue)}
+#progress-training,#progress-muscles,#progress-lifts,#progress-body{scroll-margin-top:20px}
+@media(max-width:600px){.progress-jump{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.progress-jump a{padding:8px 4px;font-size:12px}}
+
+/* Phase 4: clear plan summary and task-oriented More navigation. */
+.plan-overview-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.plan-overview-head h2{margin:5px 0 7px}
+.more-link{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;min-height:74px;text-align:left;white-space:normal}
+.more-link strong{display:flex;align-items:center;gap:8px}
+.more-link span{font-size:12px;line-height:1.45;color:var(--muted)}
+.more-privacy{margin-top:18px}
+@media(max-width:600px){.plan-overview-head>.btn{width:100%}.more-link{width:100%}}
+
+/* Accessibility audit: provide an explicit keyboard bypass and reliable touch targets. */
+.skip-link{position:fixed;top:max(8px,env(safe-area-inset-top));left:max(8px,env(safe-area-inset-left));z-index:1000;transform:translateY(-160%);background:var(--surface);color:var(--ink);border:2px solid var(--focus);border-radius:12px;padding:12px 16px;font-weight:700;text-decoration:none;box-shadow:var(--shadow)}
+.skip-link:focus-visible{transform:none}
+@media(max-width:600px){
+  nav.tabs button{min-height:48px;min-width:0}
+  .btn.small,.subnav button,.schedule-edit-row .btn,.calendar-toolbar .btn{min-height:44px}
+  .progress-jump a{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){.skip-link{transition:none!important}}
 
 /* A dedicated timer rail keeps controls reachable without covering workout fields. */
 #app{padding-left:112px}

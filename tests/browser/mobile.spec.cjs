@@ -132,6 +132,7 @@ test('Home dashboard shows training overview and routes into existing workout fl
  await page.getByRole('button',{name:/Start New Workout/}).click();
  await expect(page.locator('.workout-layout')).toBeVisible();
  await page.locator('nav.tabs button[data-tab="home"]').click();
+ await page.locator("details.home-secondary > summary").click();
  await page.getByRole('button',{name:/View schedule/}).click();
  await expect(page.locator('nav.tabs button[data-tab="plan"]')).toHaveAttribute('aria-current','page');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
@@ -222,4 +223,121 @@ test('mobile rest countdown stays accessible outside fullscreen dialog',async({p
  await expect(timer.locator('[data-timer="rest"]')).toContainText(/\d\d:\d\d/);
  await timer.getByRole('button').click();
  await expect(page.getByRole('dialog',{name:'Workout timer controls'})).toBeVisible();
+});
+
+test('Phase 3 Home disclosure and Progress anchors keep mobile actions accessible',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="home"]').click();
+ await expect(page.getByRole('region',{name:'Home dashboard'})).toBeVisible();
+ const schedule=page.locator('details.home-secondary');
+ await expect(schedule).not.toHaveAttribute('open','');
+ await schedule.locator('summary').click();
+ await expect(schedule).toHaveAttribute('open','');
+ await expect(schedule.getByRole('button',{name:/View schedule/})).toBeVisible();
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ const navigation=page.getByRole('navigation',{name:'Progress sections'});
+ await expect(navigation.getByRole('link')).toHaveCount(4);
+ for(const section of ['training','lifts','muscles','body']){
+  await expect(page.locator('#progress-'+section)).toHaveCount(1);
+  if(section==='muscles')await expect(page.getByRole('region',{name:'Muscle-group volume'})).toContainText('Primary sets count once');
+  await expect(navigation.getByRole('link',{name:new RegExp(section,'i')})).toHaveAttribute('href','#progress-'+section);
+ }
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
+});
+
+test('Phase 4 Plan and More give direct access to schedules and backups',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
+ await expect(page.getByRole('region',{name:'Schedule overview'})).toBeVisible();
+ await page.getByRole('button',{name:/Manage schedules/}).click();
+ await expect(page.locator('nav.tabs button[data-tab="plan"]')).toHaveAttribute('aria-current','page');
+ await page.locator('nav.tabs button[data-tab="more"]').click();
+ const more=page.getByRole('region',{name:'More settings'});
+ await expect(more.getByRole('button',{name:/Data & Backups/})).toBeVisible();
+ await expect(more.getByRole('button',{name:/Workout preferences/})).toBeVisible();
+ await more.getByRole('button',{name:/Data & Backups/}).click();
+ await expect(page.getByRole('region',{name:'Backup and restore settings'})).toBeVisible();
+});
+
+test('keyboard skip link bypasses navigation and mobile controls retain accessible targets',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.keyboard.press('Tab');
+ const skip=page.getByRole('link',{name:'Skip to main content'});
+ await expect(skip).toBeFocused();
+ await expect(skip).toBeVisible();
+ await page.keyboard.press('Enter');
+ await expect(page).toHaveURL(/#app$/);
+ await expect(page.locator('main#app')).toHaveCount(1);
+ for(const name of ['home','log','progress','plan','more']){
+  const tab=page.locator('nav.tabs button[data-tab="'+name+'"]');
+  const box=await tab.boundingBox();
+  expect(box,'Primary tab '+name+' should have a touch target').not.toBeNull();
+  expect(box.height).toBeGreaterThanOrEqual(44);
+ }
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
+});
+
+test('rest timer dialog traps keyboard focus and Escape restores trigger focus',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
+ await page.getByRole('button',{name:'Open rest timer'}).click();
+ const dialog=page.getByRole('dialog',{name:'Rest timer'});
+ await expect(dialog).toBeVisible();
+ await expect(dialog).toHaveAttribute('aria-describedby','rest-timer-instructions');
+ const close=dialog.getByRole('button',{name:'Close rest timer'});
+ await expect(close).toBeFocused();
+ await page.keyboard.press('Shift+Tab');
+ await expect.poll(()=>page.evaluate(()=>!!document.querySelector('[data-rest-overlay]')?.contains(document.activeElement))).toBe(true);
+ await page.keyboard.press('Escape');
+ await expect(dialog).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Open rest timer'})).toBeFocused();
+});
+
+test('workout save validation announces the error and moves focus to reps',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:/Finish & save session/}).click();
+ await expect(page.locator('#session-validation')).toContainText('Enter reps for at least one set first.');
+ await expect(page.locator('#session-validation')).toHaveAttribute('role','alert');
+ const invalid=page.locator('#app [data-f="r"][aria-invalid="true"]').first();
+ await expect(invalid).toBeFocused();
+ await expect(invalid).toHaveAttribute('aria-describedby','session-validation');
+});
+
+test('schedule deletion has contextual accessible confirmation before mutation',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="plan"]').click();
+ const manage=page.locator('[data-act="manageschedules"]').first();
+ if(await manage.count()) await manage.click();
+ const deletable=page.locator('[data-act="deleteschedule"]').first();
+ if(await deletable.count()){
+  const id=await deletable.getAttribute('data-id');
+  await deletable.click();
+  const confirm=page.locator('[data-act="deleteschedule"][data-id="'+id+'"]');
+  await expect(confirm).toHaveAccessibleName(/Confirm delete schedule/i);
+  await expect(confirm).toBeFocused();
+  await expect(page.getByRole('status').filter({hasText:/confirm deletion|delete this schedule/i}).last()).toBeVisible();
+ }
+});
+
+test('Phase B browser Back and Forward restore tabs and nested views',async({page,isMobile})=>{
+ expect(isMobile).toBeTruthy();
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs button[data-tab="progress"]').click();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await page.locator('#app .subnav button[data-destination="history"]').click();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await page.goBack();
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
+ await page.goBack();
+ await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
+ await page.goForward();
+ await expect(page.locator('nav.tabs button[data-tab="progress"]')).toHaveAttribute('aria-current','page');
+ await expect(page.locator('#progress-muscles')).toHaveCount(1);
 });

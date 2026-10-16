@@ -11,20 +11,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [mobile-chromium, mobile-webkit]
+        project: [mobile-chromium, mobile-webkit, chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps ${{ contains(matrix.project, 'webkit') && 'webkit' || contains(matrix.project, 'firefox') && 'firefox' || 'chromium' }}
       - run: node tests/version-sw.cjs --check
       - run: npm run test:regression
       - name: Browser tests (${{ matrix.project }})
         run: |
           if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
-            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown' --timeout=20000 --workers=1 --retries=1 --reporter=line
+            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown|Phase 3 Home disclosure and Progress anchors|Phase 4 Plan and More|rest timer dialog traps keyboard focus|workout save validation announces|keyboard skip link bypasses navigation' --timeout=20000 --workers=1 --retries=1 --reporter=line
+          elif [ "${{ matrix.project }}" = "firefox" ] || [ "${{ matrix.project }}" = "webkit" ]; then
+            npm run test:browser -- --project=${{ matrix.project }} --grep 'System, Light and Dark appearance|floating mobile navigation|reduced motion preserves|200-percent-equivalent desktop viewport' --workers=1 --retries=1 --reporter=line
           else
             npm run test:browser -- --project=${{ matrix.project }} --reporter=line
           fi
@@ -38,6 +40,15 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Upload desktop visual review screenshots
+        if: ${{ always() && matrix.project == 'chromium' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-review-chromium
+          path: |
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
   production-smoke:
     name: Production GitHub Pages smoke
     needs: browser
@@ -49,6 +60,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: node tests/pages-smoke.cjs
