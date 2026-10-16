@@ -122,3 +122,16 @@ test('setup stays optional and schedule management belongs to Plan',async({page}
  await expect(page.locator('.workout-options')).toHaveAttribute('open','');
  await expect(elapsed(page)).toHaveText('00:00');
 });
+
+test('choosing another workout from Home opens the library without starting the saved draft',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await settled(page);
+ await page.locator('[data-tab="home"]').click();
+ await expect(page.getByRole('button',{name:/Continue Workout/})).toBeVisible();
+ await page.getByRole('button',{name:'Choose another workout'}).click();
+ await expect(page.locator('.workout-options')).toHaveAttribute('open','');
+ await expect(elapsed(page)).toHaveText('00:00');
+ await expect(page.locator('[data-clock-state]')).toHaveText('Ready');
+ await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
+});
