@@ -94,3 +94,31 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
  await expect.poll(async()=>{try{return await page.evaluate(async()=>!(await caches.has('gt-shell-stale')))}catch{return false}},{timeout:15000}).toBe(true);
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
 });
+
+test('v4 backup restores saved draft into a separate browser profile',async({page,browser})=>{
+ await page.goto('/gym-tracker/');
+ const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/});
+ await reps.fill('13');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.locator('nav.tabs button[data-tab="more"]').click();
+ await page.getByRole('button',{name:/Data & Backups/}).click();
+ await page.locator('[data-act="export"]').click();
+ const json=await page.locator('#exportOut').inputValue();
+ const backup=JSON.parse(json);
+ expect(backup.version).toBe(4);
+ expect(backup.app).toBe('ppl-tracker');
+ const profile=await browser.newContext();
+ try{
+  const restored=await profile.newPage();
+  await restored.goto('/gym-tracker/');
+  await restored.locator('nav.tabs button[data-tab="more"]').click();
+  await restored.getByRole('button',{name:/Data & Backups/}).click();
+  await restored.locator('#importText').fill(json);
+  await restored.locator('#importMode').selectOption('replace');
+  restored.once('dialog',dialog=>dialog.accept());
+  await restored.locator('[data-act="import"]').click();
+  await restored.reload();
+  await restored.locator('nav.tabs button[data-tab="log"]').click();
+  await expect(restored.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('13');
+ }finally{await profile.close();}
+});
