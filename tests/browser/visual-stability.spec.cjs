@@ -14,7 +14,8 @@ for(const theme of ['light','dark']){
   await expect(nav).toBeVisible();
   await expect(app).toBeVisible();
   const first=await nav.boundingBox();
-  expect(first.width).toBeGreaterThan(250);
+  // Desktop uses a compact 155px rail at this breakpoint, not a full-width bottom bar.
+  expect(first.width).toBeGreaterThan(100);
   expect(first.x).toBeGreaterThanOrEqual(0);
   expect(first.x+first.width).toBeLessThanOrEqual(642);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
