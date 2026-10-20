@@ -1,33 +1,37 @@
-# Screen and flow audit
+# Screen and flow redesign
 
-The audit covered Home, Train, Plan, Progress/History, More/Data & Backups, and the workout/rest timer flow at mobile and desktop sizes.
+The app is organized around doing today's workout, planning the next sessions, and reviewing results. The former Home/Train split and five-tab navigation have been replaced with three destinations.
 
-| Finding | Effect | Change |
+| Destination | Default screen | Secondary actions |
 | --- | --- | --- |
-| Rendering a draft assigned `startedAt` immediately. There were no workout pause/stop controls. | Simply opening the app accumulated training time. | An explicit persisted workout clock stays idle while browsing or editing; Start Workout or the first completed set starts it. Pause, Resume, Stop, and Reset are separate controls. |
-| Workout/rest time lived after the exercise list; the mini rest control only appeared in Train. | Timing required scrolling and disappeared during navigation. | A persistent bottom-right floating button shows elapsed workout time and remaining rest across all five destinations, History, and backups. Its panel controls the named active workout, even when a different workout is being browsed. |
-| The timer competed with fields as an overlay. | Controls could obscure exercise entry on small screens. | The compact button floats above the mobile navigation without reserving a rail or reducing content width. The expanded panel is dismissible with Close or Escape; full-screen rest controls retain keyboard focus. |
-| Train repeated the workout name and showed schedule management, preferences, and library before logging. | Too much setup before the first exercise. | One workout header and Start/Continue action; setup under Workout options. Exercise cards follow immediately, with compact search. Notes/date and advanced metadata are optional disclosures. |
-| Home offered a second Start New Workout action beside Continue Workout, and its schedule action led into Train. | Competing actions and extra navigation. | One primary Start/Continue action with a clearly labelled alternative. Preserve the existing upcoming-schedule disclosure, compact metrics, and recent history; its action leads to Plan. |
-| Plan had a schedule overview but its management action left Plan and opened Train. | Planning tools did not live in their expected destination. | Preserve the schedule overview and calendar. Schedule management and editing stay within Plan, with Back to plan. |
-| Progress showed four filters, repeated empty charts, calculation notes, detailed tables, and body-entry forms together. | Dense first view and a long scroll before useful information. | Filters, calculation notes, detailed totals/trends, and body measurements are disclosures. Training overview and muscle map remain available; populated lift trends remain expanded. |
-| More's Workout settings link only opened Train. | The label did not match the destination. | Workout preferences opens the relevant disclosure; Data & Backups stays under More. |
+| Today | Next workout or saved session, exercise preview, estimated duration, Start/Resume, last completed session | Choose another workout, view plan |
+| Plan | Active routine and upcoming sequence | Manage schedules, expandable calendar, workout templates, searchable exercise library |
+| Progress | Recent sessions, seven-day consistency, lift trends when data exists | History, detailed analytics and filters, muscle map, body measurements |
+| Settings button | Appearance, default weight unit, rest duration, progression preference | Data & Backups |
 
-## Timer behavior and data compatibility
+## Active workout
 
-- Opening the app, changing tabs, searching, or entering reps does not start the workout clock.
-- Starting a different workout pauses the previously running clock. Only one workout runs at a time.
-- Workout pause also pauses its rest countdown. Stop retains elapsed time and all draft data, and clears the current rest countdown. Restart after Stop starts a fresh clock; Reset returns it to idle.
-- Timestamp-based running clocks recover correctly after reload or tab suspension. Paused clocks do not accumulate background time.
-- Completing the first set starts an idle workout clock and its configured rest countdown. Completing a set does not restart a deliberately paused or stopped workout clock.
-- Finishing and saving a session removes that draft's clock after the atomic storage write succeeds. It does not leave a new workout running.
-- Legacy auto-started drafts with entered data reopen paused. Empty legacy drafts reopen idle. The migration preserves draft contents and persists the frozen clock.
-- Backup format remains version 4 with optional `draft.workoutTimer` metadata. Existing v1–v4 backups still import. Older builds may reject backups containing the new optional clock fields; retain a backup before downgrading.
+Start opens a dedicated session with expandable exercise cards. The first unfinished exercise opens by default; users can jump freely between exercises. Each card shows targets, previous performance, weight/reps/completion controls, and a Next exercise action. Substitutions, RIR, set types and defaults are inside Exercise options. Session notes and date are optional.
 
-## Validation
+Finish opens a review of the actual sets that will be saved, including a count of omitted sets. The clock pauses during review. Keep training resumes it; Save session performs the existing atomic session/draft/schedule transaction and displays a saved summary. A failed storage write retains the draft. Navigation away from review invalidates that transient review, preventing a stale review from saving another workout.
 
-The change adds deterministic timer tests and browser coverage for idle browsing, pause/resume/stop/reset, reload recovery, one running clock, completion cleanup, legacy draft migration, and cross-screen floating-timer access. Existing persistence, import/export, offline, navigation, and analytics suites remain in use.
+Templates are separate from sessions. Built-in templates can be customized as copies. Editing a custom template with an active draft also creates a copy so its existing session stays intact. Starting another workout pauses the previous workout and preserves both drafts.
 
-Validated locally: Node regression/timer tests, runtime/downloadable schema parity, service-worker revision, and release consistency passed. The merged Chromium desktop/mobile suite had 93 passes and two existing skips; subsequent timer-flow follow-ups had 12 passes. Desktop WebKit's six selected appearance/reflow/timer checks passed. Mobile WebKit navigation and timer checks passed after moving the schedule Back action above the content (six final timer/flow checks passed). Responsive checks covered 320, 390, 768, 1024, and 1440px in both themes. Firefox could not finish launching in this cloud sandbox and is not counted as verified.
+## Timer and layout
 
-Recent upstream browser Back/Forward navigation, skip link, contextual destructive confirmations, isolated-profile backup restore, and visual/reflow guardrails are preserved. The CI selections now include the core timer-flow checks.
+The bottom-right floating button appears for an active session, remains available across destinations, and displays elapsed workout and remaining rest time. It reserves no horizontal content space and sits above mobile navigation. The control panel opens upward; offline/update messages occupy a separate area beside it. Rest is also shown beside the open exercise.
+
+Browsing, opening the app and entering sets do not start the workout clock. Starting or explicitly resuming a session does. Pause, Resume, Stop and Reset remain available. Stopping retains elapsed time and the draft; restarting after Stop starts a fresh clock. Completing a set starts its configured rest countdown without restarting a stopped workout clock. Saving clears the saved draft's timer after storage succeeds. Running and paused clocks recover across reloads; legacy automatic clocks reopen paused when they contain data.
+
+## Compatibility and verification
+
+Sessions, schedule progression, history editing, offline storage, optimistic concurrency and existing analytics calculations are preserved. Backups remain version 4. The optional `preferences.defaultUnit` field joins the existing optional workout-clock metadata; older v1–v4 backups continue to import. Older application builds may reject backups with new optional fields. Default-unit changes apply to new sessions; existing sets retain their units.
+
+Browser checks cover the new Start → Log → Review → Save → Summary flow, three-tab navigation, template editing, Settings persistence, timer controls, keyboard/modal focus, draft recovery, backups, offline operation and storage conflicts. Responsive checks cover 320, 390, 768 and 1440 pixels in light and dark themes. Existing analytics accuracy and 1,000/10,000-session performance checks are retained.
+
+### Local verification
+
+- Desktop/mobile Chromium: 88 checks passed with two existing profile skips; final workout-flow follow-ups passed all 16 checks, and the subsequent history/clock safeguard selection passed all eight checks.
+- Mobile WebKit: 18 checks passed. The repeated-reload clock check aborts in the native WebKit process (`std::optional` assertion). A real-time reproduction without clock mocking also fails on current main after Home/Train navigation, so it is not specific to the redesigned screens. The failing assertion remains enabled in CI; no forced clicks, disabled assertions, or increased timeouts were introduced.
+- Node regression/timer, backup-schema parity, service-worker revision/upgrade and release-readiness checks passed. The Pages startup/offline smoke script passed against a dedicated local server.
+- Firefox was not run locally; its CI project remains enabled.

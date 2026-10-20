@@ -1,31 +1,12 @@
 const {test,expect}=require('@playwright/test');
-
-// Structural visual guardrails run without environment-specific golden PNGs.
-// Screenshot artifacts are attached for reviewing unexpected visual changes.
-for(const theme of ['light','dark']){
- test('visual stability '+theme+' — shell and Progress at narrow desktop width',async({page},testInfo)=>{
-  await page.setViewportSize({width:640,height:800});
-  await page.emulateMedia({reducedMotion:'reduce'});
-  await page.goto('/gym-tracker/');
-  await page.locator('#theme-preference').selectOption(theme);
-  await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
-  const nav=page.locator('nav.tabs');
-  const app=page.locator('#app');
-  await expect(nav).toBeVisible();
-  await expect(app).toBeVisible();
-  const first=await nav.boundingBox();
-  // Desktop uses a compact 155px rail at this breakpoint, not a full-width bottom bar.
-  expect(first.width).toBeGreaterThan(100);
-  expect(first.x).toBeGreaterThanOrEqual(0);
-  expect(first.x+first.width).toBeLessThanOrEqual(642);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
-  await testInfo.attach('train-'+theme,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'});
-  await nav.locator('[data-tab="progress"]').click();
-  await expect(page.locator('#progress-muscles')).toBeVisible();
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(2);
-  await testInfo.attach('progress-'+theme,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'});
-  await page.goBack();
-  await expect(page.locator('nav.tabs button[data-tab="log"]')).toHaveAttribute('aria-current','page');
-  await expect(nav).toBeVisible();
+const {enterSession}=require('./flow-helpers.cjs');
+for(const width of [320,390,768,1440])for(const theme of ['light','dark']){
+ test(`three-tab screens and session reflow at ${width}px in ${theme}`,async({page},testInfo)=>{
+  await page.setViewportSize({width,height:900});await page.emulateMedia({colorScheme:theme,reducedMotion:'reduce'});await page.goto('/gym-tracker/');
+  for(const tab of ['home','plan','progress']){
+   await page.locator(`nav.tabs [data-tab=${tab}]`).click();await expect(page.locator('.page-intro')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+   if(width===390||width===1440)await page.screenshot({path:testInfo.outputPath(`${tab}-${theme}-${width}.png`)});
+  }
+  await enterSession(page);expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);const dock=await page.locator('.timer-dock').boundingBox();expect(Math.round(width-dock.x-dock.width)).toBe(16);await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();const panel=await page.locator('.timer-popover').boundingBox();expect(panel.x).toBeGreaterThanOrEqual(0);expect(panel.y).toBeGreaterThanOrEqual(0);expect(panel.y+panel.height).toBeLessThan(dock.y);await page.keyboard.press('Escape');
  });
 }

@@ -2,6 +2,13 @@
 
 ## [Unreleased] — v1.3.0 release candidate
 
+### Changed
+- Consolidated Home and Train into Today with explicit Start/Resume and a dedicated workout session.
+- Reduced primary navigation to Today, Plan and Progress; moved appearance, units, rest and backups into Settings.
+- Added a workout review before saving and a completed-session summary. Template editing is separate from session logging.
+- Made detailed analytics and the calendar optional disclosures; kept the floating timer contextual to active sessions and clear of offline notifications.
+- Added optional v4 `preferences.defaultUnit` while preserving older backup imports.
+
 ### Added
 - Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#90).
 - Exercise-specific primary/secondary anatomical previews, selected-muscle contributing-exercise drilldowns, and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.

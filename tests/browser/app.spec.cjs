@@ -1,23 +1,15 @@
-async function openAnalyticsFilters(page){
- const panel=page.locator('.analytics-filters');
- if(await panel.getAttribute('open')===null)await panel.locator('summary').click();
-}
-async function openNested(page,destination){
- const parent=destination==='history'?'progress':'more';
- await page.locator('nav.tabs button[data-tab="'+parent+'"]').click();
- if(destination==='history')await page.locator('#app .subnav button[data-destination="history"]').click();
- else await page.locator('#app button[data-destination="data"]').first().click();
-}
+const {enterSession,library,startTemplate,saveSession,openDetails,openNested}=require('./flow-helpers.cjs');
+async function openAnalyticsFilters(page){await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'.analytics-filters');}
 const {test,expect} = require('@playwright/test');
 test('boots native ES modules at GitHub Pages project subpath and persists drafts', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/gym-tracker/');
-  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
   await expect(page.getByText('Pull A').first()).toBeVisible();
   await openNested(page,'history');
-  await expect(page.getByText('The work adds up.')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Workout history',exact:true})).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
 test('missing program provides recovery interface',async ({page})=>{
@@ -36,7 +28,7 @@ test('migrates legacy history and schedules once without removing localStorage',
   };
   await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),legacy);
   await page.goto('/gym-tracker/');
-  await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
   await expect(page.locator('#status')).toContainText('IndexedDB');
   await expect(page.locator('#app')).toContainText('1');
   const original=await page.evaluate(()=>localStorage.getItem('ppl-tracker-v1'));
@@ -74,7 +66,7 @@ test('malformed localStorage prevents automatic migration rather than overwritin
 });
 
 test('set completion survives reload and retains metadata when saved', async ({page})=>{
-  await page.goto('/gym-tracker/');
+  await page.goto('/gym-tracker/');await enterSession(page);
   const weight=page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).first();
   const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first();
   await weight.fill('70');await reps.fill('10');
@@ -82,10 +74,10 @@ test('set completion survives reload and retains metadata when saved', async ({p
   await done.click();
   await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
   await page.waitForTimeout(500); // Allow debounced draft write to commit before reload.
-  await page.reload();
+  await page.reload();await enterSession(page);
   await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
-  await page.getByRole('button',{name:/Finish & save session/}).click();
-  await expect(page.getByText('The work adds up.')).toBeVisible();
+  await saveSession(page);
+  await expect(page.getByRole('heading',{name:'Workout history',exact:true})).toBeVisible();
   const data=await page.evaluate(async()=>{const q=indexedDB.open('gym-tracker',1);return await new Promise((ok,no)=>{q.onsuccess=()=>{const t=q.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');t.onsuccess=()=>ok(t.result);t.onerror=()=>no(t.error);};q.onerror=()=>no(q.error);});});
   expect(data.sessions).toHaveLength(1);
   expect(data.sessions[0].exercises[0].sets[0].completed).toBe(true);
@@ -93,7 +85,7 @@ test('set completion survives reload and retains metadata when saved', async ({p
 });
 
 test('rest and workout timers recover from reload and support controls',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first().fill('8');
  await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
  await expect(page.locator('[data-timer="rest"]')).toContainText(':');
@@ -101,18 +93,18 @@ test('rest and workout timers recover from reload and support controls',async({p
  await page.getByRole('button',{name:'Pause rest',exact:true}).click();
  await expect(page.getByRole('button',{name:'Resume rest',exact:true})).toBeEnabled();
  await page.waitForTimeout(500);
- await page.reload();
+ await page.reload();await enterSession(page);
  await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
  await expect(page.getByRole('button',{name:'Resume rest',exact:true})).toBeEnabled();
  await page.getByRole('button',{name:'Resume rest',exact:true}).click();
- await page.locator('[data-act="timerskip"]').click();
+ await page.locator('.timer-popover [data-act="timerskip"]').click();
  await expect(page.locator('[data-timer="rest"]')).toHaveText('—');
  await page.locator('[data-act="clockreset"]').click();
  await expect(page.locator('[data-timer="workout"]')).toHaveText('00:00');
 });
 
 test('set types, RIR, and exercise rest survive autosave and session export',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  const type=page.getByRole('combobox',{name:/Lat pulldown set 1 type/});
  await type.selectOption('warmup');
@@ -122,36 +114,36 @@ test('set types, RIR, and exercise rest survive autosave and session export',asy
  await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
  await expect(page.locator('[data-timer="rest"]')).toContainText('02:');
  await page.waitForTimeout(500);
- await page.reload();
+ await page.reload();await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await expect(page.getByRole('combobox',{name:/Lat pulldown set 1 type/})).toHaveValue('warmup');
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/})).toHaveValue('3');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await saveSession(page);
  const data=await page.evaluate(async()=>new Promise((ok,no)=>{const req=indexedDB.open('gym-tracker',1);req.onsuccess=()=>{const get=req.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');get.onsuccess=()=>ok(get.result);get.onerror=()=>no(get.error);};req.onerror=()=>no(req.error);}));
  expect(data.sessions[0].exercises[0].sets[0].type).toBe('warmup');
  expect(data.sessions[0].exercises[0].sets[0].rir).toBe(3);
 });
 
 test('exercise default survives reload and hard-set count excludes warmups', async ({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('135');
  await page.locator('[data-f="increment"]').first().fill('2.5');
  await page.locator('[data-act="incrementunit"]').first().selectOption('kg');
  await page.locator('[data-act="savedefault"]').first().click();
  await page.waitForTimeout(400);
- await page.reload();
+ await page.reload();await enterSession(page);
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('135');
  await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.getByRole('combobox',{name:/Lat pulldown set 1 type/}).selectOption('warmup');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await saveSession(page);
  await expect(page.locator('#app')).toContainText('0 hard sets');
 });
 
 test('invalid exercise increment cannot replace a saved default', async ({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('120');
  await page.locator('[data-f="increment"]').first().fill('2.5');
@@ -160,18 +152,18 @@ test('invalid exercise increment cannot replace a saved default', async ({page})
  await page.locator('[data-f="increment"]').first().fill('101');
  await page.locator('[data-act="savedefault"]').first().click();
  await expect(page.getByText(/Load increment must be/)).toBeVisible();
- await page.reload();
+ await page.reload();await enterSession(page);
  await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
 });
 
 test('global rest default persists and restores for future drafts', async ({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
  await page.getByRole('combobox',{name:'Rest duration'}).selectOption('120');
  await page.locator('.rest-preferences > summary').click();
  await page.getByRole('button',{name:'Save global rest default'}).click();
  await expect(page.getByText('Global rest default saved')).toBeVisible();
- await page.reload();
+ await page.reload();await enterSession(page);
  const snapshot=await page.evaluate(async()=>new Promise((resolve,reject)=>{
   const open=indexedDB.open('gym-tracker',1);
   open.onsuccess=()=>{const req=open.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);};
@@ -181,16 +173,16 @@ test('global rest default persists and restores for future drafts', async ({page
 });
 
 test('exercise defaults stay isolated for same-name rows in a custom workout', async ({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
- await page.locator('.workout-options > summary').click();
+ await library(page);
  await page.locator('[data-act="newworkout"]').click();
  await page.locator('[data-ed="name"]').fill('Two same names');
  await page.getByLabel('Exercise 1 name').fill('Row');
  await page.locator('[data-act="edaddex"]').click();
  await page.getByLabel('Exercise 2 name').fill('Row');
  await page.locator('[data-act="edsave"]').click();
- await expect(page.locator('.workout-hero h2')).toHaveText('Two same names');
+ await expect(page.locator('.template-detail h2')).toHaveText('Two same names');await page.getByRole('button',{name:'Start this workout'}).click();
  await page.locator('.focused-exercise').nth(0).evaluate(el=>{el.open=true});
  await page.locator('.focused-exercise').nth(1).evaluate(el=>{el.open=true});
  await page.locator('.exercise-options').nth(0).evaluate(el=>{el.open=true});
@@ -213,7 +205,7 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
      open.onerror=()=>reject(open.error);
    });
  })).toEqual([true,true]);
- await page.reload();
+ await page.reload();await enterSession(page);
  await page.locator('.focused-exercise').nth(0).evaluate(el=>{el.open=true});
  await page.locator('.focused-exercise').nth(1).evaluate(el=>{el.open=true});
  await page.locator('.exercise-options').nth(0).evaluate(el=>{el.open=true});
@@ -224,52 +216,52 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
 
 test('second tab refuses stale draft overwrite', async ({browser})=>{
  const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
- await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
+ await a.goto('/gym-tracker/');await enterSession(a);await b.goto('/gym-tracker/');await enterSession(b);
  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await a.waitForTimeout(700);
  await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
  await b.waitForTimeout(700);
  await expect(b.locator('#toast')).toContainText('Another tab');
- await a.reload();
+ await a.reload();await enterSession(a);
  await expect(a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
  await context.close();
 });
 test('copying previous sets requires explicit action',async ({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).fill('100');
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
- await page.getByRole('button',{name:/Finish & save session/}).click();
- await page.getByRole('button',{name:/train/i}).first().click();
- await page.locator('.workout-options > summary').click();
- await page.getByRole('button',{name:/Pull A/}).first().click();
+ await saveSession(page);
+ await page.locator('nav.tabs [data-tab=home]').click();
+ await library(page);
+ await startTemplate(page,'Pull A');
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('');
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('100');
 });
 
 test('progression hints can be disabled without changing draft',async({page})=>{
- await page.goto('/gym-tracker/');
- await expect(page.locator('.progression-hint').first()).toContainText('No completed working sets');
- await page.locator('.workout-options > summary').click();
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await openDetails(page,'.focused-exercise:first-of-type .exercise-options');await expect(page.locator('.progression-hint').first()).toContainText('No completed working sets');
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
  const toggle=page.locator('[data-act="progressiontoggle"]');
  await toggle.uncheck();
- await expect(page.locator('.progression-hint').first()).toContainText('disabled');
- await page.waitForTimeout(500);await page.reload();
- await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
+ await enterSession(page);await openDetails(page,'.focused-exercise:first-of-type .exercise-options');await expect(page.locator('.progression-hint').first()).toContainText('disabled');
+ await page.waitForTimeout(500);await page.reload();await enterSession(page);
+ await page.getByRole('button',{name:'Settings',exact:true}).click();await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
 });
 
 test('historical personal records appear without modifying sessions',async({page})=>{
  await page.addInitScript(()=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions:[{id:'pr1',date:'2026-10-01',dayId:'pullA',dayName:'Pull A',type:'pull',createdAt:1,notes:'',exercises:[{name:'Lat pulldown',unit:'lb',sets:[{w:100,r:8,completed:true,type:'working'}]}]}],body:[],custom:[],schedules:[],drafts:{},preferences:{}})));
  await page.goto('/gym-tracker/');
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.getByRole('heading',{name:'Personal records',exact:true})).toBeVisible();
  await expect(page.locator('.pr-summary')).toContainText('Heaviest');
 });
 
 test('dashboard filters training data and displays empty states',async({page})=>{
  await page.goto('/gym-tracker/');
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.getByText('Training analytics')).toBeVisible({timeout:15000});
  await expect(page.getByText('No training sessions match these filters.')).toBeVisible();
  await openAnalyticsFilters(page);
@@ -278,7 +270,7 @@ test('dashboard filters training data and displays empty states',async({page})=>
 });
 
 test('v4 backup round trip preserves paused timer and exercise settings',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await page.locator('[data-f="exrest"]').first().fill('125');
  await page.locator('[data-f="increment"]').first().fill('2.5');
@@ -297,7 +289,7 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
 });
 
 test('v4 import restores preferences, merge and replace obey defaults',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.locator('.exercise-options').first().evaluate(el=>{el.open=true});
  await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
@@ -309,9 +301,9 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
  page.once('dialog',dialog=>dialog.accept());
  await page.locator('[data-act="import"]').click();
  await expect(page.locator('#importResult')).toContainText('Replaced local data');
- await page.reload();
- await page.getByRole('button',{name:/train/i}).first().click();
- await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();
+ await page.reload();await enterSession(page);
+ await page.locator('nav.tabs [data-tab=home]').click();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();await expect(page.locator('[data-act="progressiontoggle"]')).not.toBeChecked();await enterSession(page);await openDetails(page,'.focused-exercise:first-of-type .exercise-options');
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('145');
 });
 
@@ -321,7 +313,7 @@ test('date, workout and exercise filters scope both PR and volume metrics',async
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await openAnalyticsFilters(page);
  await page.locator('[data-analytics="from"]').fill('2026-10-01');
  await openAnalyticsFilters(page);
@@ -339,7 +331,7 @@ test('date, workout and exercise filters scope both PR and volume metrics',async
 test('autosave displays confirmed state and offers recovery on cross-tab conflict',async({browser})=>{
  const context=await browser.newContext();
  const a=await context.newPage(), b=await context.newPage();
- await a.goto('/gym-tracker/');await b.goto('/gym-tracker/');
+ await a.goto('/gym-tracker/');await enterSession(a);await b.goto('/gym-tracker/');await enterSession(b);
  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
@@ -357,7 +349,7 @@ test('large history renders bounded accessible chart elements',async({page})=>{
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
  const started=Date.now();
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.getByText('Training analytics')).toBeVisible({timeout:20000});
  const count=await page.locator('.chart circle').count();
  expect(count).toBeLessThanOrEqual(720);
@@ -388,7 +380,7 @@ for(const count of [1000,10000]){
   await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:90000});
   const hydratedMs=Date.now()-navigationStart;
   const renderStart=Date.now();
-  await page.getByRole('button',{name:/progress/i}).first().click();
+  await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
   await expect(page.locator('.analytics-dashboard')).toBeVisible({timeout:60000});
   const renderMs=Date.now()-renderStart;
   const stats=page.locator('.analytics-dashboard .stat b');
@@ -449,9 +441,9 @@ test('navigation clicked during startup is honored after IndexedDB hydration', a
 });
 
 test('completed session, draft cleanup and cursor survive immediate reload atomically',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  // Confirm the atomic IndexedDB snapshot, rather than assuming a toast also
  // guarantees the newly opened page has hydrated the same persisted revision.
@@ -467,12 +459,12 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
  const saved=await readSnapshot();
  expect(saved.drafts?.pullA).toBeUndefined();
- await page.reload();
+ await page.reload();await enterSession(page);
  await expect.poll(async()=>{const snapshot=await readSnapshot();return snapshot?.sessions?.length??0;}).toBe(1);
  await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
- await page.getByRole('button',{name:/train/i}).first().click();
- await expect(page.locator('.workout-hero h2')).toHaveText('Push A');
+ await page.locator('nav.tabs [data-tab=home]').click();
+ await expect(page.locator('.today-workout h2')).toHaveText('Push A');
 });
 
 test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page})=>{
@@ -496,20 +488,20 @@ test('PWA metadata and all icons resolve under GitHub Pages subpath',async({page
    expect(bytes.readUInt32BE(16)).toBe(width);
    expect(bytes.readUInt32BE(20)).toBe(height);
  }
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
 });
 
 test('service worker caches app shell and preserves draft on offline reload',async({page,context})=>{
- await page.goto('/gym-tracker/');
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
  await page.evaluate(()=>navigator.serviceWorker.ready);
- await page.reload();
+ await page.reload();await enterSession(page);
  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await context.setOffline(true);
- await page.reload();
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await page.reload();await enterSession(page);
+ await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
  await expect(page.locator('#pwa-status')).toContainText(/offline/i);
  await context.setOffline(false);
@@ -517,11 +509,11 @@ test('service worker caches app shell and preserves draft on offline reload',asy
 
 
 test('edit completed workout atomically without advancing schedule or losing metadata',async({page})=>{
- await page.goto('/gym-tracker/');
- await expect(page.locator('.workout-hero')).toBeVisible();
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await expect(page.locator('.session-toolbar')).toBeVisible();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  const snapshot=await page.evaluate(async()=>{
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
@@ -539,7 +531,7 @@ test('edit completed workout atomically without advancing schedule or losing met
  await page.getByRole('button',{name:'Save changes'}).click();
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await expect(page.getByText('Corrected session')).toBeVisible();
- await page.reload();
+ await page.reload();await enterSession(page);
  await openNested(page,'history');
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
@@ -559,10 +551,10 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
  const context=await browser.newContext();
  try{
   const a=await context.newPage();
-  await a.goto('/gym-tracker/');
+  await a.goto('/gym-tracker/');await enterSession(a);
   await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
   await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
-  await a.getByRole('button',{name:/Finish & save session/}).click();
+  await saveSession(a);
   await expect(a.getByText('Session saved')).toBeVisible();
   const b=await context.newPage();
   await b.goto('/gym-tracker/');
@@ -596,7 +588,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await b.reload();
   // Firefox may complete navigation before async IndexedDB hydration. Verify
   // a completed app render before looking for the historical session.
-  await expect(b.locator('.workout-hero')).toBeVisible();
+  await expect(b.locator('.today-workout')).toBeVisible();
   await openNested(b,'history');
   await expect(b.locator('details.hist')).toHaveCount(1);
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
@@ -607,22 +599,22 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
 
 
 test('exercise search filters default workouts without modifying saved drafts',async({page})=>{
- await page.goto('/gym-tracker/');
+ await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');await library(page);await openDetails(page,'.exercise-library');
  const search=page.getByRole('searchbox',{name:'Search exercises'});
- await search.fill('pulldown');
+ await search.fill('Lat pulldown');
  await expect(page.locator('[data-exercise-search-count]')).toContainText('1 of');
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toBeVisible();
+ await expect(page.locator('.exercise-library li:visible')).toHaveCount(1);
  await search.fill('unmatched exercise xyz');
  await expect(page.getByText('No matching exercises.')).toBeVisible();
  await page.getByRole('button',{name:'Clear search'}).click();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await enterSession(page);
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await page.reload();
+ await page.reload();await enterSession(page);
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
 });
 test('workout editor supports searchable rows and exercise suggestions',async({page})=>{
  await page.goto('/gym-tracker/');
- await page.locator('.workout-options > summary').click();
+ await library(page);
  await page.locator('[data-act="newworkout"]').click();
  const exercise=page.getByLabel('Exercise 1 name');
  await exercise.fill('Lat pulldown');
@@ -641,7 +633,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),{sessions,calendarEvents,body:[],custom:[],drafts:{},schedules:[{id:'plan',name:'Weekly',mode:'weekly',days:['pullA',null,'pushA',null,'legsA',null,null],cursor:0}],preferences:{activeScheduleId:'plan'}});
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
- await page.locator('nav.tabs button[data-tab="plan"]').click();
+ await page.locator('nav.tabs button[data-tab="plan"]').click();await openDetails(page,'.calendar-disclosure');
  await expect(page.locator('.training-calendar')).toBeVisible();
  // Navigate to March 2026 without dependence on CI runner local date.
  for(let i=0;i<14;i++){
@@ -662,16 +654,16 @@ test('calendar month/week navigation, status labels and exact adherence survive 
  await page.getByRole('button',{name:'Next month'}).click();
  await expect(page.locator('.calendar-day')).toHaveCount(7);
  await page.reload();
- await page.locator('nav.tabs button[data-tab="plan"]').click();
+ await page.locator('nav.tabs button[data-tab="plan"]').click();await openDetails(page,'.calendar-disclosure');
  await expect(page.locator('.training-calendar')).toBeVisible();
 });
 
 test('known exercises carry semantic IDs while custom names remain valid after reload',async({page})=>{
- await page.goto('/gym-tracker/');
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  const snapshot=()=>page.evaluate(async()=>new Promise((resolve,reject)=>{
   const open=indexedDB.open('gym-tracker',1);
@@ -683,7 +675,7 @@ test('known exercises carry semantic IDs while custom names remain valid after r
  }));
  const before=await snapshot();
  expect(before.sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
- await page.reload();
+ await page.reload();await enterSession(page);
  await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
  expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
@@ -697,7 +689,7 @@ test('muscle analytics updates after session corrections and excludes warmups',a
  await page.addInitScript(v=>localStorage.setItem('ppl-tracker-v1',JSON.stringify(v)),fixture);
  await page.goto('/gym-tracker/');
  await expect(page.locator('#status')).toContainText('IndexedDB',{timeout:20000});
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.locator('.muscle-analytics')).toBeVisible();
  await expect(page.locator('.muscle-analytics')).toContainText('2');
  await expect(page.locator('.muscle-analytics')).toContainText('Primary');
@@ -709,9 +701,9 @@ test('muscle analytics updates after session corrections and excludes warmups',a
  await page.getByRole('button',{name:'Edit session'}).click();
  await page.getByRole('spinbutton',{name:/Barbell bench press set 1 reps/}).fill('12');
  await page.getByRole('button',{name:'Save changes'}).click();
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.locator('.muscle-analytics')).toContainText('1200');
  await page.reload();
- await page.getByRole('button',{name:/progress/i}).first().click();
+ await page.getByRole('button',{name:/progress/i}).first().click();await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'[data-disclosure=muscles]');
  await expect(page.locator('.muscle-analytics')).toContainText('1200');
 });

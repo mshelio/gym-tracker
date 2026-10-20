@@ -6,7 +6,7 @@ A modern, mobile-friendly workout journal for GitHub Pages. PPL is the starter s
 
 ## v1.3.0 muscle visualizations
 
-**Progress → Muscle-group volume** displays detailed interactive front/back anatomy, using credited primary hard sets or primary volume as a relative heatmap. Choose a muscle by pointer, touch or keyboard (Tab then Enter/Space) to inspect precise primary and separately credited secondary sets and volumes. The exact-values table is an accessible fallback; unknown exercises remain unclassified. In **Train**, expand **Muscles worked** for primary and secondary exercise targets. These diagrams illustrate training attribution, not actual measured muscle activation, growth or recovery. The SVG geometry is adapted from `vulovix/body-muscles`, Apache-2.0; see `assets/vendor/body-muscles/LICENSE` and `NOTICE`. All assets are bundled locally for offline use.
+**Progress → Muscle-group volume** displays detailed interactive front/back anatomy, using credited primary hard sets or primary volume as a relative heatmap. Choose a muscle by pointer, touch or keyboard (Tab then Enter/Space) to inspect precise primary and separately credited secondary sets and volumes. The exact-values table is an accessible fallback; unknown exercises remain unclassified. During a workout, expand **Exercise options → Muscles worked** for primary and secondary exercise targets. These diagrams illustrate training attribution, not actual measured muscle activation, growth or recovery. The SVG geometry is adapted from `vulovix/body-muscles`, Apache-2.0; see `assets/vendor/body-muscles/LICENSE` and `NOTICE`. All assets are bundled locally for offline use.
 
 ## Files and setup
 
@@ -29,12 +29,12 @@ The application is local-first. IndexedDB is authoritative after first-run migra
 
 ## Flexible workout schedules
 
-In **Train → Manage schedules**, edit the PPL starter or create your own schedule:
+In **Plan → Manage schedules**, edit the PPL starter or create your own schedule:
 
 - **Repeating sequence:** select any workouts, reorder them with the arrow buttons, repeat workouts and insert rest days. Choose the next step when saving. Saving the currently scheduled workout advances the sequence. Logging another workout leaves its progress unchanged. Use **Mark rest complete** or **Skip scheduled day** to advance without adding a session.
 - **Weekly plan:** assign workouts or rest to Monday–Sunday. The highlighted day follows your device's local calendar; logging sessions does not move the plan forward.
 
-Create workouts using **+ Custom** in Train, then select them in your schedule. Upper/lower, full-body and other splits can use the Other workout category. Switch schedules using the active-schedule dropdown; each repeating schedule keeps its own progress. The workout library remains available regardless of the active schedule.
+Create workouts using **+ New workout** in Plan → Workouts & exercises, then select them in your schedule. Upper/lower, full-body and other splits can use the Other workout category. Switch schedules using the active-schedule dropdown; each repeating schedule keeps its own progress. The workout library remains available regardless of the active schedule.
 
 A custom workout used by a schedule must be removed from that schedule before deletion. Deleting historical sessions does not rewind schedule progress. At least one schedule and one training day per schedule are required.
 
@@ -174,7 +174,7 @@ History → expand a session → **Edit session** allows corrections to its date
 
 ## Exercise search (#65)
 
-The Train screen and custom workout editor have a local **Search exercises** field. It filters visible exercise cards or rows without changing the underlying workout, saved draft, schedule or exercise identity. **Clear search** restores every item; an empty-results message and live result count support keyboard and mobile use. When entering a custom workout exercise or extra exercise, browser suggestions come from the existing starter and custom exercise library, with no network dependency. Free-text custom names remain supported. Backup v4 format and IndexedDB storage are unchanged.
+The exercise library under Plan and the custom workout editor have a local **Search exercises** field. It filters visible exercises or editor rows without changing the underlying workout, saved draft, schedule or exercise identity. **Clear search** restores every item; an empty-results message and live result count support keyboard and mobile use. When entering a custom workout exercise or extra exercise, browser suggestions come from the existing starter and custom exercise library, with no network dependency. Free-text custom names remain supported. Backup v4 format and IndexedDB storage are unchanged.
 
 
 ### v1.1.0 final exercise-default compatibility
@@ -200,8 +200,10 @@ In **Progress → Muscle-group volume**, completed working sets contribute exact
 
 ### Workout flow and floating timer
 
-Train keeps exercise logging in focus. Use **Workout options** to choose a different workout or adjust preferences, and **Plan** to manage schedules and calendar days. Search is available above the exercise cards; notes/date and advanced exercise settings expand when needed. Progress keeps filters, detailed calculations, and body measurements behind disclosures.
+The three main tabs are **Today**, **Plan**, and **Progress**. Today shows your next workout or saved session, with one Start/Resume action. Plan owns schedules, workout templates and the searchable exercise library. Progress starts with consistency and recent sessions; detailed analytics, muscle maps and body measurements expand when needed. Use the header Settings button for appearance, default units, rest preferences and Data & Backups.
 
-The floating timer stays at the bottom right on every screen, above the mobile navigation. It overlays the page without reserving content width, and its controls open upward. Opening the app or editing a draft does not start it. **Start Workout** (or completing the first set) starts the clock. Open the timer control to **Pause**, **Resume**, **Stop timer**, or **Reset timer**, and to start, pause, or skip rest. Stop keeps the elapsed time and workout draft; Restart begins a fresh timer. Only one workout clock runs at a time. Paused and running clocks survive reloads, and saving a completed session clears its timer. Legacy automatically started clocks reopen paused when a draft contains data; empty drafts reopen idle.
+Starting a workout opens the session screen. Log weight/reps and complete sets; exercise substitutions, set type, RIR and defaults are under **Exercise options**. **Finish workout** pauses timing and opens a review. **Save session** records the workout and displays a summary; **Keep training** returns to the draft. Templates are edited separately, and editing a template with an active draft creates a copy.
 
-Backups remain version 4 with optional workout-clock metadata. Existing v1–v4 backups import as before; older application builds may reject newly exported timer fields. See [the screen and flow audit](docs/ux-audit.md) for the findings and changes.
+The floating timer stays at the bottom right during an active session, above mobile navigation, without reducing content width. Opening the app does not start it. Start/Resume is explicit; completing a set starts its rest countdown. The control opens upward with Pause, Resume, Stop, Reset and Finish actions. Stopping preserves elapsed time and draft contents. Running/paused clocks survive reloads; saving a session clears its timer. Empty legacy drafts remain idle, and legacy automatic clocks with entered data reopen paused.
+
+Backups remain version 4 with optional workout-clock metadata and `preferences.defaultUnit`. Existing v1–v4 backups import as before; older builds may reject newly exported optional fields. See [the screen and flow audit](docs/ux-audit.md) for the final structure and compatibility details.

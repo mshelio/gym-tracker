@@ -41,8 +41,12 @@ async function verify(){
   }
   const navigation=await page.goto(base,{waitUntil:'domcontentloaded',timeout:20000});
   if(navigation.status()!==200)throw Error('Document navigation failed');
-  await page.getByText('Make every rep count.').waitFor({timeout:15000});
+  await page.locator('.page-intro h1').waitFor({timeout:15000});
   await page.getByText('Pull A').first().waitFor({timeout:15000});
+  // PR checks can run before Pages deploys the new navigation. Exercise the
+  // live version's real flow; release-match checks still require the exact shell.
+  const taskFlow=await page.locator('nav.tabs button').count()===3;
+  await page.getByRole('heading',{name:taskFlow?'Today':/^(Train|Make every rep count\.)$/,exact:true}).waitFor();
 
   // Only compare deployment with checkout on push/deployment events; PR and
   // scheduled runs can legitimately point to different source revisions.
@@ -68,17 +72,20 @@ async function verify(){
   });
   if(cache.name!==actualRevision||!cache.keys.includes(new URL('js/app.js',root).href))
    throw Error('Active cache does not contain expected release app shell');
+  if(taskFlow)await page.getByRole('button',{name:'Start workout',exact:true}).click();
   await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
   await page.locator('[data-save-status][data-state="saved"]').waitFor({timeout:12000});
   // Offline browser profile is disposable: this never touches a user's data.
   await context.setOffline(true);
   await page.reload();
-  await page.getByText('Make every rep count.').waitFor({timeout:15000});
+  await page.getByRole('heading',{name:taskFlow?'Today':/^(Train|Make every rep count\.)$/,exact:true}).waitFor({timeout:15000});
+  if(taskFlow)await page.getByRole('button',{name:'Resume workout',exact:true}).click();
   if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='9')
    throw Error('Draft lost during production offline reload');
   await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
   await page.locator('[data-save-status][data-state="saved"]').waitFor({timeout:12000});
   await page.reload();
+  if(taskFlow)await page.getByRole('button',{name:'Resume workout',exact:true}).click();
   if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
    throw Error('Edited offline draft was not durable');
   await context.setOffline(false);
@@ -87,10 +94,10 @@ async function verify(){
   if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
    throw Error('Service-worker update check discarded an active draft');
   console.log('PASS deployed PWA: scope, cache revision, offline startup, IndexedDB draft and update check');
-  // History is nested under Progress in the five-tab navigation.
+  // History is nested under Progress in the three-tab navigation.
   await page.locator('nav.tabs button[data-tab="progress"]').click();
   await page.locator('#app .subnav button[data-destination="history"]').click();
-  await page.getByText('The work adds up.').waitFor({timeout:10000});
+  await page.getByRole('heading',{name:taskFlow?'Workout history':'The work adds up.',exact:true}).waitFor({timeout:10000});
   if(failures.length)throw Error('Browser errors: '+failures.join('; '));
   console.log('PASS production startup, navigation and native modules on isolated profile');
   await context.close();
