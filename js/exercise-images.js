@@ -320,8 +320,8 @@ export function exerciseThumbnail(name){
  const photo=exerciseImageFor(name);
  return photo?`<img class="exercise-thumbnail" src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}${photo.note?' (related movement)':''}" width="64" height="64" loading="lazy" decoding="async">`:'<span class="exercise-photo-unavailable">No photo</span>';
 }
-export function exercisePhotoDetail(name){
+export function exercisePhotoDetail(name, expanded=false){
  const photo=exerciseImageFor(name);
  if(!photo)return '<p class="muted">No matching photo available for this exercise.</p>';
- return `<details class="exercise-photo-detail"><summary>View exercise photo</summary><img src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}" width="360" height="360" loading="lazy" decoding="async">${photo.note?`<p class="muted">${esc(photo.note)}</p>`:''}<p class="muted">Photo: <a href="https://github.com/yuhonas/free-exercise-db/tree/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/${photo.id}" target="_blank" rel="noopener noreferrer">Free Exercise DB</a></p></details>`;
+ return `<details class="exercise-photo-detail" ${expanded?"open":""}><summary>Exercise photo</summary><img src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}" width="360" height="360" loading="lazy" decoding="async">${photo.note?`<p class="muted">${esc(photo.note)}</p>`:''}<p class="muted">Photo: <a href="https://github.com/yuhonas/free-exercise-db/tree/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/${photo.id}" target="_blank" rel="noopener noreferrer">Free Exercise DB</a></p></details>`;
 }
