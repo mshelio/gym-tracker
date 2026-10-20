@@ -12,9 +12,10 @@ test('exercise photos follow substitutions and remain available offline',async({
  await first.locator('.exercise-options>summary').click();
  await first.getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/V-Bar_Pulldown/);
- await first.locator('.exercise-photo-detail>summary').click();
+ await expect(first.locator('.exercise-photo-detail')).toHaveAttribute('open','');
  const photo=first.locator('.exercise-photo-detail>img');
  await expect(photo).toBeVisible();
+ expect((await photo.boundingBox()).width).toBeGreaterThan(250);
  await expect.poll(()=>photo.evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
  await page.evaluate(()=>navigator.serviceWorker.ready);
  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBe(true);
