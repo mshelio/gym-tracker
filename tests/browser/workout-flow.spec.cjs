@@ -41,7 +41,7 @@ test('browsing does not start a timer; explicit pause, resume, stop and reset su
  await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
 });
 
-test('left timer stays visible across screens and controls the active workout and rest',async({page})=>{
+test('floating timer stays visible across screens and controls the active workout and rest',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  await page.clock.install();
  await page.goto('/gym-tracker/');
@@ -53,8 +53,15 @@ test('left timer stays visible across screens and controls the active workout an
   await page.locator(`nav.tabs button[data-tab="${tab}"]`).click();
   await expect(dock(page)).toBeInViewport();
   const box=await dock(page).boundingBox();
-  expect(box.x).toBeLessThan(20);
-  expect(box.y).toBeLessThan(500);
+  expect(390-(box.x+box.width)).toBeLessThanOrEqual(20);
+  const nav=await page.locator('nav.tabs').boundingBox();
+  expect(box.y+box.height).toBeLessThan(nav.y);
+  expect(nav.y-(box.y+box.height)).toBeLessThan(24);
+  const padding=await page.locator('#app').evaluate(el=>({left:parseFloat(getComputedStyle(el).paddingLeft),right:parseFloat(getComputedStyle(el).paddingRight)}));
+  expect(padding.left).toBe(padding.right);
+  const before=box.y;
+  await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+  expect((await dock(page).boundingBox()).y).toBeCloseTo(before,0);
  }
  const panel=await openClock(page);
  await expect(panel.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();

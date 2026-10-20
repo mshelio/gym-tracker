@@ -24,9 +24,9 @@ jobs:
       - name: Browser tests (${{ matrix.project }})
         run: |
           if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
-            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown|Phase 3 Home disclosure and Progress anchors|Phase 4 Plan and More|rest timer dialog traps keyboard focus|workout save validation announces|keyboard skip link bypasses navigation|browsing does not start|left timer stays|single workout|legacy auto-started|setup stays optional' --timeout=20000 --workers=1 --retries=1 --reporter=line
+            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and five-tab navigation|Phase 1 nested history and backups|mobile rest countdown|Phase 3 Home disclosure and Progress anchors|Phase 4 Plan and More|rest timer dialog traps keyboard focus|workout save validation announces|keyboard skip link bypasses navigation|browsing does not start|floating timer stays|single workout|legacy auto-started|setup stays optional' --timeout=20000 --workers=1 --retries=1 --reporter=line
           elif [ "${{ matrix.project }}" = "firefox" ] || [ "${{ matrix.project }}" = "webkit" ]; then
-            npm run test:browser -- --project=${{ matrix.project }} --grep 'System, Light and Dark appearance|floating mobile navigation|reduced motion preserves|200-percent-equivalent desktop viewport|browsing does not start|left timer stays' --workers=1 --retries=1 --reporter=line
+            npm run test:browser -- --project=${{ matrix.project }} --grep 'System, Light and Dark appearance|floating mobile navigation|reduced motion preserves|200-percent-equivalent desktop viewport|browsing does not start|floating timer stays' --workers=1 --retries=1 --reporter=line
           else
             npm run test:browser -- --project=${{ matrix.project }} --reporter=line
           fi
