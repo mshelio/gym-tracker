@@ -1,3 +1,4 @@
+const {enterSession,saveSession}=require('./flow-helpers.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
 const workerSource=fs.readFileSync(path.join(__dirname,'../../sw.js'),'utf8');
@@ -29,12 +30,12 @@ test('offline logging, draft persistence and session completion survive reload',
  await controlled(page);
  await context.setOffline(true);
  await page.reload();
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.reload();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
- await page.getByRole('button',{name:/Finish & save session/}).click();
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  await page.reload();
  await page.locator('nav.tabs button[data-tab="progress"]').click();
@@ -46,12 +47,12 @@ test('program fetch failure does not discard cached workout configuration',async
  await controlled(page);
  await page.route('**/ppl-default-workouts.json',route=>route.abort());
  await page.reload();
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
  await expect(page.getByText('Pull A').first()).toBeVisible();
 });
 test('old worker remains active until an explicit update and drafts survive',async({page})=>{
  await controlled(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('7');
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('7');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  const before=await page.evaluate(()=>navigator.serviceWorker.controller.scriptURL);
  const reg=await page.evaluate(()=>navigator.serviceWorker.getRegistration());
@@ -60,21 +61,21 @@ test('old worker remains active until an explicit update and drafts survive',asy
  const preserved=await page.evaluate(async(currentShell)=>{const cache=await caches.open(currentShell);return !!(await cache.match(new URL('./js/app.js',location.href).href))},currentShell);
  expect(preserved).toBe(true);
  await page.reload();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('7');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('7');
 });
 test('mobile PWA viewport and offline startup',async({page,context,isMobile})=>{
  test.skip(!isMobile,'Mobile profile only');
  await controlled(page);
  await context.setOffline(true);
  await page.reload();
- await expect(page.getByRole('heading',{name:'Train',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth)).toBeLessThanOrEqual(2);
  await context.setOffline(false);
 });
 
 test('service-worker upgrade waits for approval and removes stale shell caches',async({page})=>{
  await controlled(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('11');
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('11');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.evaluate(async()=>{
   const stale=await caches.open('gt-shell-stale');
@@ -92,15 +93,15 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
  expect(before.oldCache).toBe(true);
  await page.locator('#pwa-status .pwa-status-action').click();
  await expect.poll(async()=>{try{return await page.evaluate(async()=>!(await caches.has('gt-shell-stale')))}catch{return false}},{timeout:15000}).toBe(true);
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
 });
 
 test('v4 backup restores saved draft into a separate browser profile',async({page,browser})=>{
  await page.goto('/gym-tracker/');
- const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/});
+ await enterSession(page);const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/});
  await reps.fill('13');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await page.locator('nav.tabs button[data-tab="more"]').click();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
  await page.getByRole('button',{name:/Data & Backups/}).click();
  await page.locator('[data-act="export"]').click();
  const json=await page.locator('#exportOut').inputValue();
@@ -113,7 +114,7 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
  try{
   const restored=await profile.newPage();
   await restored.goto('/gym-tracker/');
-  await restored.locator('nav.tabs button[data-tab="more"]').click();
+  await restored.getByRole('button',{name:'Settings',exact:true}).click();
   await restored.getByRole('button',{name:/Data & Backups/}).click();
   await restored.locator('#importText').fill(json);
   await restored.locator('#importMode').selectOption('replace');
@@ -125,7 +126,7 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
   const immediateBackup=JSON.parse(await restored.locator('#exportOut').inputValue());
   expect(immediateBackup.drafts).toEqual(backup.drafts);
   await restored.reload();
-  await restored.locator('nav.tabs button[data-tab="more"]').click();
+  await restored.getByRole('button',{name:'Settings',exact:true}).click();
   await restored.getByRole('button',{name:/Data & Backups/}).click();
   await restored.locator('[data-act="export"]').click();
   const restoredBackup=JSON.parse(await restored.locator('#exportOut').inputValue());

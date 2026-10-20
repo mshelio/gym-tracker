@@ -25,11 +25,9 @@ export function initTheme(){
  const query=matchMedia('(prefers-color-scheme: dark)');
  const update=()=>{if(themePreference()==='system')applyTheme('system');};
  query.addEventListener?.('change',update);
- const choice=document.getElementById('theme-preference');
- if(choice){
-  choice.value=themePreference();
-  choice.addEventListener('change',()=>{choice.value=setTheme(choice.value);});
- }
+ document.addEventListener('change',event=>{
+  if(event.target.id==='theme-preference')event.target.value=setTheme(event.target.value);
+ });
  return ()=>query.removeEventListener?.('change',update);
 }
 initTheme();

@@ -25,6 +25,8 @@ const timerTools=createTimers();
 let timerTicker=null;
 let timerControlsOpen=false, timerWorkoutId=null;
 let analyticsFiltersOpen=false;
+let templateId=null, sessionReview=null, savedSummary=null;
+const openDisclosures=new Set();
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
 let programSource = "JSON file";
@@ -70,7 +72,7 @@ const $ = s => document.querySelector(s);
 let toastTimer;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 /* ---------- browser storage ---------- */
-const preferences = () => ({globalRestSeconds:S.globalRestSeconds||90,progressionEnabled:S.progressionEnabled!==false,bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
+const preferences = () => ({...(S.defaultUnit?{defaultUnit:S.defaultUnit}:{}),globalRestSeconds:S.globalRestSeconds||90,progressionEnabled:S.progressionEnabled!==false,bodyUnit:S.bodyUnit || "kg",selectedWorkoutId:S.dayId || null,progressExercise:S.progressEx || null,activeScheduleId:S.activeScheduleId || null,exerciseDefaults:S.exerciseDefaults||{}});
 const settingKey=(e,i,group="",dayId=S.dayId)=>exerciseKey(e.name,e.exerciseId||("legacy:"+dayId+":"+(group==="x"?"extra:":"planned:")+i));
 function settingFor(e,i,group="",dayId=S.dayId){
  const key=settingKey(e,i,group,dayId),entries=S.exerciseDefaults||{};
@@ -106,7 +108,7 @@ function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
   const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
-  S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId();
+  S.defaultUnit=l.preferences.defaultUnit;S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId();
   const migratedClocks=Object.keys(S.drafts).filter(id=>getDay(id)&&!S.drafts[id].workoutTimer);
   Object.keys(S.drafts).filter(id=>getDay(id)).forEach(id=>getDraft(id));
   if(migratedClocks.length&&!await writeLocal())setSaveStatus("error");
@@ -197,7 +199,7 @@ function newSchedule(mode){
   S.scheduleEditing={id:uid("schedule"),name:"",mode,days:mode==="weekly"?Array(7).fill(null):[allDays()[0].id],cursor:0};S.manageSchedules=false;render();
 }
 function viewScheduleManager(){
-  return `<div class="section stack"><button class="btn small schedule-back" data-act="closeschedules">← Back to plan</button><h2>Your schedules</h2><p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts with + Custom in Train, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
+  return `<div class="section stack"><button class="btn small schedule-back" data-act="closeschedules">← Back to plan</button><h2>Your schedules</h2><p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts under Plan → Workouts & exercises, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
 }
 function viewScheduleEditor(){
   const s=S.scheduleEditing;
@@ -242,58 +244,75 @@ function getDraft(dayId){
   }
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=S.globalRestSeconds||90;
   d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"",dayId)?.restSeconds; });
-  d.extra.forEach((e,i) => { if (!e.unit) e.unit = day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"x",dayId)?.restSeconds; });
+  d.extra.forEach((e,i) => { if (!e.unit) e.unit = S.defaultUnit || day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"x",dayId)?.restSeconds; });
   return d;
 }
 function lastFor(name){
   for (const s of S.sessions) { const e = (s.exercises||[]).find(x => x.name === name); if (e && e.sets && e.sets.length) return { date:s.date, sets:e.sets, unit: exUnit(e, s) }; }
   return null;
 }
-function unitFor(name, day){ const l = name ? lastFor(name) : null; return l ? l.unit : ((day && day.unit) || DEFAULT_UNIT); }
+function unitFor(name, day){ const l = name ? lastFor(name) : null; return S.defaultUnit || (l ? l.unit : ((day && day.unit) || DEFAULT_UNIT)); }
 function unitSeg(g, i, u){ return `<span class="seg" role="group" aria-label="Weight unit">${["kg","lb"].map(x => `<button type="button" data-act="unit" data-g="${g}" data-i="${i}" data-u="${x}" aria-pressed="${u===x}">${x}</button>`).join("")}</span>`; }
 function draftHasData(d){ return [...d.ex, ...(d.extra||[])].some(e => e.sets.some(s => String(s.w).trim() !== "" || String(s.r).trim() !== "")) || (d.notes||"").trim() !== ""; }
 
+function activeWorkoutId(){
+ const entries=Object.entries(S.drafts).filter(([id,d])=>getDay(id)&&d&&Array.isArray(d.ex));
+ return entries.find(([,d])=>d.workoutTimer?.state==="running")?.[0]
+  ||entries.find(([,d])=>d.workoutTimer?.state==="paused"||d.workoutTimer?.state==="stopped"||draftHasData(d))?.[0];
+}
+function recentSessionRows(limit=3){
+ return sortSessions(S.sessions).slice(0,limit).map(s=>`<button class="recent-session-row" data-act="opensession" data-id="${esc(s.id)}"><span><strong>${esc(s.dayName)}</strong><small>${esc(fmtDate(s.date))} · ${s.exercises.reduce((n,e)=>n+e.sets.length,0)} sets</small></span>${icon("arrow")}</button>`).join("");
+}
 function viewHome(){
- const scheduled=nextSlot(), selected=S.dayId&&getDay(S.dayId)?S.dayId:nextDayId();
- const drafts=Object.entries(S.drafts).filter(([id,d])=>getDay(id)&&d&&Array.isArray(d.ex)&&draftHasData(d));
- const resume=drafts.find(([id])=>id===selected)||drafts[0];
- const resumeDay=resume?getDay(resume[0]):null;
- const thisWeek=new Date(today()+"T00:00:00");thisWeek.setDate(thisWeek.getDate()-(thisWeek.getDay()+6)%7);
- const weekStart=[thisWeek.getFullYear(),String(thisWeek.getMonth()+1).padStart(2,"0"),String(thisWeek.getDate()).padStart(2,"0")].join("-");
- const sessionsThisWeek=S.sessions.filter(x=>x.date>=weekStart&&x.date<=today()).length;
- const plan=activeSchedule();
- const planned=plan?plan.days.filter(Boolean).length:0;
- const nextWorkout=resumeDay || getDay(scheduled) || getDay(nextDayId());
- const weekSessions=S.sessions.filter(x=>x.date>=weekStart&&x.date<=today());
- const monthSessions=S.sessions.filter(x=>x.date.slice(0,7)===today().slice(0,7));
- const volume=analyticsSummary(weekSessions,{unit:DEFAULT_UNIT,includeExercisePoints:false}).volume || 0;
- const weekDays=Array.from({length:7},(_,i)=>{const date=new Date(thisWeek);date.setDate(date.getDate()+i);const key=[date.getFullYear(),String(date.getMonth()+1).padStart(2,"0"),String(date.getDate()).padStart(2,"0")].join("-");return `<span class="week-day ${weekSessions.some(x=>x.date===key)?"trained":""} ${key===today()?"today":""}"><i></i><span>${["M","T","W","T","F","S","S"][i]}</span></span>`;}).join("");
- const preview=nextWorkout?.ex.slice(0,3).map(e=>`<li><span><i class="type-dot"></i>${esc(e.n)}</span><span class="mono">${e.s} × ${e.lo}–${e.hi}</span></li>`).join("")||"";
- const recent=sortSessions(S.sessions).slice(0,3).map(x=>`<div class="home-recent-row"><i class="type-dot" style="--accent:var(--${esc(getDay(x.dayId)?.type||"other")})"></i><div><strong>${esc(x.dayName||getDay(x.dayId)?.name||"Workout")}</strong><span class="muted">${esc(fmtDate(x.date))} · ${(x.exercises||[]).length} exercises</span></div>${icon("arrow")}</div>`).join("");
- return `<section class="home-dashboard" aria-label="Home dashboard">
- <div class="home-primary ${esc(nextWorkout?.type||"other")}"><div class="home-hero-heading"><div><p class="eyebrow">${resumeDay?"IN PROGRESS":"UP NEXT"}${plan?" · "+esc(plan.name):""}</p><h2>${esc(nextWorkout?.name||"Your next workout")}</h2><p class="muted">${resumeDay?"Your locally saved draft is waiting.":scheduled==null?"Rest day. Train when you’re ready.":`${nextWorkout?.ex.length||0} exercises · ${nextWorkout?.ex.reduce((n,e)=>n+e.s,0)||0} working sets`}</p></div><span class="workout-tag ${esc(nextWorkout?.type||"other")}">${esc(nextWorkout?.type||"workout")}</span></div>
- <ul class="home-exercise-preview">${preview}</ul>${nextWorkout?.ex.length>3?`<p class="home-more muted">+ ${nextWorkout.ex.length-3} more</p>`:""}
- <div class="home-actions">${resumeDay?`<button type="button" class="btn primary" data-act="homecontinue" data-id="${esc(resume[0])}">Continue Workout ${icon("arrow")}</button>`:""}
- <button type="button" class="btn ${resumeDay?"":"primary"}" data-act="${resumeDay?"homechoose":"homestart"}">${resumeDay?"Choose another workout":"Start New Workout"} ${icon("arrow")}</button></div></div>
- <details class="home-cycle home-secondary" aria-label="Schedule preview"><summary>Upcoming schedule <span class="muted">View planned days</span></summary><div class="home-section-head"><p class="eyebrow">${esc(plan?.name||"Your schedule")}</p><button class="btn small" data-act="homeschedule">View schedule →</button></div><div class="schedule-preview">${plan?.days.map((id,i)=>`<span class="schedule-step ${i===scheduleIndex(plan)?"current":""}"><i class="type-dot" style="--accent:var(--${esc(getDay(id)?.type||"other")})"></i>${esc(id?getDay(id)?.name||"Workout":"Rest")}</span>`).join("")||""}</div></details>
- <div class="home-metrics"><section class="section home-week"><p class="eyebrow">THIS WEEK</p><div class="home-stat-value"><strong>${sessionsThisWeek}</strong><span class="muted">sessions</span></div><div class="week-days" aria-label="Days trained this week">${weekDays}</div><div class="home-progress" role="progressbar" aria-label="Weekly workout progress" aria-valuemin="0" aria-valuemax="${Math.max(planned,1)}" aria-valuenow="${Math.min(sessionsThisWeek,Math.max(planned,1))}"><span style="width:${planned?Math.min(100,Math.round(sessionsThisWeek/planned*100)):0}%"></span></div></section>
- <section class="section"><p class="eyebrow">${esc(new Date(today()+"T12:00:00").toLocaleDateString(undefined,{month:"long"}))}</p><div class="home-stat-value"><strong>${monthSessions.length}</strong><span class="muted">sessions</span></div><p class="eyebrow home-volume-label">VOLUME THIS WEEK</p><span class="mono home-volume">${Math.round(volume).toLocaleString()} <small>${esc(DEFAULT_UNIT)}·reps</small></span></section></div>
- <section class="home-recent"><div class="home-section-head"><h3>Recent sessions</h3><button class="btn small" data-act="homehistory">See all →</button></div><div class="section">${recent||'<p class="muted">Your story starts with your first session.</p>'}</div></section>
- </section>`;
+ const active=activeWorkoutId(),day=getDay(active||nextSlot()),last=sortSessions(S.sessions)[0];
+ const sets=day?.ex.reduce((n,e)=>n+e.s,0)||0;
+ return `<section class="today-dashboard" aria-label="Today dashboard"><section class="section today-workout">
+ <p class="eyebrow">${active?"YOUR SESSION":day?"UP NEXT":"RECOVERY DAY"}</p><h2>${esc(day?.name||"Time to recover")}</h2>
+ <p class="muted">${active?"Your session is saved on this device. Continue when you’re ready.":day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:"Rest is part of your plan. Your next workout will be here when you’re ready."}</p>
+ ${day?`<ul class="today-preview">${day.ex.slice(0,3).map(e=>`<li>${esc(e.n)} <span>${e.s} × ${e.lo}–${e.hi}</span></li>`).join("")}</ul>${day.ex.length>3?`<p class="muted">+ ${day.ex.length-3} more exercises</p>`:""}<button class="btn primary" data-act="${active?'homecontinue':'homestart'}" data-id="${esc(day.id)}">${active?'Resume workout':'Start workout'} ${icon("arrow")}</button>`:""}
+ <button class="btn" data-act="homechoose">Choose another workout</button>${!day&&activeSchedule()?.mode==="cycle"?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':""}</section>
+ <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
+ <button class="btn today-plan-link" data-destination="plan">View your training plan →</button></section>`;
+}
+function viewLibrary(){
+ if(S.editing)return viewEditor();
+ if(templateId&&getDay(templateId)){
+  const day=getDay(templateId);
+  return `<button class="btn small" data-act="closetemplate">← Workout templates</button><section class="section template-detail"><p class="eyebrow">WORKOUT TEMPLATE</p><h2>${esc(day.name)}</h2><p class="muted">Starting a session keeps this reusable template unchanged.</p><ol class="template-exercises">${day.ex.map(e=>`<li><strong>${esc(e.n)}</strong><span>${e.s} sets · ${e.lo}–${e.hi} reps</span></li>`).join("")}</ol><div class="row-actions"><button class="btn primary" data-act="starttemplate" data-id="${esc(day.id)}">Start this workout</button><button class="btn" data-act="${BASE_DAY[day.id]?'copytemplate':'editday'}" data-id="${esc(day.id)}">${BASE_DAY[day.id]?'Customize a copy':'Edit template'}</button></div></section>`;
+ }
+ return `<section aria-label="Workout templates"><div class="section-heading"><h2>Workout templates</h2><button class="btn small" data-act="newworkout">+ New workout</button></div><p class="muted">Choose a template to preview, start, or edit.</p><div class="template-grid">${allDays().map(day=>`<button class="section template-card" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(day.type)}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets</span></button>`).join("")}</div></section><details class="section exercise-library" data-disclosure="library" ${openDisclosures.has("library")?"open":""}><summary>Exercise library</summary>${exerciseSearchBox()}<ul>${[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort().map(n=>`<li data-exercise-search-item="${esc(n)}">${esc(n)}</li>`).join("")}</ul></details>`;
+}
+function viewSettings(){
+ const theme=document.documentElement?.dataset?.themePreference||"system";
+ return `<section class="section settings-form" aria-label="Training settings"><h2>Preferences</h2><label>Appearance<select id="theme-preference" aria-label="Color theme">${['system','light','dark'].map(t=>`<option value="${t}" ${theme===t?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}</select></label><label>Default weight unit<select data-setting="unit">${['kg','lb'].map(u=>`<option ${(S.defaultUnit||DEFAULT_UNIT)===u?'selected':''}>${u}</option>`).join('')}</select></label><p class="muted">Used for new sessions. Existing sets keep their units.</p><label>Default rest time<select data-setting="rest">${[...new Set([30,60,90,120,180,240,300,S.globalRestSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${S.globalRestSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><label class="check-setting"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?'':'checked'}> Show progression suggestions</label></section><section class="section"><h2>Your data</h2><p class="muted">Workouts are stored on this device. Export a backup to keep another copy.</p><button class="btn" data-destination="data">Data & Backups →</button></section>`;
+}
+function sessionOverview(session){
+ return `<ul class="session-review-list">${session.exercises.map(e=>`<li><strong>${esc(e.name)}</strong><span>${e.sets.map(x=>`${x.w} ${esc(e.unit)} × ${x.r}`).join(' · ')}</span></li>`).join('')}</ul>`;
+}
+function viewSessionReview(){
+ if(!sessionReview)return viewLog();
+ const count=sessionReview.exercises.reduce((n,e)=>n+e.sets.length,0),draft=getDraft(S.dayId),total=[...draft.ex,...draft.extra].reduce((n,e)=>n+e.sets.length,0);
+ return `<section class="section session-review"><p class="eyebrow">REVIEW YOUR WORKOUT</p><h2>${esc(sessionReview.dayName)}</h2><p>${count} logged sets · ${sessionReview.exercises.length} exercises · ${esc(fmtDate(sessionReview.date))}</p><p class="muted">${total-count>0?`${total-count} unlogged or unchecked sets will be left out. `:''}Your workout timer is paused. Save to record this session.</p>${sessionOverview(sessionReview)}${sessionReview.notes?`<p>${esc(sessionReview.notes)}</p>`:''}<div class="row-actions"><button class="btn primary" data-act="save">Save session</button><button class="btn" data-act="backtosession">Keep training</button></div><p id="session-validation" role="alert" hidden></p></section>`;
+}
+function viewSessionSummary(){
+ if(!savedSummary)return viewHome();
+ return `<section class="section session-summary"><p class="eyebrow">SESSION SAVED</p><h2>Workout complete</h2><p>${esc(savedSummary.dayName)} · ${esc(fmtDate(savedSummary.date))}</p><p class="muted">${savedSummary.exercises.reduce((n,e)=>n+e.sets.length,0)} sets recorded. Your history and progress are up to date.</p>${sessionOverview(savedSummary)}<div class="row-actions"><button class="btn primary" data-destination="home">Back to Today</button><button class="btn" data-destination="history">View history</button></div></section>`;
 }
 
 /* ---------- render ---------- */
 function render(){
-  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === ({history:"progress",data:"more",calendar:"plan"}[S.tab] || S.tab) ? "page" : "false"));
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === ({log:"home",review:"home",summary:"home",history:"progress",data:"more",calendar:"plan",library:"plan"}[S.tab] || S.tab) ? "page" : "false"));
   const active = document.activeElement, clockFocus=active?.dataset?.act, key = active && active.dataset ? active.dataset.key : null;
   const mapFocus = S.tab==="progress" && active?.matches?.(".muscle-map [data-muscle]") ? {muscle:active.dataset.muscle,id:active.id} : null;
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
   if(document.documentElement)document.documentElement.dataset.view=S.tab;
-  const intro = {home:["YOUR TRAINING HUB","Your training, at a glance.","Start strong and keep your momentum."],log:["YOUR TRAINING SPACE", "Train", "Log your sets, one exercise at a time."], plan:["YOUR PLAN","Plan your training.","Your schedule and calendar, in one place."], calendar:["TRAINING CALENDAR","Your training at a glance.","See completed sessions, rest and planned days."], history:["YOUR TRAINING JOURNAL", "The work adds up.", "Every session, every set, all in one place."], progress:["YOUR PROGRESS", "See your strength grow.", "Follow your lifts and body measurements over time."], more:["SETTINGS AND DATA","Your training settings.","Manage your preferences and keep your data safe."],data:["YOUR DATA", "Keep your progress safe.", "Back up your log or bring it to another device."]}[S.tab];
-  app.innerHTML = `<div class="page-intro"><div><p class="eyebrow">${S.tab==="home"?esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})):intro[0]}</p><h1>${S.tab==="home"?'Small steps.<br><span>Stronger every day.</span>':intro[1]}</h1><p class="muted">${intro[2]}</p></div><span class="date-pill">${esc(new Date().toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</span></div>
-    ` + (S.tab === "home" ? viewHome() : S.tab === "log" ? viewLog() : S.tab === "history" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress">Overview</button><button type="button" data-destination="history" aria-current="page">History</button></nav>${viewHistory()}` : (S.tab === "calendar" || S.tab === "plan") ? (S.scheduleEditing?viewScheduleEditor():S.manageSchedules?viewScheduleManager():viewCalendar()) : S.tab === "progress" ? `<nav class="subnav" aria-label="Progress views"><button type="button" data-destination="progress" aria-current="page">Overview</button><button type="button" data-destination="history">History</button></nav>${viewProgress()}` : S.tab === "more" ? `<section class="section more-hub" aria-label="More settings"><h2>More</h2><p class="muted">Your preferences and data in one place.</p><div class="more-links"><button class="btn more-link" type="button" data-destination="data"><strong>${icon("download")} Data & Backups</strong><span>Export, restore or transfer your workout records.</span></button><button class="btn more-link" type="button" data-act="workoutsettings"><strong>${icon("activity")} Workout preferences</strong><span>Customize workouts, exercise defaults and rest timers in Train.</span></button><button class="btn more-link" type="button" data-destination="plan"><strong>${icon("calendar")} Schedules</strong><span>Review your training calendar and manage your routine.</span></button></div><p class="muted more-privacy">Your training data stays on this device unless you export a backup.</p></section>` : S.tab === "data" ? `<nav class="subnav" aria-label="More views"><button type="button" data-destination="more">More</button><button type="button" data-destination="data" aria-current="page">Data & Backups</button></nav>${viewData()}` : viewData()) + timerDockMarkup();
+  const titles={home:"Today",log:getDay(S.dayId)?.name||"Workout",review:"Review session",summary:"Well done",plan:"Plan",calendar:"Calendar",library:S.editing?"Edit template":"Workouts",history:"Workout history",progress:"Progress",more:"Settings",data:"Data & Backups"};
+  const planNav=`<nav class="subnav" aria-label="Plan views"><button data-destination="plan" ${S.tab==='plan'?'aria-current="page"':''}>Schedule</button><button data-destination="library" ${S.tab==='library'?'aria-current="page"':''}>Workouts & exercises</button></nav>`;
+  const progressNav=`<nav class="subnav" aria-label="Progress views"><button data-destination="progress" ${S.tab==='progress'?'aria-current="page"':''}>Overview</button><button data-destination="history" ${S.tab==='history'?'aria-current="page"':''}>History</button></nav>`;
+  app.innerHTML=`<div class="page-intro"><div><p class="eyebrow">${esc(S.tab==='home'?new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}):S.tab==='log'?'ACTIVE SESSION':'YOUR TRAINING')}</p><h1>${esc(titles[S.tab]||'Today')}</h1></div>${S.tab==='log'?'<button class="btn small" data-destination="home">← Today</button>':''}</div>`+
+   (S.tab==='home'?viewHome():S.tab==='log'?viewLog():S.tab==='review'?viewSessionReview():S.tab==='summary'?viewSessionSummary():S.tab==='library'?planNav+viewLibrary():S.tab==='plan'||S.tab==='calendar'?planNav+(S.scheduleEditing?viewScheduleEditor():S.manageSchedules?viewScheduleManager():viewCalendar()):S.tab==='progress'?progressNav+viewProgress():S.tab==='history'?progressNav+viewHistory():S.tab==='more'?viewSettings():`<nav class="subnav" aria-label="Settings views"><button data-destination="more">← Settings</button></nav>${viewData()}`)+timerDockMarkup();
   if(restOverlayOpen){const {draft:d}=timerContext();app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
   if(timerControlsOpen&&!restOverlayOpen){const target=clockFocus&&app.querySelector(`.timer-popover [data-act="${CSS.escape(clockFocus)}"]`);(target||app.querySelector("[data-act=clockclose]"))?.focus({preventScroll:true});}
   updateSessionMeter();
@@ -340,7 +359,7 @@ function restOverlayMarkup(d){
 function timerContext(){
  const valid=id=>id&&getDay(id)&&S.drafts[id];
  if(valid(timerWorkoutId)&&S.drafts[timerWorkoutId].workoutTimer?.state==="idle"&&!S.drafts[timerWorkoutId].restTimer&&S.tab==="log"&&getDay(S.dayId))timerWorkoutId=S.dayId;
- if(!valid(timerWorkoutId)){
+ if(!valid(timerWorkoutId)||(S.drafts[timerWorkoutId].workoutTimer?.state==="idle"&&activeWorkoutId()&&activeWorkoutId()!==timerWorkoutId)){
   timerWorkoutId=Object.keys(S.drafts).find(id=>valid(id)&&(S.drafts[id].workoutTimer?.state==="running"||S.drafts[id].restTimer))
    ||Object.keys(S.drafts).find(id=>valid(id)&&S.drafts[id].workoutTimer?.state==="paused")
    ||S.dayId||nextDayId();
@@ -359,7 +378,9 @@ function startWorkoutFor(id){
  timerWorkoutId=id;saveDrafts();
 }
 function timerDockMarkup(){
+ if(!activeWorkoutId()&&S.tab!=="log")return "";
  const {id,draft:d}=timerContext(),clock=d.workoutTimer,rest=d.restTimer;
+ if(clock.state==="idle"&&!rest&&!draftHasData(d))return "";
  const status={idle:"Ready",running:"Training",paused:"Paused",stopped:"Stopped"}[clock.state];
  const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
  const startAction=clock.state==="running"?'clockpause':'clockstart';
@@ -369,10 +390,10 @@ function timerDockMarkup(){
  ${timerControlsOpen?`<section class="timer-popover" id="workout-clock-controls" role="dialog" aria-modal="false" aria-label="Workout timer controls"><div class="timer-popover-heading"><div><p class="eyebrow">WORKOUT TIMER</p><h2>${esc(getDay(id).name)}</h2></div><button type="button" class="btn small" data-act="clockclose" aria-label="Close timer controls">✕</button></div>
  <div class="clock-readout"><span>${status}</span><strong data-timer="workout-panel">${timerLabel(timerTools.workoutElapsed(clock))}</strong></div>
  <div class="clock-actions"><button type="button" class="btn primary" data-act="${startAction}">${startLabel}</button><button type="button" class="btn" data-act="clockstop" ${clock.state==="idle"||clock.state==="stopped"?'disabled':''}>Stop timer</button><button type="button" class="btn small" data-act="clockreset">Reset timer</button></div><p class="muted timer-hint">Stopping the timer keeps your workout draft.</p>
- <section class="rest-controls" aria-label="Rest timer controls"><div class="rest-controls-heading"><h3>Rest</h3><strong data-timer="rest-panel">${restText}</strong></div><label>Rest duration<select data-act="restpreset" aria-label="Rest duration">${[...new Set([30,60,90,120,180,240,300,d.restSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${d.restSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><div class="clock-actions"><button type="button" class="btn" data-act="reststart">Start rest</button>${rest?`<button type="button" class="btn" data-act="${rest.pausedRemainingMs!=null?'timerresume':'timerpause'}">${rest.pausedRemainingMs!=null?'Resume rest':'Pause rest'}</button><button type="button" class="btn" data-act="timerskip">Skip rest</button>`:''}</div><button type="button" class="btn small" data-act="timeropen">Open rest timer</button><details class="rest-preferences"><summary>Rest preferences</summary><button type="button" class="btn small" data-act="saveglobalrest">Save global rest default</button></details></section><button type="button" class="btn small" data-act="clockreturn">Back to ${esc(getDay(id).name)} →</button></section>`:''}`;
+ <section class="rest-controls" aria-label="Rest timer controls"><div class="rest-controls-heading"><h3>Rest</h3><strong data-timer="rest-panel">${restText}</strong></div><label>Rest duration<select data-act="restpreset" aria-label="Rest duration">${[...new Set([30,60,90,120,180,240,300,d.restSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${d.restSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><div class="clock-actions"><button type="button" class="btn" data-act="reststart">Start rest</button>${rest?`<button type="button" class="btn" data-act="${rest.pausedRemainingMs!=null?'timerresume':'timerpause'}">${rest.pausedRemainingMs!=null?'Resume rest':'Pause rest'}</button><button type="button" class="btn" data-act="timerskip">Skip rest</button>`:''}</div><button type="button" class="btn small" data-act="timeropen">Open rest timer</button><details class="rest-preferences"><summary>Rest preferences</summary><button type="button" class="btn small" data-act="saveglobalrest">Save global rest default</button></details></section><button type="button" class="btn" data-act="clockfinish">Finish workout</button><button type="button" class="btn small" data-act="clockreturn">Back to ${esc(getDay(id).name)} →</button></section>`:''}`;
 }
 function updateTimers(){
- if(!S.ready)return;
+ if(!S.ready||(!activeWorkoutId()&&S.tab!=="log"))return;
  const {draft:d}=timerContext(),rest=d.restTimer;
  const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
  const restState=document.querySelector('[data-rest-state]');
@@ -380,7 +401,7 @@ function updateTimers(){
  for(const el of document.querySelectorAll('[data-timer]')){
   const key=el.dataset.timer;
   const value=key==="workout"||key==="workout-panel"?timerLabel(timerTools.workoutElapsed(d.workoutTimer))
-   :key==="rest"||key==="rest-panel"?restText:key==="overlay-rest"?rest?timerLabel(timerTools.remaining(rest)):"00:00":null;
+   :key==="rest"||key==="rest-panel"||key==="inline-rest"?restText:key==="overlay-rest"?rest?timerLabel(timerTools.remaining(rest)):"00:00":null;
   if(value!=null&&el.textContent!==value)el.textContent=value;
  }
 }
@@ -457,28 +478,23 @@ const workoutExpanded = new Set();
 const workoutOptionsExpanded = new Set();
 function viewLog(){
   if (S.editing) return viewEditor();
-  const next = nextSlot();
   const day = getDay(S.dayId) || getDay(nextDayId());
   S.dayId = day.id;
   const d = getDraft(day.id);
-  const isCustom = !BASE_DAY[day.id];
-  const plates = scheduleDays().map(p => `
-    <button class="plate ${esc(p.type)}" data-act="day" data-id="${esc(p.id)}" aria-pressed="${p.id===day.id}">
-      <span class="plate-top"><span class="type-dot"></span>${esc(p.type)}</span><span class="pn">${esc(p.name)}</span><span class="pt">${p.id===next ? "Next up" : (S.drafts[p.id] && draftHasData(S.drafts[p.id]) ? "In progress" : (BASE_DAY[p.id] ? `${p.ex.length} exercises` : "Custom"))}</span>
-    </button>`).join("") + `<button class="plate new" data-act="newworkout"><span class="plate-top">Build your own</span><span class="pn">+ Custom</span><span class="pt">New workout</span></button>`;
   const cards = day.ex.map((e, i) => {
     const de = d.ex[i];
     const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
     const lb = lastBlock(de.name, e, de.unit);
     const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
     return `<details class="ex active-exercise focused-exercise ${esc(day.type)}" data-exercise-id="base-${i}" ${workoutExpanded.size ? (workoutExpanded.has("base-"+i)?"open":"") : (i===Math.max(0,d.ex.findIndex(x=>x.sets.some(z=>!z.completed)))?"open":"")} data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
-      <summary class="focused-exercise-summary"><span class="ex-number">${String(i+1).padStart(2,"0")}</span><span class="focused-exercise-summary-title">${esc(de.name)}<small>${de.sets.filter(z=>z.completed===true).length}/${de.sets.length} sets complete · ${e.lo}–${e.hi} reps</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="ex-head workout-exercise-head"><span class="ex-number">${String(i+1).padStart(2,"0")}</span>${head}</div><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
-      ${lb.html}
+      <summary class="focused-exercise-summary"><span class="ex-number">${String(i+1).padStart(2,"0")}</span><span class="focused-exercise-summary-title">${esc(de.name)}<small>${de.sets.filter(z=>z.completed===true).length}/${de.sets.length} sets complete · ${e.lo}–${e.hi} reps</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
+      ${lb.html}${d.restTimer?`<div class="inline-rest"><span>Rest <strong data-timer="inline-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></span><button class="btn small" data-act="timerskip">Skip rest</button></div>`:""}
       <div class="colhead workout-set-heading"><span>Set</span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
-      <details class="exercise-options" data-options-id="base-${i}" ${workoutOptionsExpanded.has("base-"+i)?"open":""}><summary>Advanced options · Set type, RIR & defaults</summary>${exerciseActivationInfo(de.name)}
-       ${exerciseDefaultControls(de,i,"",d)}
+      <details class="exercise-options" data-options-id="base-${i}" ${workoutOptionsExpanded.has("base-"+i)?"open":""}><summary>Exercise options</summary>${exerciseActivationInfo(de.name)}
+       <label class="exercise-substitution">Exercise / substitution ${head}</label>${exerciseDefaultControls(de,i,"",d)}
       ${progressionHint(de,e)}</details><div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
+      ${i<day.ex.length-1?`<button class="btn next-exercise" data-act="nextexercise" data-i="${i+1}">Next: ${esc(day.ex[i+1].n)} →</button>`:""}
     </div></details>`;
   }).join("");
   const extras = d.extra.map((x, i) => {
@@ -487,31 +503,27 @@ function viewLog(){
       <summary class="focused-exercise-summary"><span class="ex-number">+</span><span class="focused-exercise-summary-title">${esc(x.name||"Extra exercise")}<small>${x.sets.filter(z=>z.completed===true).length}/${x.sets.length} sets complete</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
       ${x.name.trim() ? lb.html : ""}
       <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
-      <details class="exercise-options" data-options-id="extra-${i}" ${workoutOptionsExpanded.has("extra-"+i)?"open":""}><summary>Advanced options · Set type, RIR & defaults</summary>${x.name.trim()?exerciseActivationInfo(x.name):""}
+      <details class="exercise-options" data-options-id="extra-${i}" ${workoutOptionsExpanded.has("extra-"+i)?"open":""}><summary>Exercise options</summary>${x.name.trim()?exerciseActivationInfo(x.name):""}
        ${exerciseDefaultControls(x,i,"x",d)}
       ${progressionHint(x,null)}</details><div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
     </div></details>`;
   }).join("");
-  const inProgress=draftHasData(d);
   return `
-    <section class="workout-hero" aria-label="Today's workout"><div><p class="eyebrow">${d.workoutTimer.state==="running"?"WORKOUT IN PROGRESS":d.workoutTimer.state==="paused"?"WORKOUT PAUSED":"YOUR WORKOUT"}</p><h2>${esc(day.name)}</h2><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets${day.id===next?" · Next in your schedule":""}</p></div><button type="button" class="btn primary workout-hero__action" data-act="workoutbegin">${d.workoutTimer.state==="running"?"Continue Workout":d.workoutTimer.state==="paused"?"Resume Workout":"Start Workout"} ${icon("arrow")}</button></section>
-    <details class="workout-options"><summary>Workout options <span>Change workout, schedule & preferences</span></summary>
-    <div class="program-label"><h3>Choose a workout</h3><span>Any workout, any split</span></div><div class="plates" role="group" aria-label="Choose workout">${plates}</div>
-    ${schedulePanel()}<label class="progression-toggle"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?"":"checked"}> Show progression recommendations</label></details>
+    <section class="session-toolbar" aria-label="Session overview"><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets</p>${d.workoutTimer.state!=='running'?'<button class="btn" data-act="workoutbegin">Resume timer</button>':''}<button class="btn primary" data-act="reviewworkout">Finish workout</button></section>
     <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
-      <div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span>${isCustom?`<button class="btn small" data-act="editday" data-id="${esc(day.id)}">Edit workout</button>`:""}</div>
+      <div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span></div>
       ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
-      ${exerciseSearchBox()}${exerciseNameSuggestions()}${cards}${extras}
+      ${exerciseNameSuggestions()}${cards}${extras}
       <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
       <details class="section notes-card"><summary>Session notes & date</summary><label class="session-date">Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label><label for="notes">How did you feel today?</label>
         <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></details>
     </div><aside class="session-sidebar">
       <div class="session-card"><h3>Ready to finish?</h3><p class="muted"><span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets in this workout</p>
         <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        <button class="btn primary finish-session-action" data-act="save" aria-describedby="session-save-help">Finish & save session ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Finishing records the completed session.</p><p id="session-validation" role="alert" hidden></p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
+        <button class="btn primary finish-session-action" data-act="reviewworkout" aria-describedby="session-save-help">Review & finish workout ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Review your logged sets before saving the session.</p><p id="session-validation" role="alert" hidden></p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
       </div>
-      <details class="guide-card workout-guidance"><summary>Workout guidance</summary><span class="guide-icon">${icon("spark")}</span><h3>A stronger next session.</h3><ul>${PROGRAM_NOTES.slice(1).map(n=>`<li>${esc(n)}</li>`).join("")}</ul></details>
+
     </aside></div>`;
 
 }
@@ -575,7 +587,7 @@ function viewCalendar(){
   ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
  </div>`).join("");
  return `<section class="section plan-overview" aria-label="Schedule overview"><div class="plan-overview-head"><div><p class="eyebrow">YOUR PLAN</p><h2>${esc(activeSchedule()?.name||"Your training schedule")}</h2><p class="muted">${activeSchedule()?.mode==="weekly"?"Weekly routine":"Repeating workout sequence"} · ${esc(nextScheduleLabel())} next</p></div><button class="btn primary" type="button" data-act="manageschedules">Manage schedules →</button></div></section>
- <section class="section training-calendar" aria-label="Training calendar"><p class="muted">See completed sessions, planned days and rest days. Unlogged days are not counted as missed.</p>
+ ${schedulePanel()}<details class="section calendar-disclosure" data-disclosure="calendar" ${openDisclosures.has("calendar")?"open":""}><summary>Training calendar</summary><section class="training-calendar" aria-label="Training calendar"><p class="muted">See completed sessions, planned days and rest days. Unlogged days are not counted as missed.</p>
   <div class="calendar-toolbar"><h2>${esc(label)}</h2><div class="row-actions">
    <button class="btn small" data-act="calendarprev" aria-label="Previous month">←</button>
    <button class="btn small" data-act="calendartoday">Today</button>
@@ -586,7 +598,7 @@ function viewCalendar(){
   <div class="calendar-weekdays" aria-hidden="true">${WEEKDAYS.map(d=>`<span>${d.slice(0,3)}</span>`).join("")}</div>
   <div class="calendar-grid" role="group" aria-label="${esc(label)} calendar">${cards}</div>
   <p class="muted">Projected dates are shown for weekly schedules only. Repeating cycle schedules do not imply calendar dates. Completed workouts are based on your saved sessions.</p>
- </section>`;
+ </section></details>`;
 }
 function viewHistory(){
   if(savedSessionEdit)return viewSavedSessionEdit();
@@ -599,7 +611,7 @@ function viewHistory(){
     const vol = Math.round((s.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((b,x)=>b+(conv(x.w||0, exUnit(e,s), vu)||0)*(num(x.r)||0),0),0));
     const rows = (s.exercises||[]).map(e => `<tr><td>${esc(e.name)}</td><td>${(e.sets||[]).map(x=>`${esc(x.w ?? 0)}×${esc(x.r)}`).join(", ")} ${exUnit(e,s)}</td></tr>`).join("");
     const armed = S.armedDelete === s.id;
-    return `<details class="hist"><summary><span class="chip ${esc(day.type)}">${esc(day.name)}</span><span>${esc(fmtDate(s.date))}</span><span class="meta">${sets} sets · ${hardSetCount([s])} hard sets<br>${vol.toLocaleString()} ${vu}</span></summary>
+    return `<details data-session-id="${esc(s.id)}" class="hist"><summary><span class="chip ${esc(day.type)}">${esc(day.name)}</span><span>${esc(fmtDate(s.date))}</span><span class="meta">${sets} sets · ${hardSetCount([s])} hard sets<br>${vol.toLocaleString()} ${vu}</span></summary>
       <div class="body"><div class="responsive-table" tabindex="0" role="region" aria-label="Exercise sets in saved session"><table><thead><tr><th scope="col">Exercise</th><th scope="col">Logged sets</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${s.notes ? `<p class="muted">${esc(s.notes)}</p>` : ""}
       <div class="row-actions"><button class="btn small" data-act="historyedit" data-id="${esc(s.id)}">Edit session</button><button class="btn small danger" data-act="delsession" data-id="${esc(s.id)}" aria-label="${armed?"Confirm delete":"Delete"} session ${esc(day.name)} on ${esc(fmtDate(s.date))}">${armed ? "Confirm delete session" : "Delete session"}</button></div></div></details>`;
@@ -722,7 +734,10 @@ function viewProgress(){
   const wpts = visibleBody.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
   const recent = visibleBody.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
     <button class="btn small danger" data-act="delbody" data-id="${esc(b.id)}" aria-label="${S.armedDelete===b.id?"Confirm delete":"Delete"} body entry ${esc(fmtDate(b.date))}">${S.armedDelete===b.id?"Confirm delete entry":"Delete"}</button></li>`).join("");
-  return `<nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML}${muscleHTML}<details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
+  const weekStart=new Date(today()+"T12:00:00");weekStart.setDate(weekStart.getDate()-6);
+  const weekKey=[weekStart.getFullYear(),String(weekStart.getMonth()+1).padStart(2,'0'),String(weekStart.getDate()).padStart(2,'0')].join('-');
+  const weekCount=S.sessions.filter(x=>x.date>=weekKey&&x.date<=today()).length;
+  return `<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
     <details id="progress-body" class="section progress-body"><summary>Body measurements</summary>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
@@ -769,19 +784,23 @@ async function useProgramFile(file){
 
 /* ---------- events ---------- */
 // Browsing between views should behave like navigation without a network request.
-const NAV_VIEWS=new Set(["home","log","progress","plan","more","history","data","calendar"]);
+const NAV_VIEWS=new Set(["home","log","progress","plan","more","history","data","calendar","library","review","summary"]);
 function navigateView(tab,{record=true}={}){
+ if((tab==="review"&&!sessionReview)||(tab==="summary"&&!savedSummary))tab="home";
  if(!NAV_VIEWS.has(tab)||tab===S.tab)return;
+ if(S.tab==="review")sessionReview=null;
+ exerciseQuery="";
  timerControlsOpen=false;restOverlayOpen=false;
  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
  if(record&&typeof history!=="undefined")history.pushState({...history.state,gtView:tab},"",location.href);
  S.tab=tab;S.armedDelete=null;render();window.scrollTo({top:0});
 }
-if(typeof history!=="undefined"&&!history.state?.gtView)history.replaceState({...history.state,gtView:S.tab},"",location.href);
+if(typeof history!=="undefined")history.replaceState({...history.state,gtView:S.tab},"",location.href);
 window.addEventListener("popstate",event=>{
  const tab=event.state?.gtView;
  if(NAV_VIEWS.has(tab))navigateView(tab,{record:false});
 });
+document.querySelector(".settings-launch")?.addEventListener("click",()=>navigateView("more"));
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   timerControlsOpen=false;restOverlayOpen=false;
@@ -799,6 +818,7 @@ $("#app").addEventListener("click",e=>{
 
 document.addEventListener("toggle",e=>{
  const n=e.target;
+ if(n?.dataset?.disclosure){if(n.open)openDisclosures.add(n.dataset.disclosure);else openDisclosures.delete(n.dataset.disclosure);}
  if(n?.matches?.("details.analytics-filters"))analyticsFiltersOpen=n.open;
  if(n?.matches?.("details[data-exercise-id]")){
    const id=n.dataset.exerciseId;
@@ -828,7 +848,7 @@ $("#app").addEventListener("input", e => {
   if(savedSessionEdit && t.dataset.historyField){savedSessionEdit[t.dataset.historyField]=t.value;return;}
   if(savedSessionEdit && t.dataset.historySet){savedSessionEdit.exercises[+t.dataset.i].sets[+t.dataset.j][t.dataset.historySet]=t.value;return;}
   if(t.hasAttribute?.("data-schedule-name") && S.scheduleEditing){S.scheduleEditing.name=t.value;return;}
-  if (S.tab === "log" && S.editing) {
+  if (S.editing) {
     if (t.dataset.ed === "name") S.editing.name = t.value;
     else if (t.dataset.ed === "type") S.editing.type = t.value;
     else if (t.dataset.ed === "unit") S.editing.unit = t.value;
@@ -846,7 +866,12 @@ $("#app").addEventListener("input", e => {
   saveDrafts(); updateSessionMeter();
 });
 
-$("#app").addEventListener("change", e => {
+$("#app").addEventListener("change", async e => {
+  if(e.target.dataset.setting){
+   const field=e.target.dataset.setting==='unit'?'defaultUnit':'globalRestSeconds',old=S[field];
+   S[field]=field==='defaultUnit'?(e.target.value==='lb'?'lb':'kg'):Number(e.target.value);
+   if(!await writeLocal()){S[field]=old;toast("Could not save preference. Try again.");}else toast("Preference saved");render();return;
+  }
   if(e.target.matches("[data-muscle-map-metric]")){muscleMapMetric=e.target.value==="volume"?"volume":"hardSets";render();return;}
   if(e.target.dataset.analytics){S.analyticsFilter={...(S.analyticsFilter||{}),[e.target.dataset.analytics]:e.target.value};render();return;}
   if(e.target.dataset.act==="progressiontoggle"){S.progressionEnabled=e.target.checked;saveDrafts();render();return;}
@@ -870,12 +895,20 @@ $("#app").addEventListener("keydown",e=>{
 });
 $("#app").addEventListener("keydown",e=>{if(S.tab!=="progress"||!["Enter"," "].includes(e.key))return;const region=e.target.closest?.("[data-muscle]");if(!region||!region.closest?.(".muscle-map"))return;e.preventDefault();muscleMapSelected=region.dataset.muscle;render();});
 $("#app").addEventListener("click", async e => {
-  const jump=e.target.closest?.(".progress-jump a");if(jump){const target=document.querySelector(jump.getAttribute("href"));if(target?.tagName==="DETAILS")target.open=true;}
+  const jump=e.target.closest?.(".progress-jump a");if(jump){const target=document.querySelector(jump.getAttribute("href"));if(target){for(let el=target;el&&el.id!=="app";el=el.parentElement)if(el.tagName==="DETAILS")el.open=true;target.scrollIntoView({block:"start"});}}
   const muscleRegion=e.target.closest?.("[data-muscle]");
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
-  if(act==="workoutsettings"){S.tab="log";S.editing=null;render();document.querySelector(".workout-options").open=true;document.querySelector(".workout-options")?.scrollIntoView({block:"start"});return;}
+  if(act==="workoutsettings"){navigateView("more");return;}
+  if(act==="opentemplate"){templateId=b.dataset.id;render();window.scrollTo({top:0});return;}
+  if(act==="closetemplate"){templateId=null;S.editing=null;render();return;}
+  if(act==="copytemplate"){const day=getDay(b.dataset.id);S.editing={...structuredClone(day),id:uid("c"),name:day.name+" copy"};render();return;}
+  if(act==="starttemplate"){S.dayId=b.dataset.id;workoutExpanded.clear();startWorkoutFor(S.dayId);navigateView("log");return;}
+  if(act==="opensession"){navigateView("history");const row=document.querySelector(`[data-session-id="${CSS.escape(b.dataset.id)}"]`);if(row){row.open=true;row.scrollIntoView({block:"start"});}return;}
+  if(act==="nextexercise"){workoutExpanded.clear();workoutExpanded.add("base-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="base-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
+  if(act==="reviewworkout")return saveSession(b,{reviewOnly:true});
+  if(act==="backtosession"){startWorkoutFor(S.dayId);navigateView("log");return;}
   if(act==="workoutbegin"){
    if(getDraft(S.dayId).workoutTimer.state!=="running")startWorkoutFor(S.dayId);
    timerWorkoutId=S.dayId;render();document.querySelector('#workout-editor')?.scrollIntoView?.({behavior:'smooth',block:'start'});return;
@@ -884,7 +917,8 @@ $("#app").addEventListener("click", async e => {
    timerControlsOpen=act==="clocktoggle"?!timerControlsOpen:false;
    render();if(!timerControlsOpen)document.querySelector('[data-act=clocktoggle]')?.focus({preventScroll:true});return;
   }
-  if(act==="clockreturn"){S.dayId=timerContext().id;S.tab="log";timerControlsOpen=false;render();window.scrollTo({top:0});return;}
+  if(act==="clockfinish"){S.dayId=timerContext().id;timerControlsOpen=false;if(S.tab!=="log")navigateView("log");else render();return saveSession(b,{reviewOnly:true});}
+  if(act==="clockreturn"){S.dayId=timerContext().id;timerControlsOpen=false;sessionReview=null;if(S.tab==="log")render();else navigateView("log");return;}
   if(["clockstart","clockpause","clockstop","clockreset","reststart"].includes(act)){
    const {id,draft:d}=timerContext();
    if(act==="clockstart")startWorkoutFor(id);
@@ -899,8 +933,9 @@ $("#app").addEventListener("click", async e => {
   if(act==="timeradjust"){const {draft:d}=timerContext(),t=d.restTimer,delta=Number(b.dataset.seconds);if(t&&Number.isFinite(delta)){const ms=Math.max(0,(t.pausedRemainingMs!=null?t.pausedRemainingMs:t.deadline-Date.now())+delta*1000);d.restTimer={...t,deadline:Date.now()+ms,pausedRemainingMs:t.pausedRemainingMs!=null?ms:null,durationSeconds:Math.max(0,(t.durationSeconds||0)+delta)};saveDrafts();render();}return;}
 
   if(["homestart","homecontinue","homechoose","homeschedule","homeprogress","homehistory"].includes(act)){
-   if(act==="homeprogress")S.tab="progress";else if(act==="homehistory")S.tab="history";else {S.tab="log";if(act==="homecontinue"&&getDay(b.dataset.id))S.dayId=b.dataset.id;if(act==="homeschedule")S.tab="plan";else if(act==="homestart"||act==="homecontinue"){if(act==="homestart")S.dayId=getDay(nextSlot())?.id||nextDayId();startWorkoutFor(S.dayId);}}
-   render();window.scrollTo({top:0});if(act==="homechoose"){const options=document.querySelector(".workout-options");if(options){options.open=true;options.scrollIntoView({block:"start"});}}return;
+   if(act==="homechoose"){templateId=null;S.editing=null;navigateView("library");return;}
+   if(act==="homeschedule"||act==="homeprogress"||act==="homehistory"){navigateView({homeschedule:"plan",homeprogress:"progress",homehistory:"history"}[act]);return;}
+   S.dayId=getDay(b.dataset.id)?.id||activeWorkoutId()||nextDayId();workoutExpanded.clear();if(getDraft(S.dayId).workoutTimer.state!=="running")startWorkoutFor(S.dayId);navigateView("log");return;
   }
   if(act==="recoverbackup"){S.tab="data";render();await exportJSON();return;}
   if(act==="reloadconflict"){window.location.reload();return;}
@@ -909,7 +944,7 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
-  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);if(d.workoutTimer.state==="idle")startWorkoutFor(S.dayId);timerWorkoutId=S.dayId;const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
+  if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);timerWorkoutId=S.dayId;const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const {draft:d}=timerContext();if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.workoutTimer=timerTools.idleWorkout();}saveDrafts();render();return;}
   if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=timerContext().draft.restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
    if(act==="resetdefault"){const e=grp(),key=settingKey(e,+b.dataset.i,b.dataset.g),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};if(Object.hasOwn(next,exerciseKey(e.name)))next[key]={};else delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;for(const field of ["restSeconds","loadIncrement","incrementUnit"]){if(before[field]===undefined)delete e[field];else e[field]=before[field];}toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
@@ -922,11 +957,11 @@ $("#app").addEventListener("click", async e => {
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
-  if (act === "addextra") { getDraft(S.dayId).extra.push({ name:"", unit:(getDay(S.dayId).unit||DEFAULT_UNIT), sets:[{w:"",r:""},{w:"",r:""},{w:"",r:""}] }); saveDrafts(); render();
+  if (act === "addextra") { workoutExpanded.add("extra-"+getDraft(S.dayId).extra.length);getDraft(S.dayId).extra.push({ name:"", unit:(S.defaultUnit||getDay(S.dayId).unit||DEFAULT_UNIT), sets:[{w:"",r:""},{w:"",r:""},{w:"",r:""}] }); saveDrafts(); render();
     const el = document.querySelector(`[data-key="xname-${getDraft(S.dayId).extra.length-1}"]`); if (el) el.focus(); return; }
   if (act === "rmextra") { getDraft(S.dayId).extra.splice(+b.dataset.i, 1); saveDrafts(); render(); return; }
   if (act === "newworkout") { S.editing = { id: uid("c"), name:"", type:"other", unit:DEFAULT_UNIT, ex:[{n:"",s:3,lo:8,hi:12}] }; S.armedDelete = null; render(); window.scrollTo({top:0}); return; }
-  if (act === "editday") { const c = S.custom.find(x => x.id === b.dataset.id); if (c) { S.editing = JSON.parse(JSON.stringify(c)); S.armedDelete = null; render(); window.scrollTo({top:0}); } return; }
+  if (act === "editday") { const c = S.custom.find(x => x.id === b.dataset.id); if (c) { S.editing = JSON.parse(JSON.stringify(c));if(S.drafts[c.id]&&(draftHasData(S.drafts[c.id])||S.drafts[c.id].workoutTimer?.state!=="idle")){S.editing.id=uid("c");S.editing.name=c.name+" copy";toast("Editing a copy keeps your active session safe.");} S.armedDelete = null; render(); window.scrollTo({top:0}); } return; }
   if (act === "edaddex") { S.editing.ex.push({n:"",s:3,lo:8,hi:12}); render(); const el = document.querySelector(`[data-key="ed-n-${S.editing.ex.length-1}"]`); if (el) el.focus(); return; }
   if (act === "edrmex") { S.editing.ex.splice(+b.dataset.i, 1); if (!S.editing.ex.length) S.editing.ex.push({n:"",s:3,lo:8,hi:12}); render(); return; }
   if (act === "edcancel") { S.editing = null; S.armedDelete = null; render(); return; }
@@ -993,10 +1028,10 @@ let savedSessionEditPending=false;
 function reportSessionValidation(message, field){
  const notice=document.querySelector('#session-validation');
  if(notice){notice.hidden=false;notice.textContent=message;}
- if(field){field.setAttribute('aria-invalid','true');field.setAttribute('aria-describedby','session-validation');field.focus({preventScroll:true});}
+ if(field){for(let el=field.parentElement;el;el=el.parentElement)if(el.tagName==="DETAILS")el.open=true;field.setAttribute('aria-invalid','true');field.setAttribute('aria-describedby','session-validation');field.focus();}
  toast(message);
 }
-async function saveSession(btn){
+async function saveSession(btn,{reviewOnly=false}={}){
   if(sessionSavePending)return;
  const notice=document.querySelector('#session-validation');if(notice){notice.hidden=true;notice.textContent='';}
  document.querySelectorAll('#app [aria-invalid="true"][data-f]').forEach(input=>{input.removeAttribute?.('aria-invalid');if(input.getAttribute?.('aria-describedby')==='session-validation')input.removeAttribute?.('aria-describedby');});
@@ -1007,12 +1042,17 @@ async function saveSession(btn){
   if (!exercises.length) { reportSessionValidation("Enter reps for at least one set first.",document.querySelector("#app [data-f=r]")); return; }
   if (!validDataDate(d.date)) { reportSessionValidation("Pick a valid date for this session.",document.querySelector("#app [data-f=date]")); return; }
   const s = { id: uid("s"), dayId: day.id, dayName: day.name, type: day.type, date: d.date, notes: (d.notes||"").trim(), exercises, createdAt: Date.now() };
+  if(reviewOnly){
+    d.workoutTimer=timerTools.pauseWorkout(d.workoutTimer);
+    if(d.restTimer&&d.restTimer.pausedRemainingMs==null)d.restTimer=timerTools.pause(d.restTimer);
+    sessionReview=s;saveDrafts();navigateView("review");return;
+  }
   sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {
     clearTimeout(draftTimer);
     await putSession(s,true);
     setSaveStatus("saved");
-    S.tab = "history"; render(); window.scrollTo({top:0});
+    savedSummary=s;sessionReview=null;timerWorkoutId=null;navigateView("summary");
     toast("Session saved");
   } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); } finally { sessionSavePending=false; }
 }
@@ -1034,7 +1074,8 @@ async function saveWorkout(btn){
   try {
     const list = S.custom.some(c => c.id === clean.id) ? S.custom.map(c => c.id === clean.id ? clean : c) : [...S.custom, clean];
     await putCustom(list);
-    S.editing = null; S.dayId = clean.id; flushDrafts(); render(); window.scrollTo({top:0}); toast("Workout saved");
+    if(S.drafts[clean.id]&&!draftHasData(S.drafts[clean.id])&&S.drafts[clean.id].workoutTimer?.state==="idle")delete S.drafts[clean.id];
+    S.editing = null; templateId=clean.id; flushDrafts(); render(); window.scrollTo({top:0}); toast("Workout saved");
   } catch { btn.disabled = false; btn.textContent = "Save workout"; toast("Couldn't save. Try again."); }
 }
 
@@ -1046,7 +1087,7 @@ async function addBody(){
   catch { toast("Couldn't save. Try again."); }
 }
 
-const DATA_SCHEMA = {"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Gym Tracker app data","description":"Version 4 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.","type":"object","properties":{"app":{"const":"ppl-tracker"},"version":{"const":4},"exportedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"sessions":{"type":"array","items":{"$ref":"#/$defs/session"}},"body":{"type":"array","items":{"$ref":"#/$defs/body"}},"custom":{"type":"array","items":{"$ref":"#/$defs/custom"}},"drafts":{"type":"object","propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"$ref":"#/$defs/draft"}},"preferences":{"$ref":"#/$defs/preferences"},"schedules":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/schedule"}},"calendarEvents":{"type":"array","items":{"$ref":"#/$defs/calendarEvent"}}},"required":["app","version","exportedAt","sessions","body","custom","drafts","preferences","schedules"],"additionalProperties":false,"$defs":{"id":{"type":"string","pattern":"^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_\\-.~:@+]{1,190}$"},"unit":{"type":"string","enum":["kg","lb"]},"date":{"type":"string","format":"date"},"set":{"type":"object","properties":{"w":{"type":"number","minimum":0},"r":{"type":"integer","minimum":1},"id":{"$ref":"#/$defs/id"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"exercise":{"type":"object","properties":{"name":{"type":"string","minLength":1},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/set"},"minItems":1},"exerciseId":{"$ref":"#/$defs/id"}},"required":["name","unit","sets"],"additionalProperties":false},"session":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"dayId":{"$ref":"#/$defs/id"},"dayName":{"type":"string"},"type":{"type":"string","enum":["pull","push","legs","other"]},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"exercises":{"type":"array","items":{"$ref":"#/$defs/exercise"},"minItems":1},"createdAt":{"type":"integer","minimum":0}},"required":["id","dayId","dayName","type","date","notes","exercises","createdAt"],"additionalProperties":false},"body":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"type":"string","format":"date"},"weight":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"waist":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"unit":{"type":"string","enum":["kg","lb"]},"createdAt":{"type":"integer","minimum":0}},"required":["id","date","weight","waist","unit","createdAt"],"additionalProperties":false},"customExercise":{"type":"object","properties":{"n":{"type":"string","minLength":1},"s":{"type":"integer","minimum":1,"maximum":30},"lo":{"type":"integer","minimum":1,"maximum":100},"hi":{"type":"integer","minimum":1,"maximum":100},"alt":{"type":"array","items":{"type":"string"}},"exerciseId":{"$ref":"#/$defs/id"}},"required":["n","s","lo","hi","alt"],"additionalProperties":false},"custom":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1},"type":{"type":"string","enum":["pull","push","legs","other"]},"unit":{"type":"string","enum":["kg","lb"]},"ex":{"type":"array","items":{"$ref":"#/$defs/customExercise"},"minItems":1}},"required":["id","name","type","unit","ex"],"additionalProperties":false},"draftValue":{"anyOf":[{"type":"string"},{"type":"number"}]},"draftSet":{"type":"object","properties":{"w":{"$ref":"#/$defs/draftValue"},"r":{"$ref":"#/$defs/draftValue"},"id":{"type":"string"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"type":"string","format":"date-time"},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"draftExercise":{"type":"object","properties":{"name":{"type":"string"},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/draftSet"},"minItems":1},"exerciseId":{"type":"string"},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"anyOf":[{"type":"number","exclusiveMinimum":0,"maximum":100},{"type":"string"},{"type":"null"}]},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"required":["name","unit","sets"],"additionalProperties":false},"draft":{"type":"object","properties":{"sig":{"type":"string"},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"ex":{"type":"array","items":{"$ref":"#/$defs/draftExercise"},"minItems":1},"extra":{"type":"array","items":{"$ref":"#/$defs/draftExercise"}},"startedAt":{"type":"number","minimum":0},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"recoveryWarning":{"type":"boolean"},"restTimer":{"anyOf":[{"type":"null"},{"type":"object","properties":{"durationSeconds":{"type":"integer","minimum":0,"maximum":3600},"deadline":{"type":"number"},"pausedRemainingMs":{"anyOf":[{"type":"number","minimum":0},{"type":"null"}]}},"required":["durationSeconds","deadline","pausedRemainingMs"],"additionalProperties":false}]},"workoutTimer":{"type":"object","properties":{"state":{"type":"string","enum":["idle","running","paused","stopped"]},"elapsedMs":{"type":"number","minimum":0},"startedAt":{"anyOf":[{"type":"null"},{"type":"number","minimum":0}]}},"required":["state","elapsedMs","startedAt"],"additionalProperties":false}},"required":["sig","date","notes","ex","extra"],"additionalProperties":false},"preferences":{"type":"object","properties":{"bodyUnit":{"type":"string","enum":["kg","lb"]},"selectedWorkoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"progressExercise":{"anyOf":[{"type":"string"},{"type":"null"}]},"activeScheduleId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"exerciseDefaults":{"type":"object","propertyNames":{"type":"string","minLength":1,"maxLength":300,"pattern":"^(?!(__proto__|constructor|prototype)$).+$"},"additionalProperties":{"type":"object","properties":{"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"type":"number","exclusiveMinimum":0,"maximum":100},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"additionalProperties":false}},"progressionEnabled":{"type":"boolean"},"globalRestSeconds":{"type":"integer","minimum":15,"maximum":600}},"required":["bodyUnit","selectedWorkoutId","progressExercise","activeScheduleId"],"additionalProperties":false},"schedule":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1,"maxLength":80},"mode":{"type":"string","enum":["cycle","weekly"]},"days":{"type":"array","minItems":1,"maxItems":28,"items":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"cursor":{"type":"integer","minimum":0}},"required":["id","name","mode","days","cursor"],"additionalProperties":false},"calendarEvent":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"$ref":"#/$defs/date"},"type":{"type":"string","enum":["planned","rest","skipped","completed"]},"workoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"sessionId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"updatedAt":{"type":"string","format":"date-time"}},"required":["id","date","type","updatedAt"],"additionalProperties":false}}};
+const DATA_SCHEMA = {"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Gym Tracker app data","description":"Version 4 backup with flexible schedules. Default workouts remain in ppl-default-workouts.json. IDs are unique per collection; schedules must reference available workouts, include a training day, and weekly plans have seven days.","type":"object","properties":{"app":{"const":"ppl-tracker"},"version":{"const":4},"exportedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"sessions":{"type":"array","items":{"$ref":"#/$defs/session"}},"body":{"type":"array","items":{"$ref":"#/$defs/body"}},"custom":{"type":"array","items":{"$ref":"#/$defs/custom"}},"drafts":{"type":"object","propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"$ref":"#/$defs/draft"}},"preferences":{"$ref":"#/$defs/preferences"},"schedules":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/schedule"}},"calendarEvents":{"type":"array","items":{"$ref":"#/$defs/calendarEvent"}}},"required":["app","version","exportedAt","sessions","body","custom","drafts","preferences","schedules"],"additionalProperties":false,"$defs":{"id":{"type":"string","pattern":"^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9_\\-.~:@+]{1,190}$"},"unit":{"type":"string","enum":["kg","lb"]},"date":{"type":"string","format":"date"},"set":{"type":"object","properties":{"w":{"type":"number","minimum":0},"r":{"type":"integer","minimum":1},"id":{"$ref":"#/$defs/id"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"exercise":{"type":"object","properties":{"name":{"type":"string","minLength":1},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/set"},"minItems":1},"exerciseId":{"$ref":"#/$defs/id"}},"required":["name","unit","sets"],"additionalProperties":false},"session":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"dayId":{"$ref":"#/$defs/id"},"dayName":{"type":"string"},"type":{"type":"string","enum":["pull","push","legs","other"]},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"exercises":{"type":"array","items":{"$ref":"#/$defs/exercise"},"minItems":1},"createdAt":{"type":"integer","minimum":0}},"required":["id","dayId","dayName","type","date","notes","exercises","createdAt"],"additionalProperties":false},"body":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"type":"string","format":"date"},"weight":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"waist":{"anyOf":[{"type":"number","exclusiveMinimum":0},{"type":"null"}]},"unit":{"type":"string","enum":["kg","lb"]},"createdAt":{"type":"integer","minimum":0}},"required":["id","date","weight","waist","unit","createdAt"],"additionalProperties":false},"customExercise":{"type":"object","properties":{"n":{"type":"string","minLength":1},"s":{"type":"integer","minimum":1,"maximum":30},"lo":{"type":"integer","minimum":1,"maximum":100},"hi":{"type":"integer","minimum":1,"maximum":100},"alt":{"type":"array","items":{"type":"string"}},"exerciseId":{"$ref":"#/$defs/id"}},"required":["n","s","lo","hi","alt"],"additionalProperties":false},"custom":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1},"type":{"type":"string","enum":["pull","push","legs","other"]},"unit":{"type":"string","enum":["kg","lb"]},"ex":{"type":"array","items":{"$ref":"#/$defs/customExercise"},"minItems":1}},"required":["id","name","type","unit","ex"],"additionalProperties":false},"draftValue":{"anyOf":[{"type":"string"},{"type":"number"}]},"draftSet":{"type":"object","properties":{"w":{"$ref":"#/$defs/draftValue"},"r":{"$ref":"#/$defs/draftValue"},"id":{"type":"string"},"type":{"type":"string","enum":["working","warmup","drop"]},"completed":{"type":"boolean"},"completedAt":{"type":"string","format":"date-time"},"rir":{"anyOf":[{"type":"integer","minimum":0,"maximum":10},{"type":"null"}]},"restSeconds":{"type":"integer","minimum":0,"maximum":3600}},"required":["w","r"],"additionalProperties":false},"draftExercise":{"type":"object","properties":{"name":{"type":"string"},"unit":{"type":"string","enum":["kg","lb"]},"sets":{"type":"array","items":{"$ref":"#/$defs/draftSet"},"minItems":1},"exerciseId":{"type":"string"},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"anyOf":[{"type":"number","exclusiveMinimum":0,"maximum":100},{"type":"string"},{"type":"null"}]},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"required":["name","unit","sets"],"additionalProperties":false},"draft":{"type":"object","properties":{"sig":{"type":"string"},"date":{"type":"string","format":"date"},"notes":{"type":"string"},"ex":{"type":"array","items":{"$ref":"#/$defs/draftExercise"},"minItems":1},"extra":{"type":"array","items":{"$ref":"#/$defs/draftExercise"}},"startedAt":{"type":"number","minimum":0},"restSeconds":{"type":"integer","minimum":15,"maximum":600},"recoveryWarning":{"type":"boolean"},"restTimer":{"anyOf":[{"type":"null"},{"type":"object","properties":{"durationSeconds":{"type":"integer","minimum":0,"maximum":3600},"deadline":{"type":"number"},"pausedRemainingMs":{"anyOf":[{"type":"number","minimum":0},{"type":"null"}]}},"required":["durationSeconds","deadline","pausedRemainingMs"],"additionalProperties":false}]},"workoutTimer":{"type":"object","properties":{"state":{"type":"string","enum":["idle","running","paused","stopped"]},"elapsedMs":{"type":"number","minimum":0},"startedAt":{"anyOf":[{"type":"null"},{"type":"number","minimum":0}]}},"required":["state","elapsedMs","startedAt"],"additionalProperties":false}},"required":["sig","date","notes","ex","extra"],"additionalProperties":false},"preferences":{"type":"object","properties":{"bodyUnit":{"type":"string","enum":["kg","lb"]},"selectedWorkoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"progressExercise":{"anyOf":[{"type":"string"},{"type":"null"}]},"activeScheduleId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"exerciseDefaults":{"type":"object","propertyNames":{"type":"string","minLength":1,"maxLength":300,"pattern":"^(?!(__proto__|constructor|prototype)$).+$"},"additionalProperties":{"type":"object","properties":{"restSeconds":{"type":"integer","minimum":15,"maximum":600},"loadIncrement":{"type":"number","exclusiveMinimum":0,"maximum":100},"incrementUnit":{"type":"string","enum":["kg","lb"]}},"additionalProperties":false}},"progressionEnabled":{"type":"boolean"},"globalRestSeconds":{"type":"integer","minimum":15,"maximum":600},"defaultUnit":{"$ref":"#/$defs/unit"}},"required":["bodyUnit","selectedWorkoutId","progressExercise","activeScheduleId"],"additionalProperties":false},"schedule":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"name":{"type":"string","minLength":1,"maxLength":80},"mode":{"type":"string","enum":["cycle","weekly"]},"days":{"type":"array","minItems":1,"maxItems":28,"items":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"cursor":{"type":"integer","minimum":0}},"required":["id","name","mode","days","cursor"],"additionalProperties":false},"calendarEvent":{"type":"object","properties":{"id":{"$ref":"#/$defs/id"},"date":{"$ref":"#/$defs/date"},"type":{"type":"string","enum":["planned","rest","skipped","completed"]},"workoutId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"sessionId":{"anyOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"updatedAt":{"type":"string","format":"date-time"}},"required":["id","date","type","updatedAt"],"additionalProperties":false}}};
 function validDataDate(date){
   return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date+"T12:00:00Z")) && new Date(date+"T12:00:00Z").toISOString().slice(0,10) === date;
 }
@@ -1149,7 +1190,7 @@ async function importJSON(){
     legacy=j.version<3;incoming=validateAppData(j.version<4 ? migrateLegacy(j) : j);
   } catch(err){importFeedback("Import cancelled: "+err.message,true);return;}
   const replace=$("#importMode")?.value==="replace";
-  const previous={sessions:S.sessions,calendarEvents:S.calendarEvents,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,globalRestSeconds:S.globalRestSeconds,progressionEnabled:S.progressionEnabled};
+  const previous={sessions:S.sessions,calendarEvents:S.calendarEvents,body:S.body,custom:S.custom,drafts:S.drafts,dayId:S.dayId,defaultUnit:S.defaultUnit,bodyUnit:S.bodyUnit,progressEx:S.progressEx,schedules:S.schedules,activeScheduleId:S.activeScheduleId,exerciseDefaults:S.exerciseDefaults,globalRestSeconds:S.globalRestSeconds,progressionEnabled:S.progressionEnabled};
   const merge=(current,added)=>[...new Map([...current,...added].map(x=>[x.id,x])).values()];
   try {
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
@@ -1164,6 +1205,7 @@ async function importJSON(){
     // Replace takes backed-up settings (defaults for older backups); merge
     // preserves current keys absent from incoming and prefers incoming keys.
     const p=incoming.preferences;
+    S.defaultUnit=replace?p.defaultUnit:(p.defaultUnit||S.defaultUnit);
     S.globalRestSeconds=replace?(importedPreferenceKeys.includes("globalRestSeconds")?p.globalRestSeconds:90):(importedPreferenceKeys.includes("globalRestSeconds")?p.globalRestSeconds:S.globalRestSeconds||90);
     S.exerciseDefaults=replace ? {...(importedPreferenceKeys.includes("exerciseDefaults") ? p.exerciseDefaults||{} : {})} : {...(S.exerciseDefaults||{}),...(importedPreferenceKeys.includes("exerciseDefaults")?p.exerciseDefaults||{}:{})};
     S.progressionEnabled=replace ? (!importedPreferenceKeys.includes("progressionEnabled") || p.progressionEnabled!==false) : (importedPreferenceKeys.includes("progressionEnabled") ? p.progressionEnabled : S.progressionEnabled!==false);

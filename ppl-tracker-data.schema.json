@@ -693,6 +693,9 @@
           "type": "integer",
           "minimum": 15,
           "maximum": 600
+        },
+        "defaultUnit": {
+          "$ref": "#/$defs/unit"
         }
       },
       "required": [
