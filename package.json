@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test:regression": "node tests/schedules.test.cjs && node tests/muscle-map.test.cjs && node tests/muscle-map-view.test.cjs && node tests/timers.test.cjs",
+    "test:regression": "node tests/schedules.test.cjs && node tests/exercise-images.test.cjs && node tests/muscle-map.test.cjs && node tests/muscle-map-view.test.cjs && node tests/timers.test.cjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {
