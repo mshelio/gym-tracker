@@ -548,3 +548,9 @@ nav.tabs{grid-template-columns:1fr!important}
 .session-toolbar .btn.primary{width:auto;margin-left:auto;padding-inline:20px}
 /* Status messages share the bottom edge without blocking the workout clock. */
 body:has(.timer-dock) .pwa-status-banner{left:auto;right:calc(var(--timer-right) + 108px);bottom:var(--timer-bottom);width:min(460px,calc(100vw - 144px));max-width:calc(100vw - 144px);z-index:35}
+
+/* iOS zooms focused form controls below 16px. Keep touch inputs readable
+   without restricting the user's viewport or pinch-to-zoom. */
+@media(max-width:1000px), (any-pointer:coarse){
+ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),select,textarea{font-size:16px!important}
+}
