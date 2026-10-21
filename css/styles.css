@@ -574,3 +574,7 @@ body:has(.timer-dock) .pwa-status-banner{left:auto;right:calc(var(--timer-right)
  .today-preview .exercise-thumbnail,.today-preview .exercise-photo-unavailable{grid-row:span 2}
  .today-preview li>span:last-child{grid-column:2}
 }
+
+.exercise-video{display:grid;justify-items:start;gap:6px;margin:12px 0}
+.exercise-video .exercise-video-link{display:inline-flex;align-items:center;min-height:44px;max-width:100%;white-space:normal;text-align:left;text-decoration:none}
+.exercise-video small{font-size:12px;line-height:1.5}

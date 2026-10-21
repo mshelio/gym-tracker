@@ -12,6 +12,10 @@ test('exercise photos follow substitutions and remain available offline',async({
  await first.locator('.exercise-options>summary').click();
  await first.getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/V-Bar_Pulldown/);
+ const video=first.locator('.exercise-video-link');
+ await expect(video).toHaveAttribute('href',/search_query=Neutral-grip%20pulldown/);
+ await expect(video).toHaveAttribute('target','_blank');
+ await expect(video).toHaveAttribute('rel','noopener noreferrer');
  await expect(first.locator('.exercise-photo-detail')).toHaveAttribute('open','');
  const photo=first.locator('.exercise-photo-detail>img');
  await expect(photo).toBeVisible();

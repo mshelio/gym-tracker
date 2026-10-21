@@ -17,3 +17,13 @@ for(const workout of program.workouts)for(const exercise of workout.exercises){
  assert.equal(bytes.readUInt16BE(0),0xffd8,exercise.name+' must have a real JPEG');
 }
 console.log('PASS: default exercise photo coverage, explicit variants, and unknown custom names');
+
+const videoUrl=name=>vm.runInContext(`exerciseVideoSearchUrl(${JSON.stringify(name)})`,context);
+for(const name of ['Lat pulldown','Neutral-grip pulldown','My custom lift','Pull-ups & dips #1']){
+ const url=new URL(videoUrl(name));
+ assert.equal(url.origin,'https://www.youtube.com');
+ assert.equal(url.searchParams.get('search_query'),name+' exercise proper form demonstration');
+ assert.equal(url.hash,'');
+}
+assert.equal(videoUrl('   '),null);
+console.log('PASS: demonstration searches preserve exercise variants and encode custom names');

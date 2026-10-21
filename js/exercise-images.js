@@ -320,8 +320,16 @@ export function exerciseThumbnail(name){
  const photo=exerciseImageFor(name);
  return photo?`<img class="exercise-thumbnail" src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}${photo.note?' (related movement)':''}" width="64" height="64" loading="lazy" decoding="async">`:'<span class="exercise-photo-unavailable">No photo</span>';
 }
+export function exerciseVideoSearchUrl(name){
+ const query=String(name||"").trim().replace(/\s+/g," ");
+ return query?"https://www.youtube.com/results?search_query="+encodeURIComponent(query+" exercise proper form demonstration"):null;
+}
+export function exerciseVideoLink(name){
+ const url=exerciseVideoSearchUrl(name);
+ return url?`<div class="exercise-video"><a class="btn exercise-video-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="Find video demonstration for ${esc(name)} on YouTube (opens in a new tab)">▶ Find video demonstration</a><small class="muted">YouTube search · opens a new tab · internet required</small></div>`:"";
+}
 export function exercisePhotoDetail(name, expanded=false){
  const photo=exerciseImageFor(name);
- if(!photo)return '<p class="muted">No matching photo available for this exercise.</p>';
- return `<details class="exercise-photo-detail" ${expanded?"open":""}><summary>Exercise photo</summary><img src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}" width="360" height="360" loading="lazy" decoding="async">${photo.note?`<p class="muted">${esc(photo.note)}</p>`:''}<p class="muted">Photo: <a href="https://github.com/yuhonas/free-exercise-db/tree/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/${photo.id}" target="_blank" rel="noopener noreferrer">Free Exercise DB</a></p></details>`;
+ if(!photo)return exerciseVideoLink(name)+'<p class="muted">No matching photo available for this exercise.</p>';
+ return `${exerciseVideoLink(name)}<details class="exercise-photo-detail" ${expanded?"open":""}><summary>Exercise photo</summary><img src="./assets/exercises/${photo.id}.jpg" alt="${esc(photo.name)}" width="360" height="360" loading="lazy" decoding="async">${photo.note?`<p class="muted">${esc(photo.note)}</p>`:''}<p class="muted">Photo: <a href="https://github.com/yuhonas/free-exercise-db/tree/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/${photo.id}" target="_blank" rel="noopener noreferrer">Free Exercise DB</a></p></details>`;
 }
