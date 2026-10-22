@@ -27,6 +27,7 @@ let timerTicker=null;
 let timerControlsOpen=false, timerWorkoutId=null;
 let analyticsFiltersOpen=false;
 let templateId=null, sessionReview=null, savedSummary=null;
+let homeWeekOffset=0;
 const openDisclosures=new Set();
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
@@ -264,16 +265,34 @@ function activeWorkoutId(){
 function recentSessionRows(limit=3){
  return sortSessions(S.sessions).slice(0,limit).map(s=>`<button class="recent-session-row" data-act="opensession" data-id="${esc(s.id)}"><span><strong>${esc(s.dayName)}</strong><small>${esc(fmtDate(s.date))} · ${s.exercises.reduce((n,e)=>n+e.sets.length,0)} sets</small></span>${icon("arrow")}</button>`).join("");
 }
+function dateOffset(date, days){
+ const value=new Date(date+"T12:00:00Z");value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10);
+}
+function dashboardWeek(){
+ const now=today(),weekday=(new Date(now+"T12:00:00Z").getUTCDay()+6)%7;
+ const from=dateOffset(now,-weekday+homeWeekOffset*7);
+ return calendarDays(from,dateOffset(from,6),S.sessions,S.calendarEvents||[],activeSchedule());
+}
+function activityOverview(){
+ const end=today(),start=dateOffset(end,-83),counts=new Map();
+ for(const session of S.sessions)if(session.date>=start&&session.date<=end)counts.set(session.date,(counts.get(session.date)||0)+1);
+ const total=[...counts.values()].reduce((a,b)=>a+b,0);
+ return `<section class="section activity-overview"><h2>Training activity</h2><p class="muted">${total} sessions · last 12 weeks</p><div class="activity-grid" role="img" aria-label="${total} sessions across ${counts.size} training days in the last 12 weeks">${Array.from({length:84},(_,i)=>{const date=dateOffset(start,i),count=counts.get(date)||0;return `<span class="activity-cell ${count?'trained':''}" title="${date}: ${count} sessions" aria-hidden="true"></span>`;}).join("")}</div><button class="btn small" data-destination="history">View workout history →</button></section>`;
+}
 function viewHome(){
- const active=activeWorkoutId(),day=getDay(active||nextSlot()),last=sortSessions(S.sessions)[0];
- const sets=day?.ex.reduce((n,e)=>n+e.s,0)||0;
- return `<section class="today-dashboard" aria-label="Today dashboard"><section class="section today-workout">
- <p class="eyebrow">${active?"YOUR SESSION":day?"UP NEXT":"RECOVERY DAY"}</p><h2>${esc(day?.name||"Time to recover")}</h2>
- <p class="muted">${active?"Your session is saved on this device. Continue when you’re ready.":day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:"Rest is part of your plan. Your next workout will be here when you’re ready."}</p>
- ${day?`<ul class="today-preview">${day.ex.slice(0,3).map(e=>`<li>${exerciseThumbnail(e.n)}<span class="exercise-preview-name">${esc(e.n)}</span><span>${e.s} × ${e.lo}–${e.hi}</span></li>`).join("")}</ul>${day.ex.length>3?`<p class="muted">+ ${day.ex.length-3} more exercises</p>`:""}<button class="btn primary" data-act="${active?'homecontinue':'homestart'}" data-id="${esc(day.id)}">${active?'Resume workout':'Start workout'} ${icon("arrow")}</button>`:""}
- <button class="btn" data-act="homechoose">Choose another workout</button>${!day&&activeSchedule()?.mode==="cycle"?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':""}</section>
+ const active=activeWorkoutId(),day=getDay(active||nextSlot()),last=sortSessions(S.sessions)[0],week=dashboardWeek();
+ const sets=day?.ex.reduce((n,e)=>n+e.s,0)||0,body=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1);
+ const thisWeekStart=dateOffset(today(),-((new Date(today()+"T12:00:00Z").getUTCDay()+6)%7));
+ const weeklyCount=S.sessions.filter(x=>x.date>=thisWeekStart&&x.date<=today()).length;
+ return `<section class="today-dashboard" aria-label="Today dashboard">
+ <section class="section week-overview" aria-label="Weekly training overview"><div class="week-heading"><button class="btn small" data-act="homeweek" data-delta="-1" aria-label="Previous week">‹</button><div><h2>${homeWeekOffset===0?'This week':esc(fmtDate(week[0].date))+' – '+esc(fmtDate(week[6].date))}</h2>${homeWeekOffset!==0?'<button class="week-reset" data-act="homeweekreset">Back to this week</button>':''}</div><button class="btn small" data-act="homeweek" data-delta="1" aria-label="Next week">›</button></div>
+ <div class="week-strip">${week.map((d,i)=>`<div class="week-day ${d.type}" ${d.date===today()?'aria-current="date"':''} aria-label="${esc(fmtDate(d.date))}: ${d.type==='none'?'No scheduled workout':d.type}"><span>${['M','T','W','T','F','S','S'][i]}</span><strong>${Number(d.date.slice(-2))}</strong><small>${d.type==='completed'?'✓':d.type==='planned'?'•':d.type==='rest'?'–':d.type==='skipped'?'×':'·'}</small></div>`).join('')}</div><p class="week-legend muted">✓ Completed · • Planned · – Rest</p><button class="btn small" data-destination="plan">View your training plan →</button></section>
+ <section class="section today-workout"><p class="eyebrow">${active?'IN PROGRESS':day?'READY TO TRAIN':'RECOVERY DAY'}</p><h2>${esc(day?.name||'Time to recover')}</h2><p class="muted">${active?'Pick up where you left off.':day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:'Rest is part of your plan. Choose a workout whenever you are ready.'}</p>
+ ${day?`<button class="btn primary" data-act="${active?'homecontinue':'homestart'}" data-id="${esc(day.id)}">${active?'Resume workout':'Start workout'} ${icon('arrow')}</button><details class="today-exercises"><summary>Preview ${day.ex.length} exercises</summary><ul class="today-preview">${day.ex.map(e=>`<li>${exerciseThumbnail(e.n)}<span class="exercise-preview-name">${esc(e.n)}</span><span>${e.s} × ${e.lo}–${e.hi}</span></li>`).join('')}</ul></details>`:''}
+ <button class="btn" data-act="homechoose">Choose another workout</button>${!day&&activeSchedule()?.mode==='cycle'?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':''}</section>
+ <div class="home-metrics"><section class="section"><p class="muted">This week</p><strong class="metric-value">${weeklyCount}</strong><p class="muted">sessions · ${S.sessions.length} total</p></section><section class="section"><p class="muted">Body weight</p><strong class="metric-value">${body?esc(body.weight)+' <small>'+esc(body.unit||DEFAULT_UNIT)+'</small>':'—'}</strong><p class="muted">${body?esc(fmtDate(body.date)):'No entries yet'}</p><button class="btn small" data-act="homebody">Log weight →</button></section></div>
  <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
- <button class="btn today-plan-link" data-destination="plan">View your training plan →</button></section>`;
+ <button class="btn" data-destination="library">Browse workouts & exercises →</button></section>`;
 }
 function viewLibrary(){
  if(S.editing)return viewEditor();
@@ -511,6 +530,7 @@ function viewLog(){
     </div></details>`;
   }).join("");
   return `
+    <section class="session-completion" aria-label="Workout completion"><div><span>Session progress</span><strong>${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length} / ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets complete</strong></div><progress aria-label="Completed sets" max="${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)||1}" value="${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length}"></progress></section>
     <section class="session-toolbar" aria-label="Session overview"><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets</p>${d.workoutTimer.state!=='running'?'<button class="btn" data-act="workoutbegin">Resume timer</button>':''}<button class="btn primary" data-act="reviewworkout">Finish workout</button></section>
     <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
       <div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span></div>
@@ -738,7 +758,7 @@ function viewProgress(){
   const weekStart=new Date(today()+"T12:00:00");weekStart.setDate(weekStart.getDate()-6);
   const weekKey=[weekStart.getFullYear(),String(weekStart.getMonth()+1).padStart(2,'0'),String(weekStart.getDate()).padStart(2,'0')].join('-');
   const weekCount=S.sessions.filter(x=>x.date>=weekKey&&x.date<=today()).length;
-  return `<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
+  return `${activityOverview()}<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
     <details id="progress-body" class="section progress-body"><summary>Body measurements</summary>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
@@ -901,6 +921,10 @@ $("#app").addEventListener("click", async e => {
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
+  if(act==="homeweekreset"){homeWeekOffset=0;render();return;}
+  if(act==="homebody"){navigateView("progress");const panel=document.getElementById("progress-body");panel.open=true;panel.scrollIntoView({block:"start"});document.getElementById("bWeight").focus({preventScroll:true});return;}
+
   if(act==="workoutsettings"){navigateView("more");return;}
   if(act==="opentemplate"){templateId=b.dataset.id;render();window.scrollTo({top:0});return;}
   if(act==="closetemplate"){templateId=null;S.editing=null;render();return;}

@@ -3,6 +3,7 @@ const {enterSession,library}=require('./flow-helpers.cjs');
 test('exercise photos follow substitutions and remain available offline',async({page,context})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/gym-tracker/');
+ await page.locator('.today-exercises>summary').click();
  const thumb=page.locator('.today-preview .exercise-thumbnail').first();
  await expect(thumb).toBeVisible();
  await expect.poll(()=>thumb.evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
@@ -12,6 +13,10 @@ test('exercise photos follow substitutions and remain available offline',async({
  await first.locator('.exercise-options>summary').click();
  await first.getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/V-Bar_Pulldown/);
+ const video=first.locator('.exercise-video-link');
+ await expect(video).toHaveAttribute('href',/search_query=Neutral-grip%20pulldown/);
+ await expect(video).toHaveAttribute('target','_blank');
+ await expect(video).toHaveAttribute('rel','noopener noreferrer');
  await expect(first.locator('.exercise-photo-detail')).toHaveAttribute('open','');
  const photo=first.locator('.exercise-photo-detail>img');
  await expect(photo).toBeVisible();

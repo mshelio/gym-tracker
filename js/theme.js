@@ -12,7 +12,7 @@ export function applyTheme(mode=themePreference()){
  document.documentElement.dataset.themePreference=choice;
  document.documentElement.style.colorScheme=dark?'dark':'light';
  const meta=document.querySelector('meta[name="theme-color"]');
- meta?.setAttribute('content',dark?'#060a13':'#eaeff7');
+ meta?.setAttribute('content',dark?'#090b0a':'#f4f5f4');
  return choice;
 }
 export function setTheme(mode){
