@@ -1,0 +1,41 @@
+const {test,expect}=require('@playwright/test');
+const {enterSession}=require('./flow-helpers.cjs');
+test('weekly dashboard browses dates without starting a workout and previews exercises on demand',async({page})=>{
+ await page.clock.setFixedTime(new Date('2026-10-22T12:00:00'));
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('.week-day')).toHaveCount(7);
+ await expect(page.locator('.week-day[aria-current=date] strong')).toHaveText('22');
+ await expect(page.locator('.today-exercises')).not.toHaveAttribute('open','');
+ await page.getByRole('button',{name:'Previous week',exact:true}).click();
+ await expect(page.locator('.week-day[aria-current=date]')).toHaveCount(0);
+ await page.getByRole('button',{name:'Back to this week'}).click();
+ await expect(page.locator('.week-day[aria-current=date] strong')).toHaveText('22');
+ await expect(page.locator('.timer-dock')).toHaveCount(0);
+ await page.locator('.today-exercises>summary').click();
+ await expect(page.locator('.today-preview')).toBeVisible();
+});
+test('home weight shortcut saves through the existing body measurements flow',async({page})=>{
+ await page.goto('/gym-tracker/');
+ await page.getByRole('button',{name:'Log weight'}).click();
+ await expect(page.locator('#bWeight')).toBeFocused();
+ await page.locator('#bUnit').selectOption('kg');
+ await page.locator('#bWeight').fill('80');
+ await page.getByRole('button',{name:'Add entry',exact:true}).click();
+ await page.locator('nav.tabs [data-tab=home]').click();
+ await expect(page.locator('.home-metrics')).toContainText('80 kg');
+ await page.reload();
+ await expect(page.locator('.home-metrics')).toContainText('80 kg');
+});
+test('session progress counts completed sets and progress shows real activity',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ const meter=page.getByRole('progressbar',{name:'Completed sets'});
+ await expect(meter).toHaveAttribute('value','0');
+ await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');
+ await expect(meter).toHaveAttribute('value','0');
+ await page.getByRole('button',{name:'Lat pulldown set 1 mark complete',exact:true}).click();
+ await expect(meter).toHaveAttribute('value','1');
+ await page.locator('nav.tabs [data-tab=progress]').click();
+ await expect(page.locator('.activity-cell')).toHaveCount(84);
+ await expect(page.locator('.activity-cell.trained')).toHaveCount(0);
+ await expect(page.locator('.activity-overview')).toContainText('0 sessions');
+});

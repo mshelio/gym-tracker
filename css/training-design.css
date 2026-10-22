@@ -1,0 +1,38 @@
+/* Independent adaptation of openGym's calm, task-focused visual direction.
+   No upstream code or restricted exercise media is included. */
+:root,:root[data-theme="light"]{
+ --bg:#f4f5f4;--surface:#fff;--sunk:#edf0ed;--ink:#17211b;--muted:#59665e;--line:#d8dfda;
+ --blue:#18753c;--blue-deep:#105a2d;--blue-soft:#e3f3e8;--focus:#18753c;--ok:#18753c;--pull:#18753c;--accent:#18753c;
+ --glass:var(--surface);--glass-2:var(--surface);--hi:transparent;--shadow:none;--overlay:#f4f5f4;
+ --display:system-ui,-apple-system,"Segoe UI",sans-serif;--body:var(--display);
+}
+:root[data-theme="dark"]{
+ --bg:#090b0a;--surface:#1c201e;--sunk:#2a302c;--ink:#f2f6f3;--muted:#abb6ae;--line:#343d37;
+ --blue:#4ade80;--blue-deep:#6ee79a;--blue-soft:#203d2b;--focus:#4ade80;--ok:#4ade80;--pull:#4ade80;--accent:#4ade80;
+ --glass:var(--surface);--glass-2:var(--surface);--hi:transparent;--shadow:none;--overlay:#090b0a;
+}
+body::before,body::after,.wrap::before{display:none;animation:none}
+:is(.section,.active-exercise,.plate,.hist,.overview>div,.home-primary,.workout-hero,.session-card,.guide-card,.schedule-panel,.rest-overlay__card,.pwa-status-banner){background:var(--surface);box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.brand-mark{box-shadow:none;background:var(--blue-soft);color:var(--blue)}
+.brand{letter-spacing:-.03em;font-size:20px}.brand-sub,.rail-bottom>p{display:none}
+.page-intro h1{letter-spacing:-.04em}.page-intro .eyebrow{letter-spacing:.04em}
+nav.tabs button[aria-current="page"]{background:var(--blue-soft)!important;box-shadow:none}
+.btn.primary{box-shadow:none;background:var(--blue)!important;border-color:var(--blue)!important}
+.btn,.btn.small{background:var(--sunk)}.btn:hover,.btn.small:hover{background:var(--blue-soft)}
+.week-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:center}.week-heading h2{font-size:17px;letter-spacing:0}.week-heading .btn{font-size:26px;min-width:44px}
+.week-reset{color:var(--blue);background:none;border:0;font-size:12px;min-height:44px;padding:6px}
+.week-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:16px 0 4px}.week-day{display:grid;justify-items:center;gap:4px;min-width:0;color:var(--muted)}
+.week-day>span{font-size:11px}.week-day strong{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:18px;font-weight:600;color:var(--ink)}
+.week-day[aria-current="date"] strong{background:var(--blue);color:var(--bg);font-weight:800}.week-day small{font-size:16px;line-height:1}.week-day.completed small{color:var(--ok);font-weight:800}.week-day.planned small{color:var(--blue)}.week-legend{font-size:11px;margin:12px 0}
+.today-dashboard{gap:16px}.today-workout{gap:12px}.today-workout h2{font-size:30px}.today-workout>.primary{margin-top:8px}.today-exercises>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:14px;color:var(--muted)}.today-exercises[open]>summary{margin-bottom:12px}
+.home-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.home-metrics .section{min-width:0;padding:18px}.home-metrics p{font-size:13px}.metric-value{display:block;font-size:32px;line-height:1.4;letter-spacing:-.04em}.metric-value small{font-size:16px;color:var(--muted)}.home-metrics .btn{margin-top:10px}
+.activity-overview h2{font-size:20px}.activity-overview>p{font-size:13px;margin-top:8px}.activity-grid{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px;margin:18px 0}.activity-cell{aspect-ratio:1;border-radius:4px;background:var(--sunk);max-height:22px}.activity-cell.trained{background:var(--blue)}
+.session-completion{margin-bottom:16px}.session-completion>div{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}.session-completion strong{color:var(--ink)}.session-completion progress{appearance:none;display:block;width:100%;height:8px;border:0;border-radius:9px;margin-top:12px;overflow:hidden;background:var(--sunk)}.session-completion progress::-webkit-progress-bar{background:var(--sunk)}.session-completion progress::-webkit-progress-value{background:var(--blue)}.session-completion progress::-moz-progress-bar{background:var(--blue)}
+.focused-exercise-summary-title{font-size:17px}.focused-exercise-summary-title small{font-size:12px}.focused-exercise-body{padding:0 16px 20px}.exercise-photo-detail>img{max-height:380px;width:100%;object-fit:contain}.exercise-video{margin-top:0}
+.workout-set-row{background:var(--sunk)}.workout-set-row input{background:var(--surface);font-size:18px;min-height:48px}.workout-set-row .set-complete[aria-pressed="true"]{color:var(--bg)!important}.timer-dock-toggle{box-shadow:none;background:var(--surface)}
+@media(max-width:600px){
+ .week-overview{padding:16px}.week-strip{gap:0}.week-day strong{width:30px;height:30px;font-size:16px}.week-heading h2{font-size:14px}
+ .today-workout{padding:20px}.home-metrics{gap:12px}.home-metrics .section{padding:14px}
+ .focused-exercise-summary-title{font-size:15px}.focused-exercise-body{padding:0 10px 16px}.exercise-photo-detail>img{max-height:300px}
+ .session-completion>div{font-size:12px}.activity-grid{gap:4px}
+}
