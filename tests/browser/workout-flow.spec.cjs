@@ -89,7 +89,7 @@ test('setup stays optional and schedule management belongs to Plan',async({page}
 });
 
 test('choosing another workout from Today opens the library without starting a draft',async({page})=>{
- await page.goto('/gym-tracker/');await page.getByRole('button',{name:'Choose another workout'}).click();
+ await page.goto('/gym-tracker/');await page.getByRole('button',{name:'Choose a workout'}).click();
  await expect(page.locator('.template-card')).toHaveCount(6);await expect(dock(page)).toHaveCount(0);
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByLabel('Default weight unit').selectOption('kg');await expect(page.locator('#toast')).toHaveText('Preference saved');
  await page.getByLabel('Default rest time').selectOption('120');await expect(page.locator('#toast')).toHaveText('Preference saved');
@@ -105,5 +105,5 @@ test('finish from the floating timer reviews the active workout and invalidates 
 
 test('editing a template with an active session protects its draft by making a copy',async({page})=>{
  await page.goto('/gym-tracker/');await library(page);await page.locator('.template-card').filter({hasText:'Pull A'}).click();await page.getByRole('button',{name:'Customize a copy'}).click();await page.locator('[data-ed=name]').fill('My session');await page.getByRole('button',{name:'Save workout',exact:true}).click();await page.getByRole('button',{name:'Start this workout'}).click();await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('9');await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await library(page);await page.getByRole('button',{name:'Edit template',exact:true}).click();await expect(page.locator('[data-ed=name]')).toHaveValue('My session copy');await page.getByLabel('Exercise 1 name').fill('Different exercise');await page.getByRole('button',{name:'Save workout',exact:true}).click();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('9');
+ await library(page);await page.locator('.template-card').filter({has:page.getByText('My session',{exact:true})}).click();await page.getByRole('button',{name:'Edit template',exact:true}).click();await expect(page.locator('[data-ed=name]')).toHaveValue('My session copy');await page.getByLabel('Exercise 1 name').fill('Different exercise');await page.getByRole('button',{name:'Save workout',exact:true}).click();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('9');
 });

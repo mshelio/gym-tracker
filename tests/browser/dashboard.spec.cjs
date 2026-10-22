@@ -1,18 +1,17 @@
 const {test,expect}=require('@playwright/test');
 const {enterSession}=require('./flow-helpers.cjs');
-test('weekly dashboard browses dates without starting a workout and previews exercises on demand',async({page})=>{
+test('weekly dashboard browses dates without starting a workout or choosing a plan',async({page})=>{
  await page.clock.setFixedTime(new Date('2026-10-22T12:00:00'));
  await page.goto('/gym-tracker/');
  await expect(page.locator('.week-day')).toHaveCount(7);
  await expect(page.locator('.week-day[aria-current=date] strong')).toHaveText('22');
- await expect(page.locator('.today-exercises')).not.toHaveAttribute('open','');
+ await expect(page.locator('.today-workout')).toContainText('Choose how you train');
  await page.getByRole('button',{name:'Previous week',exact:true}).click();
  await expect(page.locator('.week-day[aria-current=date]')).toHaveCount(0);
  await page.getByRole('button',{name:'Back to this week'}).click();
  await expect(page.locator('.week-day[aria-current=date] strong')).toHaveText('22');
  await expect(page.locator('.timer-dock')).toHaveCount(0);
- await page.locator('.today-exercises>summary').click();
- await expect(page.locator('.today-preview')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Choose a workout',exact:true})).toBeVisible();
 });
 test('home weight shortcut saves through the existing body measurements flow',async({page})=>{
  await page.goto('/gym-tracker/');
