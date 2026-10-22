@@ -5,7 +5,7 @@ test('boots native ES modules at GitHub Pages project subpath and persists draft
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/gym-tracker/');
   await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
-  await expect(page.getByText('Pull A').first()).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Choose how you train'})).toBeVisible();
   await openNested(page,'history');
   await expect(page.getByRole('heading',{name:'Workout history',exact:true})).toBeVisible();
   await page.reload();
@@ -441,7 +441,11 @@ test('navigation clicked during startup is honored after IndexedDB hydration', a
 });
 
 test('completed session, draft cleanup and cursor survive immediate reload atomically',async({page})=>{
- await page.goto('/gym-tracker/');await enterSession(page);
+ await page.goto('/gym-tracker/');
+ await page.locator('nav.tabs [data-tab=plan]').click();
+ await page.locator('[data-act=manageschedules]').click();
+ await page.locator('[data-act=activateschedule][data-id=starter-ppl]').click();
+ await enterSession(page);
  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();

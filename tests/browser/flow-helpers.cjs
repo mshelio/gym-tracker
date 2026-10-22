@@ -8,7 +8,9 @@ async function enterSession(page){
   await page.locator('[data-act="clockreturn"]').click();
  }else{
   await page.locator('nav.tabs [data-tab="home"]').click();
-  await page.getByRole('button',{name:/^(Start|Resume) workout$/}).click();
+  const start=page.getByRole('button',{name:/^(Start|Resume) workout$/});
+  if(await start.count())await start.click();
+  else await startTemplate(page,'Pull A');
  }
  await expect(page.locator('.session-toolbar')).toBeVisible();
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
@@ -16,6 +18,7 @@ async function enterSession(page){
 async function library(page){
  await page.locator('nav.tabs [data-tab="plan"]').click();
  await page.getByRole('button',{name:'Workouts & exercises',exact:true}).click();
+ if(await page.locator('[data-act=closetemplate]').count())await page.locator('[data-act=closetemplate]').click();
 }
 async function startTemplate(page,name){
  await library(page);

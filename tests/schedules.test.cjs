@@ -134,6 +134,10 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.S.calendarEvents.length,0);
   assert.equal(a.S.ready,true); assert.equal(c.requested(),'https://user.github.io/ppl-tracker/ppl-default-workouts.json');
   assert.equal(a.nextDayId(),'pullA');
+  assert.equal(a.activeSchedule(),null);assert.equal(a.nextSlot(),null);
+  const unselected=a.buildAppData();assert.equal(unselected.preferences.activeScheduleId,null);
+  const blankRestore=setup();await settle();blankRestore.node('#importMode').value='replace';blankRestore.node('#importText').value=JSON.stringify(unselected);await blankRestore.api.importJSON();assert.equal(blankRestore.api.activeSchedule(),null);
+  await a.useSchedule('starter-ppl');
   // Import preference contract: merge overlays keys, replace clears missing keys.
   const fixture=a.buildAppData();
   fixture.preferences.exerciseDefaults={"name:bench":{restSeconds:150,loadIncrement:2.5,incrementUnit:"kg"}};
@@ -281,7 +285,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   a.S.tab='data';a.render();await a.exportJSON();assert(!node('#toast').textContent.includes('Cannot export'),node('#toast').textContent);const full=setup();await settle();full.node('#importText').value=node('#exportOut').value;await full.api.importJSON();assert.equal(full.api.S.sessions.length,2,full.node('#toast').textContent);assert.equal(full.api.S.body.length,1);assert.equal(full.api.S.custom.length,1);
   full.node('#importText').value=JSON.stringify({sessions:[{id:'bad',date:'2026-10-05',exercises:[{name:'Invalid',sets:null}]}],custom:[{id:'badc',name:'Invalid',ex:[null]}]});await full.api.importJSON();assert.equal(full.api.S.sessions.length,2);assert.equal(full.api.S.custom.length,1);assert(full.node('#toast').textContent.includes('Import cancelled'));
   full.node('#importText').value='null';await full.api.importJSON();assert(full.node('#toast').textContent.includes('tracker backup'));
-  const rotation=setup();await settle();for(const expected of canonical.rotation){assert.equal(rotation.api.nextDayId(),expected);rotation.api.S.dayId=expected;rotation.api.getDraft(expected).ex[0].sets[0]={w:'20',r:'8'};await rotation.api.saveSession({})}assert.equal(rotation.api.nextDayId(),'pullA');
+  const rotation=setup();await settle();await rotation.api.useSchedule('starter-ppl');for(const expected of canonical.rotation){assert.equal(rotation.api.nextDayId(),expected);rotation.api.S.dayId=expected;rotation.api.getDraft(expected).ex[0].sets[0]={w:'20',r:'8'};await rotation.api.saveSession({})}assert.equal(rotation.api.nextDayId(),'pullA');
   const offline=setup({fetchFail:true,storage:c.storage});await settle();assert.equal(offline.api.S.ready,true);assert(offline.api.viewData().includes('file unavailable'));
   const missing=setup({fetchFail:true});await settle();assert.equal(missing.api.S.ready,false);assert(missing.node('#app').innerHTML.includes('Choose program JSON'));
   await missing.api.useProgramFile({text:async()=>JSON.stringify(canonical)});assert.equal(missing.api.S.ready,true);
@@ -301,7 +305,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.throws(()=>a.parseProgram({...canonical,rotation:['missing']}));assert.throws(()=>a.parseProgram({...canonical,workouts:[{...canonical.workouts[0],exercises:[{name:'Invalid',sets:0,repsMin:8,repsMax:12}]}]}));
   const changed=structuredClone(canonical);changed.defaultUnit='kg';changed.rotation.reverse();changed.workouts[0].exercises[0].sets=4;a.applyProgram(changed);assert.equal(a.getDay('pullA').ex[0].s,4);assert.equal(a.getDay('pullA').unit,'kg');assert.equal(a.nextDayId(),'pushA');
   // Flexible schedules, migrations, calendar plans and atomic persistence.
-  const flex=setup();await settle();const f=flex.api;
+  const flex=setup();await settle();const f=flex.api;await f.useSchedule('starter-ppl');
   const custom={id:'upper',name:'Upper',type:'other',unit:'kg',ex:[{n:'Row',s:3,lo:8,hi:12,alt:[]}]};f.S.custom=[custom];
   const cycle={id:'own',name:'My split',mode:'cycle',days:['upper',null,'pullA','upper'],cursor:0};
   await f.saveScheduleList([f.activeSchedule(),cycle],'own');assert.equal(f.nextSlot(),'upper');

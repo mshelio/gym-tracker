@@ -3,8 +3,8 @@ const {enterSession,library}=require('./flow-helpers.cjs');
 test('exercise photos follow substitutions and remain available offline',async({page,context})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/gym-tracker/');
- await page.locator('.today-exercises>summary').click();
- const thumb=page.locator('.today-preview .exercise-thumbnail').first();
+ await enterSession(page);
+ const thumb=page.locator('.focused-exercise-summary .exercise-thumbnail').first();
  await expect(thumb).toBeVisible();
  await expect.poll(()=>thumb.evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
  await enterSession(page);

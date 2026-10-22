@@ -48,7 +48,8 @@ test('program fetch failure does not discard cached workout configuration',async
  await page.route('**/ppl-default-workouts.json',route=>route.abort());
  await page.reload();
  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
- await expect(page.getByText('Pull A').first()).toBeVisible();
+ await enterSession(page);
+ await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toBeVisible();
 });
 test('old worker remains active until an explicit update and drafts survive',async({page})=>{
  await controlled(page);

@@ -153,13 +153,13 @@ function starterSchedule(sessions=S.sessions){
 }
 function activeSchedule(){return S.schedules.find(s=>s.id===S.activeScheduleId) || null;}
 const scheduleIndex = (schedule=activeSchedule()) => scheduleIndexFor(schedule);
-function nextSlot(){const s=activeSchedule();return s ? s.days[scheduleIndex(s)] : ORDER[0];}
+function nextSlot(){const s=activeSchedule();return s ? s.days[scheduleIndex(s)] : null;}
 function nextDayId(){
   const s=activeSchedule();
   if(s){for(let offset=0;offset<s.days.length;offset++){const id=s.days[(scheduleIndex(s)+offset)%s.days.length];if(id && getDay(id))return id;}}
   return ORDER.find(id=>getDay(id)) || S.custom[0]?.id;
 }
-function nextScheduleLabel(){return nextSlot()==null ? "Rest day" : getDay(nextSlot())?.name || "Choose workout";}
+function nextScheduleLabel(){if(!activeSchedule())return "Choose a plan";return nextSlot()==null ? "Rest day" : getDay(nextSlot())?.name || "Choose workout";}
 function validateSchedules(list,custom=S.custom){
   if(!Array.isArray(list) || !list.length || new Set(list.map(s=>s.id)).size!==list.length)throw new Error("Schedules must have unique IDs and include at least one schedule.");
   const ids=new Set([...PROGRAM,...custom].map(w=>w.id));
@@ -169,7 +169,7 @@ function validateSchedules(list,custom=S.custom){
 }
 function ensureSchedules(){
   try{validateSchedules(S.schedules);}catch{S.schedules=[starterSchedule()];}
-  if(!S.schedules.some(s=>s.id===S.activeScheduleId))S.activeScheduleId=S.schedules[0].id;
+  if(!S.schedules.some(s=>s.id===S.activeScheduleId))S.activeScheduleId=S.activeScheduleId===undefined&&S.sessions.length?S.schedules[0].id:null;
 }
 function scheduleDays(){
   const ids=[...new Set((activeSchedule()?.days || []).filter(Boolean))];
@@ -198,10 +198,10 @@ function schedulePanel(){
   ${nextSlot()==null ? `<div class="rest-banner"><b>${s.mode==="weekly"?"Today is a rest day.":"Rest is next in your sequence."}</b><span>You can still log a workout below.</span>${s.mode==="cycle"?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':""}</div>` : s.mode==="cycle" ? '<button class="btn small" data-act="skipscheduled">Skip scheduled day</button>' : ""}</section>`;
 }
 function newSchedule(mode){
-  S.scheduleEditing={id:uid("schedule"),name:"",mode,days:mode==="weekly"?Array(7).fill(null):[allDays()[0].id],cursor:0};S.manageSchedules=false;render();
+  S.scheduleEditing={id:uid("schedule"),name:"",mode,days:mode==="weekly"?Array(7).fill(null):[null],cursor:0};S.manageSchedules=false;render();
 }
 function viewScheduleManager(){
-  return `<div class="section stack"><button class="btn small schedule-back" data-act="closeschedules">← Back to plan</button><h2>Your schedules</h2><p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts under Plan → Workouts & exercises, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
+  return `<div class="section stack"><button class="btn small schedule-back" data-act="closeschedules">← Back to plan</button><h2>Your schedules</h2>${activeSchedule()?'<button class="btn" data-act="noschedule">Train without a schedule</button>':'<p class="muted">No active schedule. Choose a saved plan or create your own.</p>'}<p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts under Plan → Workouts & exercises, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
 }
 function viewScheduleEditor(){
   const s=S.scheduleEditing;
@@ -224,7 +224,7 @@ async function scheduleAction(b){
     else if(act==="addscheduleday" && s && s.days.length<28){s.days.push(null);render();}
     else if(act==="removescheduleday" && s && s.days.length>1){s.days.splice(+b.dataset.i,1);s.cursor=Math.min(s.cursor,s.days.length-1);render();}
     else if(act==="saveschedule" && s){const clean={...s,name:s.name.trim(),cursor:s.mode==="weekly"?0:s.cursor};await saveScheduleList(S.schedules.some(w=>w.id===s.id)?S.schedules.map(w=>w.id===s.id?clean:w):[...S.schedules,clean],s.id);S.scheduleEditing=null;S.manageSchedules=false;render();toast("Schedule saved");}
-    else if(act==="deleteschedule" && S.schedules.length>1){if(S.armedDelete!==b.dataset.id){S.armedDelete=b.dataset.id;render();document.querySelector(`[data-act="deleteschedule"][data-id="${CSS.escape(b.dataset.id)}"]`)?.focus({preventScroll:true});toast("Press again to delete this schedule, or choose another action to cancel.");return;}const list=S.schedules.filter(w=>w.id!==b.dataset.id);await saveScheduleList(list,S.activeScheduleId===b.dataset.id?list[0].id:S.activeScheduleId);S.armedDelete=null;render();toast("Schedule deleted");}
+    else if(act==="deleteschedule" && S.schedules.length>1){if(S.armedDelete!==b.dataset.id){S.armedDelete=b.dataset.id;render();document.querySelector(`[data-act="deleteschedule"][data-id="${CSS.escape(b.dataset.id)}"]`)?.focus({preventScroll:true});toast("Press again to delete this schedule, or choose another action to cancel.");return;}const list=S.schedules.filter(w=>w.id!==b.dataset.id);await saveScheduleList(list,S.activeScheduleId===b.dataset.id?null:S.activeScheduleId);S.armedDelete=null;render();toast("Schedule deleted");}
   }catch(err){toast(err.message);}
 }
 
@@ -287,9 +287,9 @@ function viewHome(){
  return `<section class="today-dashboard" aria-label="Today dashboard">
  <section class="section week-overview" aria-label="Weekly training overview"><div class="week-heading"><button class="btn small" data-act="homeweek" data-delta="-1" aria-label="Previous week">‹</button><div><h2>${homeWeekOffset===0?'This week':esc(fmtDate(week[0].date))+' – '+esc(fmtDate(week[6].date))}</h2>${homeWeekOffset!==0?'<button class="week-reset" data-act="homeweekreset">Back to this week</button>':''}</div><button class="btn small" data-act="homeweek" data-delta="1" aria-label="Next week">›</button></div>
  <div class="week-strip">${week.map((d,i)=>`<div class="week-day ${d.type}" ${d.date===today()?'aria-current="date"':''} aria-label="${esc(fmtDate(d.date))}: ${d.type==='none'?'No scheduled workout':d.type}"><span>${['M','T','W','T','F','S','S'][i]}</span><strong>${Number(d.date.slice(-2))}</strong><small>${d.type==='completed'?'✓':d.type==='planned'?'•':d.type==='rest'?'–':d.type==='skipped'?'×':'·'}</small></div>`).join('')}</div><p class="week-legend muted">✓ Completed · • Planned · – Rest</p><button class="btn small" data-destination="plan">View your training plan →</button></section>
- <section class="section today-workout"><p class="eyebrow">${active?'IN PROGRESS':day?'READY TO TRAIN':'RECOVERY DAY'}</p><h2>${esc(day?.name||'Time to recover')}</h2><p class="muted">${active?'Pick up where you left off.':day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:'Rest is part of your plan. Choose a workout whenever you are ready.'}</p>
+ <section class="section today-workout"><p class="eyebrow">${active?'IN PROGRESS':day?'READY TO TRAIN':activeSchedule()?'RECOVERY DAY':'YOUR TRAINING'}</p><h2>${esc(day?.name||(activeSchedule()?'Time to recover':'Choose how you train'))}</h2><p class="muted">${active?'Pick up where you left off.':day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:activeSchedule()?'Rest is part of your plan. Choose a workout whenever you are ready.':'Create your own workout or choose a template. No training split is selected for you.'}</p>
  ${day?`<button class="btn primary" data-act="${active?'homecontinue':'homestart'}" data-id="${esc(day.id)}">${active?'Resume workout':'Start workout'} ${icon('arrow')}</button><details class="today-exercises"><summary>Preview ${day.ex.length} exercises</summary><ul class="today-preview">${day.ex.map(e=>`<li>${exerciseThumbnail(e.n)}<span class="exercise-preview-name">${esc(e.n)}</span><span>${e.s} × ${e.lo}–${e.hi}</span></li>`).join('')}</ul></details>`:''}
- <button class="btn" data-act="homechoose">Choose another workout</button>${!day&&activeSchedule()?.mode==='cycle'?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':''}</section>
+ <button class="btn ${!day?'primary':''}" data-act="homechoose">${day?'Choose another workout':'Choose a workout'}</button>${!activeSchedule()?'<button class="btn" data-act="homecreate">Create my own workout</button>':''}${!day&&activeSchedule()?.mode==='cycle'?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':''}</section>
  <div class="home-metrics"><section class="section"><p class="muted">This week</p><strong class="metric-value">${weeklyCount}</strong><p class="muted">sessions · ${S.sessions.length} total</p></section><section class="section"><p class="muted">Body weight</p><strong class="metric-value">${body?esc(body.weight)+' <small>'+esc(body.unit||DEFAULT_UNIT)+'</small>':'—'}</strong><p class="muted">${body?esc(fmtDate(body.date)):'No entries yet'}</p><button class="btn small" data-act="homebody">Log weight →</button></section></div>
  <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
  <button class="btn" data-destination="library">Browse workouts & exercises →</button></section>`;
@@ -607,7 +607,7 @@ function viewCalendar(){
   <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state state-${d.type}">${d.type==="none"?"—":esc(d.type)}</span>
   ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
  </div>`).join("");
- return `<section class="section plan-overview" aria-label="Schedule overview"><div class="plan-overview-head"><div><p class="eyebrow">YOUR PLAN</p><h2>${esc(activeSchedule()?.name||"Your training schedule")}</h2><p class="muted">${activeSchedule()?.mode==="weekly"?"Weekly routine":"Repeating workout sequence"} · ${esc(nextScheduleLabel())} next</p></div><button class="btn primary" type="button" data-act="manageschedules">Manage schedules →</button></div></section>
+ return `<section class="section plan-overview" aria-label="Schedule overview"><div class="plan-overview-head"><div><p class="eyebrow">YOUR PLAN</p><h2>${esc(activeSchedule()?.name||"Your training schedule")}</h2><p class="muted">${activeSchedule()?(activeSchedule().mode==="weekly"?"Weekly routine":"Repeating workout sequence")+" · "+esc(nextScheduleLabel())+" next":"No active plan. Choose or create a schedule when you are ready."}</p></div><button class="btn primary" type="button" data-act="manageschedules">Manage schedules →</button></div></section>
  ${schedulePanel()}<details class="section calendar-disclosure" data-disclosure="calendar" ${openDisclosures.has("calendar")?"open":""}><summary>Training calendar</summary><section class="training-calendar" aria-label="Training calendar"><p class="muted">See completed sessions, planned days and rest days. Unlogged days are not counted as missed.</p>
   <div class="calendar-toolbar"><h2>${esc(label)}</h2><div class="row-actions">
    <button class="btn small" data-act="calendarprev" aria-label="Previous month">←</button>
@@ -921,6 +921,8 @@ $("#app").addEventListener("click", async e => {
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
+  if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
   if(act==="homeweekreset"){homeWeekOffset=0;render();return;}
   if(act==="homebody"){navigateView("progress");const panel=document.getElementById("progress-body");panel.open=true;panel.scrollIntoView({block:"start"});document.getElementById("bWeight").focus({preventScroll:true});return;}
@@ -1181,7 +1183,7 @@ function migrateLegacy(j){
     calendarEvents:j.calendarEvents||[],sessions:(j.sessions || []).map(s=>({id:s.id,dayId:s.dayId || "legacy",dayName:s.dayName || "Workout",type:s.type || "other",date:s.date,notes:s.notes || "",createdAt:s.createdAt ?? 0,exercises:(s.exercises || []).map(e=>({name:e.name,...(e.exerciseId ? {exerciseId:e.exerciseId} : {}),unit:normalizeUnit(e.unit || s.unit),sets:Array.isArray(e.sets) ? e.sets.map(x=>({...Object.fromEntries(["id","type","completed","completedAt","rir","restSeconds"].filter(k=>x[k]!==undefined).map(k=>[k,x[k]])),w:x.w == null ? 0 : Number(x.w),r:Number(x.r)})) : e.sets}))})),
     body:(j.body || []).map(b=>({id:b.id,date:b.date,weight:b.weight == null ? null : Number(b.weight),waist:b.waist == null ? null : Number(b.waist),unit:normalizeUnit(b.unit),createdAt:b.createdAt ?? 0})),
     custom:(j.custom || []).map(c=>({id:c.id,name:c.name,type:c.type || "other",unit:normalizeUnit(c.unit),ex:(c.ex || []).map(e=>({n:e.n,s:e.s,lo:e.lo,hi:e.hi,alt:e.alt || [],...(e.exerciseId ? {exerciseId:e.exerciseId} : {})}))})),
-    drafts:normalizeDrafts(j.drafts),schedules:j.schedules || [starterSchedule(j.sessions || [])],preferences:{...preferences(),...(j.preferences || {}),activeScheduleId:j.preferences?.activeScheduleId || j.schedules?.[0]?.id || "starter-ppl"}};
+    drafts:normalizeDrafts(j.drafts),schedules:j.schedules || [starterSchedule(j.sessions || [])],preferences:{...preferences(),...(j.preferences || {}),activeScheduleId:Object.hasOwn(j.preferences||{},"activeScheduleId")?j.preferences.activeScheduleId:(j.schedules?.[0]?.id || "starter-ppl")}};
 }
 function buildAppData(){
   const normalized=migrateLegacy({exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,custom:S.custom,drafts:{},schedules:S.schedules,preferences:preferences()});
@@ -1224,7 +1226,7 @@ async function importJSON(){
     S.custom=replace ? incoming.custom : merge(S.custom,incoming.custom);
     S.schedules=replace ? incoming.schedules : legacy ? S.schedules : merge(S.schedules,incoming.schedules);
     validateSchedules(S.schedules,S.custom);
-    S.activeScheduleId=legacy && !replace ? S.activeScheduleId : incoming.preferences.activeScheduleId || S.schedules[0].id;
+    S.activeScheduleId=legacy && !replace ? S.activeScheduleId : incoming.preferences.activeScheduleId ?? null;
     S.drafts=replace ? incoming.drafts : {...S.drafts,...incoming.drafts};
     S.bodyUnit=incoming.preferences.bodyUnit;S.progressEx=incoming.preferences.progressExercise;
     // Replace takes backed-up settings (defaults for older backups); merge
