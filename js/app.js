@@ -436,6 +436,7 @@ function setRows(i, prefix, name, sets, last, lo, hi, unit){
       <select aria-label="${esc(name)} set ${j+1} type" data-act="settype" data-g="${prefix}" data-i="${i}" data-j="${j}">${["working","warmup","drop"].map(t=>`<option value="${t}" ${(s.type||"working")===t?"selected":""}>${t}</option>`).join("")}</select>
       <input type="number" min="0" max="10" step="1" inputmode="numeric" aria-label="${esc(name)} set ${j+1} RIR" data-f="rir" data-g="${prefix}" data-i="${i}" data-j="${j}" value="${s.rir??""}" placeholder="RIR">
       <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}" title="${s.completed===true?"Mark set incomplete":"Complete set and start rest timer"}">${s.completed===true ? "✓ Done" : "○ Done"}</button>
+      <div class="set-adjustments"><button type="button" data-act="adjustweight" data-g="${prefix}" data-i="${i}" data-j="${j}" data-direction="-1" aria-label="Decrease ${esc(name)} set ${j+1} weight" ${s.completed?'disabled':''}>− Weight</button><button type="button" data-act="adjustweight" data-g="${prefix}" data-i="${i}" data-j="${j}" data-direction="1" aria-label="Increase ${esc(name)} set ${j+1} weight" ${s.completed?'disabled':''}>+ Weight</button>${ph?`<button type="button" data-act="uselastset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="Use previous ${esc(name)} set ${j+1}" ${s.completed?'disabled':''}>Use last: ${esc(ph.w)} ${unit} × ${esc(ph.r)}</button>`:''}</div>
     </div>`; }).join("");
 }
 function lastBlock(name, e, unit){
@@ -973,6 +974,21 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
+  if(act==="adjustweight"||act==="uselastset"){
+   const exercise=grp(),entry=exercise.sets[+b.dataset.j];if(!entry||entry.completed)return;
+   const previous=lastFor(exercise.name),last=previous?.sets[+b.dataset.j];
+   if(act==="uselastset"){
+    if(!last)return;
+    if(String(entry.w??"").trim()!==""||String(entry.r??"").trim()!==""){toast("Clear this set before using the previous values.");return;}
+    entry.w=String(tidy(conv(last.w??0,previous.unit,exercise.unit),exercise.unit));entry.r=String(last.r??"");
+   }else{
+    const saved=settingFor(exercise,+b.dataset.i,b.dataset.g),amount=Number(exercise.loadIncrement||saved.loadIncrement)|| (exercise.unit==="kg"?2.5:5);
+    const increment=convertIncrement(amount,exercise.incrementUnit||saved.incrementUnit||exercise.unit,exercise.unit);
+    const current=num(entry.w)??(last?conv(last.w??0,previous.unit,exercise.unit):0);
+    entry.w=String(Math.round(Math.max(0,current+Number(b.dataset.direction)*increment)*1000)/1000);
+   }
+   saveDrafts();render();document.querySelector(`[data-act="${act}"][data-g="${b.dataset.g}"][data-i="${b.dataset.i}"][data-j="${b.dataset.j}"]`)?.focus({preventScroll:true});return;
+  }
   if (act === "completeset") { const entry=grp().sets[+b.dataset.j]; if(entry.completed===true){entry.completed=false;delete entry.completedAt;}else{if(!(num(entry.r)>0)){toast("Enter reps before completing a set.");return;}entry.completed=true;entry.completedAt=new Date().toISOString();const d=getDraft(S.dayId);timerWorkoutId=S.dayId;const exercise=grp();d.restTimer=timerTools.start(resolveRestSeconds({set:entry,exercise,draft:d,defaults:settingFor(exercise,+b.dataset.i,b.dataset.g),globalRestSeconds:S.globalRestSeconds}));}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const {draft:d}=timerContext();if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.workoutTimer=timerTools.idleWorkout();}saveDrafts();render();return;}
   if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=timerContext().draft.restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
