@@ -7,7 +7,7 @@ import { icon } from "./render.js";
 import { scheduleIndexFor } from "./schedules.js";
 import { createLocalStorage } from "./storage.js";
 import { recommendProgression } from "./progression.js";
-import { calculateRecords } from "./records.js";
+import { calculateRecords, strengthHighlights } from "./records.js";
 import { analyticsRange,analyticsSummary } from "./analytics.js";
 import { muscleVolumeSummary } from "./muscle-analytics.js";
 import { muscleMapData } from "./muscle-map-data.js";
@@ -712,6 +712,10 @@ function chartSVG(points, color, unit){
     <text x="${P.l}" y="${H-8}" font-size="12" fill="var(--muted)">${d0}</text><text x="${W-P.r}" y="${H-8}" font-size="12" text-anchor="end" fill="var(--muted)">${d1}</text></svg></div>`;
 }
 
+function progressHighlights(sessions){
+ const rows=strengthHighlights(sessions,S.bodyUnit||"kg");
+ return `<section class="section strength-highlights" aria-label="Recent strength highlights"><h2>Recent strength</h2><p class="muted">Best estimated 1RM in each exercise’s latest session versus its previous session, within your filters.</p>${rows.length?rows.map(r=>`<button class="btn strength-highlight" data-act="progresslift" data-name="${esc(r.name)}"><span><strong>${esc(r.name)}</strong><small>${esc(fmtDate(r.date))}</small></span><span><strong>${r.latest} ${r.unit}</strong><small>${r.previous===null?'First recorded session':Math.abs(r.latest-r.previous)<0.01?'Unchanged from previous':(r.latest>r.previous?'↑ +':'↓ ')+(Math.round((r.latest-r.previous)*100)/100)+' '+r.unit+' from previous'}</small><small>Best in range: ${r.best} ${r.unit}</small></span></button>`).join(""):'<p class="empty">Log working sets to see strength changes here.</p>'}<p class="muted">An estimate, not a tested maximum. Warm-ups and incomplete sets are excluded.</p></section>`;
+}
 function viewProgress(){
   const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
   const {filtered,summary}=cachedAnalytics(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
@@ -782,7 +786,7 @@ function viewProgress(){
   const weekStart=new Date(today()+"T12:00:00");weekStart.setDate(weekStart.getDate()-6);
   const weekKey=[weekStart.getFullYear(),String(weekStart.getMonth()+1).padStart(2,'0'),String(weekStart.getDate()).padStart(2,'0')].join('-');
   const weekCount=S.sessions.filter(x=>x.date>=weekKey&&x.date<=today()).length;
-  return `${activityOverview()}<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
+  return `${progressHighlights(filtered)}${activityOverview()}<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
     <details id="progress-body" class="section progress-body"><summary>Body measurements</summary>
       <div class="form-row">
         <label>Date<input type="date" id="bDate" value="${today()}"></label>
@@ -952,6 +956,7 @@ $("#app").addEventListener("click", async e => {
    S.editing={id:uid("c"),name:preset.name,type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:ex.map(e=>({...structuredClone(e),s:3}))};render();window.scrollTo({top:0});return;
   }
   if(act==="snoozebackup"){try{localStorage.setItem("gt-backup-snooze",String(Date.now()+7*86400000));render();}catch{toast("Could not save reminder preference.");}return;}
+  if(act==="progresslift"){S.progressEx=b.dataset.name;render();const panel=document.getElementById("progress-lifts");panel.open=true;panel.scrollIntoView({block:"start"});return;}
   if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
   if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
