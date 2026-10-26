@@ -36,3 +36,5 @@ nav.tabs button[aria-current="page"]{background:var(--blue-soft)!important;box-s
  .focused-exercise-summary-title{font-size:15px}.focused-exercise-body{padding:0 10px 16px}.exercise-photo-detail>img{max-height:300px}
  .session-completion>div{font-size:12px}.activity-grid{gap:4px}
 }
+
+.exercise-jump{margin:0 0 18px;padding:14px 18px}.exercise-jump>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}.exercise-jump nav{display:grid;gap:8px;margin-top:12px}.exercise-jump .btn{justify-content:space-between;text-align:left}.exercise-jump small{white-space:nowrap;color:var(--muted)}.previous-exercise{margin-top:16px;width:100%}.focused-exercise{scroll-margin-top:16px}

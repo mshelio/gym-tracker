@@ -514,6 +514,7 @@ function viewLog(){
        <label class="exercise-substitution">Exercise / substitution ${head}</label>${exerciseDefaultControls(de,i,"",d)}
       ${progressionHint(de,e)}</details><div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
       <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
+      ${i>0?`<button class="btn previous-exercise" data-act="nextexercise" data-i="${i-1}">← Previous: ${esc(day.ex[i-1].n)}</button>`:""}
       ${i<day.ex.length-1?`<button class="btn next-exercise" data-act="nextexercise" data-i="${i+1}">Next: ${esc(day.ex[i+1].n)} →</button>`:""}
     </div></details>`;
   }).join("");
@@ -533,7 +534,7 @@ function viewLog(){
     <section class="session-completion" aria-label="Workout completion"><div><span>Session progress</span><strong>${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length} / ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets complete</strong></div><progress aria-label="Completed sets" max="${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)||1}" value="${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length}"></progress></section>
     <section class="session-toolbar" aria-label="Session overview"><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets</p>${d.workoutTimer.state!=='running'?'<button class="btn" data-act="workoutbegin">Resume timer</button>':''}<button class="btn primary" data-act="reviewworkout">Finish workout</button></section>
     <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
-      <div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span></div>
+      <details class="section exercise-jump"><summary>Jump to an exercise · ${day.ex.length+d.extra.length} exercises</summary><nav aria-label="Workout exercises">${day.ex.map((e,i)=>`<button class="btn" data-act="jumptoexercise" data-i="${i}"><span>${i+1}. ${esc(d.ex[i].name)}</span><small>${d.ex[i].sets.filter(s=>s.completed).length}/${d.ex[i].sets.length} sets</small></button>`).join("")}${d.extra.map((e,i)=>`<button class="btn" data-act="jumpextra" data-i="${i}">${esc(e.name||"Extra exercise")}</button>`).join("")}</nav></details><div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span></div>
       ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
       ${exerciseNameSuggestions()}${cards}${extras}
       <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
@@ -933,7 +934,8 @@ $("#app").addEventListener("click", async e => {
   if(act==="copytemplate"){const day=getDay(b.dataset.id);S.editing={...structuredClone(day),id:uid("c"),name:day.name+" copy"};render();return;}
   if(act==="starttemplate"){S.dayId=b.dataset.id;workoutExpanded.clear();startWorkoutFor(S.dayId);navigateView("log");return;}
   if(act==="opensession"){navigateView("history");const row=document.querySelector(`[data-session-id="${CSS.escape(b.dataset.id)}"]`);if(row){row.open=true;row.scrollIntoView({block:"start"});}return;}
-  if(act==="nextexercise"){workoutExpanded.clear();workoutExpanded.add("base-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="base-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
+  if(act==="jumpextra"){workoutExpanded.clear();workoutExpanded.add("extra-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="extra-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
+  if(act==="nextexercise"||act==="jumptoexercise"){workoutExpanded.clear();workoutExpanded.add("base-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="base-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
   if(act==="reviewworkout")return saveSession(b,{reviewOnly:true});
   if(act==="backtosession"){startWorkoutFor(S.dayId);navigateView("log");return;}
   if(act==="workoutbegin"){
