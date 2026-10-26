@@ -294,13 +294,21 @@ function viewHome(){
  <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
  <button class="btn" data-destination="library">Browse workouts & exercises →</button></section>`;
 }
+const STARTER_WORKOUTS={
+ full:{name:"Full Body",description:"One balanced session · squat, push, pull and core",names:["Back squat","Dumbbell bench press","Seated cable row","Romanian deadlift","Cable crunch"]},
+ upper:{name:"Upper Body",description:"Upper/lower split · chest, back, shoulders and arms",names:["Dumbbell bench press","Lat pulldown","Seated cable row","Lateral raise","EZ-bar curl","Triceps pushdown"]},
+ lower:{name:"Lower Body",description:"Upper/lower split · legs, hips and core",names:["Back squat","Romanian deadlift","Leg extension","Lying leg curl","Standing calf raise","Cable crunch"]}
+};
+function starterChoices(){
+ return `<section class="section starter-choices" aria-label="Starter workout choices"><h2>Start your way</h2><p class="muted">Review and customize a workout before saving. Nothing is selected automatically.</p><div class="starter-grid">${Object.entries(STARTER_WORKOUTS).map(([id,p])=>`<button class="btn" data-act="reviewstarter" data-preset="${id}"><strong>${p.name}</strong><span>${p.description}</span><small>${p.names.length} exercises · ${p.names.length*3} sets · about ${Math.round(p.names.length*7.5/5)*5} min</small></button>`).join("")}<button class="btn" data-act="newworkout"><strong>Create my own</strong><span>Choose your exercises and set targets.</span></button></div><p class="muted">Prefer Push / Pull / Legs? Preview the PPL templates below. Combine saved workouts into a repeating or weekly schedule under Plan.</p></section>`;
+}
 function viewLibrary(){
  if(S.editing)return viewEditor();
  if(templateId&&getDay(templateId)){
   const day=getDay(templateId);
   return `<button class="btn small" data-act="closetemplate">← Workout templates</button><section class="section template-detail"><p class="eyebrow">WORKOUT TEMPLATE</p><h2>${esc(day.name)}</h2><p class="muted">Starting a session keeps this reusable template unchanged.</p><ol class="template-exercises">${day.ex.map(e=>`<li class="exercise-photo-row">${exerciseThumbnail(e.n)}<div><strong>${esc(e.n)}</strong><span>${e.s} sets · ${e.lo}–${e.hi} reps</span>${exercisePhotoDetail(e.n)}</div></li>`).join("")}</ol><div class="row-actions"><button class="btn primary" data-act="starttemplate" data-id="${esc(day.id)}">Start this workout</button><button class="btn" data-act="${BASE_DAY[day.id]?'copytemplate':'editday'}" data-id="${esc(day.id)}">${BASE_DAY[day.id]?'Customize a copy':'Edit template'}</button></div></section>`;
  }
- return `<section aria-label="Workout templates"><div class="section-heading"><h2>Workout templates</h2><button class="btn small" data-act="newworkout">+ New workout</button></div><p class="muted">Choose a template to preview, start, or edit.</p><div class="template-grid">${allDays().map(day=>`<button class="section template-card" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(day.type)}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets</span></button>`).join("")}</div></section><details class="section exercise-library" data-disclosure="library" ${openDisclosures.has("library")?"open":""}><summary>Exercise library</summary>${exerciseSearchBox()}<ul>${[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort().map(n=>`<li class="exercise-photo-row" data-exercise-search-item="${esc(n)}">${exerciseThumbnail(n)}<div>${esc(n)}${exercisePhotoDetail(n)}</div></li>`).join("")}</ul></details>`;
+ return `${starterChoices()}<section aria-label="Workout templates"><div class="section-heading"><h2>Workout templates</h2><button class="btn small" data-act="newworkout">+ New workout</button></div><p class="muted">Choose a template to preview, start, or edit.</p><div class="template-grid">${allDays().map(day=>`<button class="section template-card" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(day.type)}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets</span></button>`).join("")}</div></section><details class="section exercise-library" data-disclosure="library" ${openDisclosures.has("library")?"open":""}><summary>Exercise library</summary>${exerciseSearchBox()}<ul>${[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort().map(n=>`<li class="exercise-photo-row" data-exercise-search-item="${esc(n)}">${exerciseThumbnail(n)}<div>${esc(n)}${exercisePhotoDetail(n)}</div></li>`).join("")}</ul></details>`;
 }
 function viewSettings(){
  const theme=document.documentElement?.dataset?.themePreference||"system";
@@ -923,6 +931,12 @@ $("#app").addEventListener("click", async e => {
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="reviewstarter"){
+   const preset=STARTER_WORKOUTS[b.dataset.preset];if(!preset)return;
+   const definitions=allDays().flatMap(d=>d.ex),ex=preset.names.map(name=>definitions.find(e=>e.n===name));
+   if(ex.some(e=>!e)){toast("Some starter exercises are unavailable in this program. Create your own workout instead.");return;}
+   S.editing={id:uid("c"),name:preset.name,type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:ex.map(e=>({...structuredClone(e),s:3}))};render();window.scrollTo({top:0});return;
+  }
   if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
   if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
