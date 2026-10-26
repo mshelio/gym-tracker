@@ -22,3 +22,21 @@ export function calculateRecords(sessions,exerciseName,unit="kg"){
  let maxVolume=null,volumeWinner=null;for(const v of volumes){if(maxVolume===null||v.value>maxVolume){maxVolume=v.value;volumeWinner=v;volumeTies=1;}else if(v.value===maxVolume)volumeTies++;}
  return {unit,heaviest:best("weight"),mostReps:best("reps"),estimated1RM:best("estimated1RM"),repAtLoad:[...atLoad].sort((a,b)=>b[0]-a[0]).map(([load,e])=>({load,reps:e.reps})),sessionVolume:maxVolume==null?null:{...volumeWinner,tieCount:volumeTies},sampleCount:entries.length};
 }
+
+// Group history once; compare the two latest sessions for each exercise.
+export function strengthHighlights(sessions,unit="kg",limit=3){
+ const grouped=new Map();
+ for(const session of sessions||[])for(const name of new Set((session.exercises||[]).map(e=>e.name))){
+  if(!grouped.has(name))grouped.set(name,[]);
+  grouped.get(name).push({...session,exercises:session.exercises.filter(e=>e.name===name)});
+ }
+ const rows=[];
+ for(const [name,history] of grouped){
+  const ordered=history.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||(b.createdAt||0)-(a.createdAt||0)||String(b.id).localeCompare(String(a.id)));
+  const valid=ordered.map(s=>({session:s,record:calculateRecords([s],name,unit).estimated1RM})).filter(x=>x.record);
+  if(!valid.length)continue;
+  const latest=valid[0],previous=valid[1],best=calculateRecords(history,name,unit).estimated1RM;
+  rows.push({name,date:latest.session.date,latest:latest.record.value,previous:previous?.record.value??null,best:best.value,unit});
+ }
+ return rows.sort((a,b)=>String(b.date).localeCompare(String(a.date))||a.name.localeCompare(b.name)).slice(0,limit);
+}
