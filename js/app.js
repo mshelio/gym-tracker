@@ -279,6 +279,20 @@ function activityOverview(){
  const total=[...counts.values()].reduce((a,b)=>a+b,0);
  return `<section class="section activity-overview"><h2>Training activity</h2><p class="muted">${total} sessions · last 12 weeks</p><div class="activity-grid" role="img" aria-label="${total} sessions across ${counts.size} training days in the last 12 weeks">${Array.from({length:84},(_,i)=>{const date=dateOffset(start,i),count=counts.get(date)||0;return `<span class="activity-cell ${count?'trained':''}" title="${date}: ${count} sessions" aria-hidden="true"></span>`;}).join("")}</div><button class="btn small" data-destination="history">View workout history →</button></section>`;
 }
+function backupInfo(){
+ let exported=0,snoozed=0;
+ try{exported=Number(localStorage.getItem("gt-last-export"))||0;snoozed=Number(localStorage.getItem("gt-backup-snooze"))||0;}catch{}
+ const now=Date.now();if(exported<0||exported>now||!Number.isFinite(exported))exported=0;
+ return {exported,due:(S.sessions.length+S.body.length+S.custom.length>0)&&now>=snoozed&&(!exported||now-exported>=30*86400000)};
+}
+function backupStatus(){
+ const {exported}=backupInfo();
+ return `<p class="muted backup-export-status">${exported?'Last export started: '+esc(new Date(exported).toLocaleString()):'No export recorded on this device.'} Check that the downloaded file is saved somewhere safe.</p>`;
+}
+function backupReminder(){
+ if(!backupInfo().due)return "";
+ return `<aside class="section backup-reminder" aria-label="Backup reminder"><h2>Keep a copy of your training</h2><p class="muted">${backupInfo().exported?'It has been at least 30 days since your last export.':'You have training data on this device and no recorded export.'}</p><div class="row-actions"><button class="btn" data-destination="data">Back up my data</button><button class="btn small" data-act="snoozebackup">Remind me in a week</button></div></aside>`;
+}
 function viewHome(){
  const active=activeWorkoutId(),day=getDay(active||nextSlot()),last=sortSessions(S.sessions)[0],week=dashboardWeek();
  const sets=day?.ex.reduce((n,e)=>n+e.s,0)||0,body=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1);
@@ -292,7 +306,7 @@ function viewHome(){
  <button class="btn ${!day?'primary':''}" data-act="homechoose">${day?'Choose another workout':'Choose a workout'}</button>${!activeSchedule()?'<button class="btn" data-act="homecreate">Create my own workout</button>':''}${!day&&activeSchedule()?.mode==='cycle'?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':''}</section>
  <div class="home-metrics"><section class="section"><p class="muted">This week</p><strong class="metric-value">${weeklyCount}</strong><p class="muted">sessions · ${S.sessions.length} total</p></section><section class="section"><p class="muted">Body weight</p><strong class="metric-value">${body?esc(body.weight)+' <small>'+esc(body.unit||DEFAULT_UNIT)+'</small>':'—'}</strong><p class="muted">${body?esc(fmtDate(body.date)):'No entries yet'}</p><button class="btn small" data-act="homebody">Log weight →</button></section></div>
  <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
- <button class="btn" data-destination="library">Browse workouts & exercises →</button></section>`;
+ <button class="btn" data-destination="library">Browse workouts & exercises →</button>${backupReminder()}</section>`;
 }
 const STARTER_WORKOUTS={
  full:{name:"Full Body",description:"One balanced session · squat, push, pull and core",names:["Back squat","Dumbbell bench press","Seated cable row","Romanian deadlift","Cable crunch"]},
@@ -312,7 +326,7 @@ function viewLibrary(){
 }
 function viewSettings(){
  const theme=document.documentElement?.dataset?.themePreference||"system";
- return `<section class="section settings-form" aria-label="Training settings"><h2>Preferences</h2><label>Appearance<select id="theme-preference" aria-label="Color theme">${['system','light','dark'].map(t=>`<option value="${t}" ${theme===t?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}</select></label><label>Default weight unit<select data-setting="unit">${['kg','lb'].map(u=>`<option ${(S.defaultUnit||DEFAULT_UNIT)===u?'selected':''}>${u}</option>`).join('')}</select></label><p class="muted">Used for new sessions. Existing sets keep their units.</p><label>Default rest time<select data-setting="rest">${[...new Set([30,60,90,120,180,240,300,S.globalRestSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${S.globalRestSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><label class="check-setting"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?'':'checked'}> Show progression suggestions</label></section><section class="section"><h2>Your data</h2><p class="muted">Workouts are stored on this device. Export a backup to keep another copy.</p><button class="btn" data-destination="data">Data & Backups →</button></section>`;
+ return `<section class="section settings-form" aria-label="Training settings"><h2>Preferences</h2><label>Appearance<select id="theme-preference" aria-label="Color theme">${['system','light','dark'].map(t=>`<option value="${t}" ${theme===t?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}</select></label><label>Default weight unit<select data-setting="unit">${['kg','lb'].map(u=>`<option ${(S.defaultUnit||DEFAULT_UNIT)===u?'selected':''}>${u}</option>`).join('')}</select></label><p class="muted">Used for new sessions. Existing sets keep their units.</p><label>Default rest time<select data-setting="rest">${[...new Set([30,60,90,120,180,240,300,S.globalRestSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${S.globalRestSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><label class="check-setting"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?'':'checked'}> Show progression suggestions</label></section><section class="section"><h2>Your data</h2>${backupStatus()}<p class="muted">Workouts are stored on this device. Export a backup to keep another copy.</p><button class="btn" data-destination="data">Data & Backups →</button></section>`;
 }
 function sessionOverview(session){
  return `<ul class="session-review-list">${session.exercises.map(e=>`<li><strong>${esc(e.name)}</strong><span>${e.sets.map(x=>`${x.w} ${esc(e.unit)} × ${x.r}`).join(' · ')}</span></li>`).join('')}</ul>`;
@@ -784,7 +798,7 @@ function viewProgress(){
 }
 
 function viewData(){
-  return `<div class="data-grid" role="region" aria-label="Backup and restore settings"><div class="section stack"><span class="panel-icon">${icon("download")}</span><h3>Back up this device</h3><p class="muted">Your workouts stay on this device until you export a file. Save a backup before replacing data or clearing your browser.</p><p class="muted">${S.sessions.length} sessions · ${S.body.length} body entries · ${S.custom.length} custom workouts</p>
+  return `<div class="data-grid" role="region" aria-label="Backup and restore settings"><div class="section stack"><span class="panel-icon">${icon("download")}</span><h3>Back up this device</h3>${backupStatus()}<p class="muted">Your workouts stay on this device until you export a file. Save a backup before replacing data or clearing your browser.</p><p class="muted">${S.sessions.length} sessions · ${S.body.length} body entries · ${S.custom.length} custom workouts</p>
     <p class="muted">Export workouts, schedules, schedule progress, session drafts and preferences in one JSON backup.</p><button class="btn primary" data-act="export">Export app data (.json)</button>
     <textarea id="exportOut" readonly hidden aria-label="Exported JSON"></textarea><button class="btn" data-act="copyexport" id="copyBtn" hidden>Copy JSON instead</button></div>
     <div class="section stack"><span class="panel-icon">${icon("upload")}</span><h3>Restore a backup</h3><p class="muted">Supports Gym Tracker backup versions 1 through 4. Restoring never requires an account or network connection.</p><p class="muted">Choose a backup or paste its JSON. The complete file is validated before saving.</p><label class="file-label">Choose backup file<input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup"></label>
@@ -937,6 +951,7 @@ $("#app").addEventListener("click", async e => {
    if(ex.some(e=>!e)){toast("Some starter exercises are unavailable in this program. Create your own workout instead.");return;}
    S.editing={id:uid("c"),name:preset.name,type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:ex.map(e=>({...structuredClone(e),s:3}))};render();window.scrollTo({top:0});return;
   }
+  if(act==="snoozebackup"){try{localStorage.setItem("gt-backup-snooze",String(Date.now()+7*86400000));render();}catch{toast("Could not save reminder preference.");}return;}
   if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
   if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
@@ -1234,7 +1249,10 @@ async function exportJSON(){
   try {
     const url = URL.createObjectURL(new Blob([json],{type:"application/json"}));
     const a = document.createElement("a");a.href=url;a.download=`ppl-tracker-data-${today()}.json`;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);toast("App data export started");
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    try{localStorage.setItem("gt-last-export",String(Date.now()));localStorage.removeItem("gt-backup-snooze");}catch{}
+    document.querySelectorAll(".backup-export-status").forEach(el=>{el.textContent="Last export started: "+new Date().toLocaleString()+". Check that the downloaded file is saved somewhere safe.";});
+    toast("App data export started");
   } catch {toast("Download unavailable. Copy the JSON below.");}
 }
 async function importJSON(){
