@@ -334,7 +334,7 @@ function sessionOverview(session){
 function viewSessionReview(){
  if(!sessionReview)return viewLog();
  const count=sessionReview.exercises.reduce((n,e)=>n+e.sets.length,0),draft=getDraft(S.dayId),total=[...draft.ex,...draft.extra].reduce((n,e)=>n+e.sets.length,0);
- return `<section class="section session-review"><p class="eyebrow">REVIEW YOUR WORKOUT</p><h2>${esc(sessionReview.dayName)}</h2><p>${count} logged sets · ${sessionReview.exercises.length} exercises · ${esc(fmtDate(sessionReview.date))}</p><p class="muted">${total-count>0?`${total-count} unlogged or unchecked sets will be left out. `:''}Your workout timer is paused. Save to record this session.</p>${sessionOverview(sessionReview)}${sessionReview.notes?`<p>${esc(sessionReview.notes)}</p>`:''}<div class="row-actions"><button class="btn primary" data-act="save">Save session</button><button class="btn" data-act="backtosession">Keep training</button></div><p id="session-validation" role="alert" hidden></p></section>`;
+ return `<section class="section session-review"><p class="eyebrow">REVIEW YOUR WORKOUT</p><h2>${esc(sessionReview.dayName)}</h2><p>${count} logged sets · ${sessionReview.exercises.length} exercises · ${esc(fmtDate(sessionReview.date))}</p><p class="muted">${total-count>0?`${total-count} unlogged or unchecked sets will be left out. `:''}Your workout timer is paused. Save to record this session.</p><label class="session-date">Workout date<input type="date" id="review-workout-date" value="${esc(sessionReview.date)}"></label>${sessionReview.date!==today()?'<p class="muted">This draft is dated earlier or later than today. Check the date before saving.</p>':''}<button class="btn small" data-act="reviewtoday">Use today (${esc(today())})</button>${sessionOverview(sessionReview)}${sessionReview.notes?`<p>${esc(sessionReview.notes)}</p>`:''}<div class="row-actions"><button class="btn primary" data-act="save">Save session</button><button class="btn" data-act="backtosession">Keep training</button></div><p id="session-validation" role="alert" hidden></p></section>`;
 }
 function viewSessionSummary(){
  if(!savedSummary)return viewHome();
@@ -415,6 +415,7 @@ function startWorkoutFor(id){
   if(other.restTimer?.pausedRemainingMs==null&&other.restTimer)other.restTimer=timerTools.pause(other.restTimer);
  }
  const d=getDraft(id);
+ if(d.workoutTimer.state==="idle"&&!draftHasData(d))d.date=today();
  d.workoutTimer=timerTools.startWorkout(d.workoutTimer);
  if(d.restTimer?.pausedRemainingMs!=null)d.restTimer=timerTools.resume(d.restTimer);
  timerWorkoutId=id;saveDrafts();
@@ -957,6 +958,7 @@ $("#app").addEventListener("click", async e => {
   }
   if(act==="snoozebackup"){try{localStorage.setItem("gt-backup-snooze",String(Date.now()+7*86400000));render();}catch{toast("Could not save reminder preference.");}return;}
   if(act==="progresslift"){S.progressEx=b.dataset.name;render();const panel=document.getElementById("progress-lifts");panel.open=true;panel.scrollIntoView({block:"start"});return;}
+  if(act==="reviewtoday"){const field=document.getElementById("review-workout-date");if(field)field.value=today();return;}
   if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
   if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
@@ -1115,6 +1117,8 @@ async function saveSession(btn,{reviewOnly=false}={}){
  const notice=document.querySelector('#session-validation');if(notice){notice.hidden=true;notice.textContent='';}
  document.querySelectorAll('#app [aria-invalid="true"][data-f]').forEach(input=>{input.removeAttribute?.('aria-invalid');if(input.getAttribute?.('aria-describedby')==='session-validation')input.removeAttribute?.('aria-describedby');});
   const day = getDay(S.dayId), d = getDraft(S.dayId);
+  const reviewDate=document.querySelector("#review-workout-date");
+  if(!reviewOnly&&sessionReview&&reviewDate){if(!validDataDate(reviewDate.value)){reportSessionValidation("Pick a valid workout date.",reviewDate);return;}d.date=reviewDate.value;}
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
   const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){reportSessionValidation("RIR must be a whole number from 0 to 10.",document.querySelector("#app [data-f=rir]"));return;}
