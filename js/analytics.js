@@ -27,7 +27,7 @@ export function analyticsSummary(sessions=[],options={}){
     if(options.exercise&&ex.name!==options.exercise)continue;
     const converted=display(w,from),volume=converted*r;
     row.volume+=volume;totalVolume+=volume;
-    if(set.type!=="drop"){row.hardSets++;hardSets++;}
+    if(set.type!=="drop"&&set.type!=="reverse-drop"){row.hardSets++;hardSets++;}
     if(collectPoints && (ex.name===options.exercise||!options.exercise)){
       exercisePoints.push({date,exercise:ex.name,weight:converted,estimated1RM:converted*(1+r/30),reps:r,createdAt:session.createdAt||0});
     }

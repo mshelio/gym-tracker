@@ -3,7 +3,7 @@ export function exerciseKey(name, exerciseId) {
   return exerciseId ? "id:" + exerciseId : "name:" + String(name || "").trim().toLocaleLowerCase();
 }
 export function hardSetCount(sessions) {
-  return sessions.reduce((total,session)=>total+(session.exercises||[]).reduce((count,exercise)=>count+(exercise.sets||[]).filter(set=>set.type!=="warmup" && set.type!=="drop" && set.completed!==false && Number(set.r)>0).length,0),0);
+  return sessions.reduce((total,session)=>total+(session.exercises||[]).reduce((count,exercise)=>count+(exercise.sets||[]).filter(set=>set.type!=="warmup" && set.type!=="drop" && set.type!=="reverse-drop" && set.completed!==false && Number(set.r)>0).length,0),0);
 }
 export function normalizeExerciseSetting(raw) {
   if(!raw || typeof raw!=="object")return {};
@@ -22,6 +22,7 @@ export function convertIncrement(value,from,to){
 
 /** A set may override rest without changing the exercise's saved preference. */
 export function resolveRestSeconds({set,exercise,draft,defaults,globalRestSeconds=90}={}){
+ if(Number.isInteger(set?.restSeconds)&&set.restSeconds>=0&&set.restSeconds<=600)return set.restSeconds;
  const valid=n=>Number.isInteger(n)&&n>=15&&n<=600;
  for(const n of [set?.restSeconds,exercise?.restSeconds,defaults?.restSeconds,draft?.restSeconds,globalRestSeconds,90]){
   if(valid(n))return n;

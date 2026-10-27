@@ -29,7 +29,7 @@ export function muscleVolumeSummary(sessions=[],{from="",to="",workout="",exerci
     const weight=Number(set.w),reps=Number(set.r);
     if(set.completed===false||set.type==="warmup"||!Number.isFinite(weight)||weight<0||!Number.isInteger(reps)||reps<=0)continue;
     const load=weight*(source===unit?1:source==="lb"?MUSCLE_KG:1/MUSCLE_KG)*reps;
-    const hard=set.type==="drop"?0:1;
+    const hard=["drop","reverse-drop"].includes(set.type)?0:1;
     hardSets+=hard;volume+=load;
     if(!meta){add(unknown,"unknown",hard,load);row.unknown.hardSets+=hard;row.unknown.volume+=load;continue;}
     add(primary,meta.primaryMuscle,hard,load);add(row.primary,meta.primaryMuscle,hard,load);

@@ -1,5 +1,5 @@
 // Pure, explainable double-progression: history is never modified.
-const eligible = s => s && s.type !== "warmup" && s.type !== "drop" && s.completed !== false && Number.isInteger(Number(s.r)) && Number(s.r)>0 && Number.isFinite(Number(s.w)) && Number(s.w)>=0;
+const eligible = s => s && s.type !== "warmup" && s.type !== "drop" && s.type !== "reverse-drop" && s.completed !== false && Number.isInteger(Number(s.r)) && Number(s.r)>0 && Number.isFinite(Number(s.w)) && Number(s.w)>=0;
 export function recommendProgression({sessions=[],exerciseName,exerciseId,minimum=6,maximum=12,unit="kg",increment=2.5,incrementUnit=unit,enabled=true}={}){
  if(!enabled)return {kind:"disabled",reason:"Progression suggestions are disabled."};
  if(!exerciseName || !Number.isInteger(minimum)||!Number.isInteger(maximum)||minimum<1||maximum<minimum||!Number.isFinite(increment)||increment<=0)return {kind:"unavailable",reason:"Valid exercise, rep range and load increment are required."};

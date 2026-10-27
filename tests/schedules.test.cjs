@@ -254,7 +254,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.resolveRestSeconds({set:{restSeconds:999},exercise:{restSeconds:80},defaults:{restSeconds:120},draft:{restSeconds:180}}),80);
   assert.equal(a.resolveRestSeconds({defaults:{restSeconds:120},draft:{restSeconds:180}}),120);
   assert.equal(a.resolveRestSeconds({draft:{restSeconds:180}}),180);
-  assert.equal(a.resolveRestSeconds({set:{restSeconds:0}}),90);
+  assert.equal(a.resolveRestSeconds({set:{restSeconds:0}}),0);
   assert.notEqual(a.exerciseKey("Row","row-id-1"),a.exerciseKey("Row","row-id-2"));
 
 
