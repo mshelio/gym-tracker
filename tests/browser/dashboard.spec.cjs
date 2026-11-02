@@ -10,7 +10,7 @@ test('weekly dashboard browses dates without starting a workout or choosing a pl
  await expect(page.locator('.week-day[aria-current=date]')).toHaveCount(0);
  await page.getByRole('button',{name:'Back to this week'}).click();
  await expect(page.locator('.week-day[aria-current=date] strong')).toHaveText('22');
- await expect(page.locator('.timer-dock')).toHaveCount(0);
+ await expect(page.locator('.resume-bar')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Choose a workout',exact:true})).toBeVisible();
 });
 test('home weight shortcut saves through the existing body measurements flow',async({page})=>{
@@ -33,6 +33,7 @@ test('session progress counts completed sets and progress shows real activity',a
  await expect(meter).toHaveAttribute('value','0');
  await page.getByRole('button',{name:'Lat pulldown set 1 mark complete',exact:true}).click();
  await expect(meter).toHaveAttribute('value','1');
+ await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await page.locator('nav.tabs [data-tab=progress]').click();
  await expect(page.locator('.activity-cell')).toHaveCount(84);
  await expect(page.locator('.activity-cell.trained')).toHaveCount(0);

@@ -7,6 +7,10 @@ for(const width of [320,390,768,1440])for(const theme of ['light','dark']){
    await page.locator(`nav.tabs [data-tab=${tab}]`).click();await expect(page.locator('.page-intro')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
    if(width===390||width===1440)await page.screenshot({path:testInfo.outputPath(`${tab}-${theme}-${width}.png`)});
   }
-  await enterSession(page);expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);const dock=await page.locator('.timer-dock').boundingBox();expect(Math.round(width-dock.x-dock.width)).toBe(16);await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();const panel=await page.locator('.timer-popover').boundingBox();expect(panel.x).toBeGreaterThanOrEqual(0);expect(panel.y).toBeGreaterThanOrEqual(0);expect(panel.y+panel.height).toBeLessThan(dock.y);await page.keyboard.press('Escape');
+  await enterSession(page);expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  const bar=await page.locator('.session-toolbar').boundingBox();expect(bar.x).toBeGreaterThanOrEqual(-1);expect(bar.x+bar.width).toBeLessThanOrEqual(width+1);
+  if(width===390||width===1440)await page.screenshot({path:testInfo.outputPath(`session-${theme}-${width}.png`)});
+  await page.getByRole('button',{name:'Session options',exact:true}).click();const sheet=await page.locator('.sheet').boundingBox();
+  expect(sheet.x).toBeGreaterThanOrEqual(0);expect(sheet.y).toBeGreaterThanOrEqual(0);expect(sheet.x+sheet.width).toBeLessThanOrEqual(width);await page.keyboard.press('Escape');
  });
 }

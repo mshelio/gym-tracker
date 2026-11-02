@@ -102,6 +102,7 @@ test('v4 backup restores saved draft into a separate browser profile',async({pag
  await enterSession(page);const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/});
  await reps.fill('13');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  await page.getByRole('button',{name:/Data & Backups/}).click();
  await page.locator('[data-act="export"]').click();

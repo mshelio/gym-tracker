@@ -65,7 +65,13 @@
 :root[data-theme="dark"] .muscle-map__activation--primary{fill:#ad91ff}
 :root[data-theme="dark"] .muscle-map__activation--secondary{fill:#79c9ea}
 
-/* Blue design system: muscle activity levels share the app accent palette. */
-.muscle-map__region{fill:color-mix(in srgb,var(--blue) calc(var(--muscle-intensity)*82%),var(--sunk));stroke:var(--surface)}
-.muscle-map__region:hover,.muscle-map__region:focus-visible{stroke:var(--blue-deep)}
+/* Athletic design system: muscle activity uses the volt heat scale on neutral anatomy. */
+.muscle-map__region,:root[data-theme="dark"] .muscle-map__region{fill:color-mix(in srgb,var(--heat) calc(var(--muscle-intensity)*88%),var(--surface-2));stroke:var(--surface)}
+.muscle-map__region:hover,.muscle-map__region:focus-visible,.muscle-map__region.is-selected{stroke:var(--ink)}
+.muscle-map__anatomy-base,:root[data-theme="dark"] .muscle-map__anatomy-base{fill:var(--surface-2);stroke:var(--line-strong)}
+.muscle-map__scale,:root[data-theme="dark"] .muscle-map__scale{background:linear-gradient(90deg,var(--surface-2),var(--heat));border:1px solid var(--line)}
 .muscle-map__view{background:var(--sunk);border-radius:15px;padding:.8rem}
+.muscle-map__details{border-radius:var(--radius-sm)}
+.muscle-map__activation--primary,:root[data-theme="dark"] .muscle-map__activation--primary{fill:var(--heat)}
+.muscle-map__activation--secondary,:root[data-theme="dark"] .muscle-map__activation--secondary{fill:color-mix(in srgb,var(--heat) 45%,var(--surface-2))}
+.muscle-map__activation--inactive,:root[data-theme="dark"] .muscle-map__activation--inactive{fill:var(--surface-2)}

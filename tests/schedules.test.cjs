@@ -30,7 +30,7 @@ const sources = Object.fromEntries(moduleFiles.map(f => [f, fs.readFileSync(path
 const moduleCode = sources['app.js'];
 const combined = moduleFiles.map(f => sources[f].replace(/^\s*import\s+[^;]+;\s*/gm, '').replace(/^export\s+\{[^}]+\};?\s*/gm, '').replace(/^export\s+(?=(?:async\s+)?function|const|class)/gm, '')).join('\n');
 assert.match(html, /type="module" src="\.\/js\/app\.js"/);
-const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,resolveExerciseMetadata,resolveExerciseIdentity,muscleVolumeSummary,muscleMapData,renderMuscleMap,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
+const code = combined.replace('initApp();\n})();', 'globalThis.test = {S, parseProgram, applyProgram, initApp, getDay, getDraft, nextDayId, saveSession, saveWorkout, saveCalendarEvent, deleteCalendarEvent, addBody, viewLog, viewHistory, viewCalendar, viewProgress, viewLifts, viewBody, sheetMarkup, viewData, render, importJSON, exportJSON, putSession, removeSession, updateSessionMeter, useProgramFile, flushDrafts, buildAppData, validateAppData, activeSchedule, nextSlot, scheduleIndex, saveScheduleList, skipScheduleDay, useSchedule, validateSchedules, scheduleAction, viewScheduleEditor, viewScheduleManager, isLocalDate,validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,projectWeeklyCalendar,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds,exerciseKey,resolveExerciseMetadata,resolveExerciseIdentity,muscleVolumeSummary,muscleMapData,renderMuscleMap,recommendProgression,calculateRecords,analyticsSummary,analyticsRange,sampleChartPoints,chartSVG};\ninitApp();\n})();');
 function setup({fetchFail=false, storage={}, rejectWrites=false}={}){
   const nodes = new Map();
   const node = (id) => {
@@ -243,7 +243,8 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   delete identityDraft.ex[1].exerciseId; // Older v4 draft: recover ID from unchanged definition.
   assert.equal(a.getDraft('identity-test').ex[1].exerciseId,'unique-row-2');
   a.S.custom.pop();a.S.exerciseDefaults={};delete a.S.drafts['identity-test'];
-  assert(a.viewLog().includes('data-act="savedefault"'));
+  assert(a.viewLog().includes('data-sheet="exercise"'));
+  assert(a.sheetMarkup({kind:'exercise',g:'',i:0}).includes('data-act="savedefault"'));
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:8,type:"working",completed:true},{r:10,type:"warmup",completed:true},{r:9,type:"drop",completed:true},{r:6}]}]}]),2);
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:12,type:"working",completed:false}]}]}]),0);
   assert.equal(a.normalizeExerciseSetting({restSeconds:14}).restSeconds,undefined);
@@ -268,9 +269,11 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.throws(()=>a.validateAppData(clockBackup),/workoutTimer/);
   delete clockBackup.drafts[a.S.dayId].workoutTimer;
   assert.doesNotThrow(()=>a.validateAppData(clockBackup));
-  assert(a.viewLog().includes('data-act="settype"'));
-  assert(a.viewLog().includes('data-f="rir"'));
-  assert(a.viewLog().includes('data-f="exrest"'));
+  // Set type, RIR and exercise rest moved from every set row into the per-set and per-exercise sheets.
+  assert(a.viewLog().includes('data-sheet="set"'));
+  assert(a.sheetMarkup({kind:'set',g:'',i:0,j:0}).includes('data-act="settype"'));
+  assert(a.sheetMarkup({kind:'set',g:'',i:0,j:0}).includes('data-f="rir"'));
+  assert(a.sheetMarkup({kind:'exercise',g:'',i:0}).includes('data-f="exrest"'));
   assert(!node('#app').innerHTML.includes('data-act="clocktoggle"'));
   assert(a.viewLog().includes('Make every')===false);assert(node('#app').innerHTML.includes('<h1>Today</h1>'));
   a.S.tab='log';const d=a.getDraft('pullA');d.restSeconds=135;d.restTimer={durationSeconds:135,deadline:Date.now()+135000,pausedRemainingMs:90000};d.startedAt=Date.now()-40000;d.ex[0].restSeconds=120;d.ex[0].loadIncrement='2.5';d.ex[0].incrementUnit='kg';d.ex[0].sets[0]={w:'100',r:'8',type:'working',completed:true,completedAt:'2026-10-14T10:00:00Z',rir:2};assert.equal(a.buildAppData().drafts.pullA.restTimer.pausedRemainingMs,90000);assert.equal(a.buildAppData().drafts.pullA.ex[0].restSeconds,120);assert.equal(a.buildAppData().drafts.pullA.ex[0].sets[0].rir,2);a.updateSessionMeter();assert.equal(node('#loggedSets').textContent,1);
@@ -279,8 +282,8 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   a.S.tab='data';a.render();await a.exportJSON();assert.equal(c.downloads.length,1);const backup=node('#exportOut').value;assert.equal(JSON.parse(backup).app,'ppl-tracker');
   const restored=setup();await settle();restored.node('#importText').value=backup;await restored.api.importJSON();assert.equal(restored.api.S.sessions.length,1);await restored.api.importJSON();assert.equal(restored.api.S.sessions.length,1);
   a.S.editing={id:'custom1',name:'Home workout',type:'other',unit:'kg',ex:[{n:'Goblet squat',s:3,lo:8,hi:12}]};await a.saveWorkout({});assert.equal(a.S.custom.length,1);assert.equal(a.nextDayId(),'pushA');assert.equal(a.S.dayId,'pushA');
-  a.S.tab='progress';node('#bDate').value='2026-10-05';node('#bWeight').value='80';node('#bWaist').value='90';node('#bUnit').value='kg';await a.addBody();assert.equal(a.S.body.length,1);assert(a.viewProgress().includes('80 kg'));
-  await a.putSession({id:'test-second',dayId:'pullA',dayName:'Pull A',date:'2026-10-06',createdAt:2,exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50,r:8}]}]});a.S.progressEx='Lat pulldown';assert(a.viewProgress().includes('Trend chart'));assert(a.viewHistory().includes('Pull A'));
+  a.S.tab='progress';node('#bDate').value='2026-10-05';node('#bWeight').value='80';node('#bWaist').value='90';node('#bUnit').value='kg';await a.addBody();assert.equal(a.S.body.length,1);assert(a.viewBody().includes('80 kg'));
+  await a.putSession({id:'test-second',dayId:'pullA',dayName:'Pull A',date:'2026-10-06',createdAt:2,exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50,r:8}]}]});a.S.progressEx='Lat pulldown';assert(a.viewLifts().includes('Trend chart'));assert(a.viewProgress().includes('Training analytics'));assert(a.viewHistory().includes('Pull A'));
   const reload=setup({storage:c.storage});await settle();assert.equal(reload.api.S.sessions.length,2);assert.equal(reload.api.S.custom.length,1);assert.equal(reload.api.S.body.length,1);
   a.S.tab='data';a.render();await a.exportJSON();assert(!node('#toast').textContent.includes('Cannot export'),node('#toast').textContent);const full=setup();await settle();full.node('#importText').value=node('#exportOut').value;await full.api.importJSON();assert.equal(full.api.S.sessions.length,2,full.node('#toast').textContent);assert.equal(full.api.S.body.length,1);assert.equal(full.api.S.custom.length,1);
   full.node('#importText').value=JSON.stringify({sessions:[{id:'bad',date:'2026-10-05',exercises:[{name:'Invalid',sets:null}]}],custom:[{id:'badc',name:'Invalid',ex:[null]}]});await full.api.importJSON();assert.equal(full.api.S.sessions.length,2);assert.equal(full.api.S.custom.length,1);assert(full.node('#toast').textContent.includes('Import cancelled'));

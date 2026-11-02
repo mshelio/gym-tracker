@@ -24,10 +24,13 @@ let calendarMonth=null,calendarMode="month",calendarWeekOffset=0;
 let muscleMapMetric="hardSets",muscleMapSelected="chest";
 const timerTools=createTimers();
 let timerTicker=null;
-let timerControlsOpen=false, timerWorkoutId=null;
+let timerWorkoutId=null;
 let analyticsFiltersOpen=false;
-let templateId=null, sessionReview=null, savedSummary=null;
+let templateId=null, sessionReview=null, savedSummary=null, savedSummaryMeta=null;
 let homeWeekOffset=0;
+// Bottom sheets: {kind:"swap"|"weight"|"session"|"exercise"|"set", g, i, j}.
+let sheet=null, sheetReturn=null;
+let historyMode="list", calendarSelected=null;
 const openDisclosures=new Set();
 const exUnit = (e, session) => e.unit || (session && session.unit) || DEFAULT_UNIT;
 let PROGRAM = [], BASE_DAY = {}, ORDER = [], DEFAULT_UNIT = "lb", PROGRAM_NOTES = [];
@@ -131,7 +134,7 @@ async function putSession(s,advance=false){
   }
   // One full-snapshot commit: session, schedule cursor, draft deletion and selection.
   if(!await writeLocal()){Object.assign(S,previous);throw new Error(hasConflict()?"Another tab changed your data":"Browser storage unavailable");}
-  if(advance){timerWorkoutId=null;timerControlsOpen=false;restOverlayOpen=false;}
+  if(advance){timerWorkoutId=null;restOverlayOpen=false;}
 }
 async function saveCalendarEvent(event){
  const next=upsertCalendarEvent(S.calendarEvents,event);
@@ -190,25 +193,19 @@ async function skipScheduleDay(){
   await saveScheduleList(S.schedules.map(w=>w.id===s.id ? {...w,cursor:(w.cursor+1)%w.days.length} : w));
   render();toast("Schedule advanced");
 }
-function schedulePanel(){
-  const s=activeSchedule();if(!s)return "";
-  return `<section class="schedule-panel"><div class="schedule-toolbar"><label>Active schedule<select data-act="useschedule" aria-label="Active schedule">${S.schedules.map(w=>`<option value="${esc(w.id)}" ${w.id===s.id?"selected":""}>${esc(w.name)}</option>`).join("")}</select></label><button class="btn" data-act="manageschedules">Manage schedules</button></div>
-  <p class="muted">${s.mode==="weekly" ? "Monday–Sunday plan · today is "+WEEKDAYS[scheduleIndex(s)] : "Repeating sequence · completed scheduled workouts advance the next day"}. You can always log another workout.</p>
-  <div class="schedule-preview">${s.days.map((id,i)=>`<span class="schedule-step ${i===scheduleIndex(s)?"current":""}" ${i===scheduleIndex(s)?'aria-current="step"':""}><small>${s.mode==="weekly"?WEEKDAYS[i].slice(0,3):"Step "+(i+1)}</small>${esc(id ? getDay(id)?.name || "Missing workout" : "Rest")}</span>`).join("")}</div>
-  ${nextSlot()==null ? `<div class="rest-banner"><b>${s.mode==="weekly"?"Today is a rest day.":"Rest is next in your sequence."}</b><span>You can still log a workout below.</span>${s.mode==="cycle"?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':""}</div>` : s.mode==="cycle" ? '<button class="btn small" data-act="skipscheduled">Skip scheduled day</button>' : ""}</section>`;
-}
+
 function newSchedule(mode){
   S.scheduleEditing={id:uid("schedule"),name:"",mode,days:mode==="weekly"?Array(7).fill(null):[null],cursor:0};S.manageSchedules=false;render();
 }
 function viewScheduleManager(){
-  return `<div class="section stack"><button class="btn small schedule-back" data-act="closeschedules">← Back to plan</button><h2>Your schedules</h2>${activeSchedule()?'<button class="btn" data-act="noschedule">Train without a schedule</button>':'<p class="muted">No active schedule. Choose a saved plan or create your own.</p>'}<p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts under Plan → Workouts & exercises, then select them in a schedule.</p><div class="row-actions"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
+  return `<div class="section stack schedule-manager"><button class="btn small ghost back-btn schedule-back" data-act="closeschedules">← Back to plan</button><h2 class="display-title">Your schedules</h2>${activeSchedule()?'<button class="btn ghost" data-act="noschedule">Train without a schedule</button>':'<p class="muted">No active schedule. Choose a saved plan or create your own.</p>'}<p class="muted">Choose any split: PPL, upper/lower, full body, or your own mix. Create custom workouts under Plan → Workouts, then select them in a schedule.</p><div class="row-actions two"><button class="btn primary" data-act="newschedule" data-mode="cycle">+ Repeating sequence</button><button class="btn" data-act="newschedule" data-mode="weekly">+ Weekly plan</button></div>${S.schedules.map(s=>`<div class="schedule-list-row ${s.id===S.activeScheduleId?"is-active":""}"><div><h3>${esc(s.name)}</h3><p class="muted">${s.mode==="weekly"?"Monday–Sunday":"Repeating sequence"} · ${s.days.length} days ${s.id===S.activeScheduleId?"· Active":""}</p></div><div class="row-actions"><button class="btn small" data-act="editschedule" data-id="${esc(s.id)}">Edit / reorder</button>${s.id!==S.activeScheduleId?`<button class="btn small" data-act="activateschedule" data-id="${esc(s.id)}">Use schedule</button>`:""}${S.schedules.length>1?`<button class="btn small danger" data-act="deleteschedule" data-id="${esc(s.id)}" aria-label="${S.armedDelete===s.id?"Confirm delete":"Delete"} schedule ${esc(s.name)}">${S.armedDelete===s.id?"Confirm delete schedule":"Delete schedule"}</button>`:""}</div></div>`).join("")}</div>`;
 }
 function viewScheduleEditor(){
   const s=S.scheduleEditing;
   const options=id=>`<option value="" ${id==null?"selected":""}>Rest day</option>`+allDays().map(w=>`<option value="${esc(w.id)}" ${w.id===id?"selected":""}>${esc(w.name)}</option>`).join("");
-  return `<div class="section stack"><h2>${S.schedules.some(w=>w.id===s.id)?"Edit schedule":"New schedule"}</h2><p class="muted">${s.mode==="weekly"?"Assign any workout or rest to each weekday.":"Reorder days, repeat workouts, or insert rest days. This sequence repeats independently of calendar weekdays."}</p><label>Schedule name<input type="text" maxlength="80" style="width:100%;margin-top:6px" data-schedule-name data-key="schedule-name" value="${esc(s.name)}" placeholder="e.g. Upper / Lower, Full body, My PPL"></label>
+  return `<div class="section stack schedule-editor"><h2 class="display-title">${S.schedules.some(w=>w.id===s.id)?"Edit schedule":"New schedule"}</h2><p class="muted">${s.mode==="weekly"?"Assign any workout or rest to each weekday.":"Reorder days, repeat workouts, or insert rest days. This sequence repeats independently of calendar weekdays."}</p><label class="field-label">Schedule name<input type="text" maxlength="80" data-schedule-name data-key="schedule-name" value="${esc(s.name)}" placeholder="e.g. Upper / Lower, Full body, My PPL"></label>
   ${s.days.map((id,i)=>`<div class="schedule-edit-row"><label>${s.mode==="weekly"?WEEKDAYS[i]:"Step "+(i+1)}<select data-schedule-day="${i}" aria-label="${s.mode==="weekly"?WEEKDAYS[i]:"Step "+(i+1)} workout">${options(id)}</select></label><div class="row-actions"><button class="btn small" data-act="movescheduleday" data-i="${i}" data-dir="-1" aria-label="Move day ${i+1} up" ${i===0?"disabled":""}>↑</button><button class="btn small" data-act="movescheduleday" data-i="${i}" data-dir="1" aria-label="Move day ${i+1} down" ${i===s.days.length-1?"disabled":""}>↓</button>${s.mode==="cycle"?`<button class="btn small danger" data-act="removescheduleday" data-i="${i}" ${s.days.length===1?"disabled":""}>Remove</button>`:""}</div></div>`).join("")}
-  ${s.mode==="cycle"?`<button class="btn" data-act="addscheduleday" ${s.days.length>=28?"disabled":""}>+ Add day</button><label>Next step after saving<select data-schedule-cursor style="display:block;width:100%">${s.days.map((id,i)=>`<option value="${i}" ${i===s.cursor?"selected":""}>Step ${i+1} · ${esc(id?getDay(id)?.name:"Rest")}</option>`).join("")}</select></label>`:""}<p class="muted">Include at least one workout. Saving makes this your active schedule.</p><div class="row-actions"><button class="btn primary" data-act="saveschedule">Save & use schedule</button><button class="btn" data-act="cancelschedule">Cancel</button></div></div>`;
+  ${s.mode==="cycle"?`<button class="btn" data-act="addscheduleday" ${s.days.length>=28?"disabled":""}>+ Add day</button><label class="field-label">Next step after saving<select data-schedule-cursor>${s.days.map((id,i)=>`<option value="${i}" ${i===s.cursor?"selected":""}>Step ${i+1} · ${esc(id?getDay(id)?.name:"Rest")}</option>`).join("")}</select></label>`:""}<p class="muted">Include at least one workout. Saving makes this your active schedule.</p><div class="row-actions two"><button class="btn primary" data-act="saveschedule">Save & use schedule</button><button class="btn" data-act="cancelschedule">Cancel</button></div></div>`;
 }
 async function scheduleAction(b){
   const act=b.dataset.act,s=S.scheduleEditing;
@@ -262,9 +259,6 @@ function activeWorkoutId(){
  return entries.find(([,d])=>d.workoutTimer?.state==="running")?.[0]
   ||entries.find(([,d])=>d.workoutTimer?.state==="paused"||d.workoutTimer?.state==="stopped"||draftHasData(d))?.[0];
 }
-function recentSessionRows(limit=3){
- return sortSessions(S.sessions).slice(0,limit).map(s=>`<button class="recent-session-row" data-act="opensession" data-id="${esc(s.id)}"><span><strong>${esc(s.dayName)}</strong><small>${esc(fmtDate(s.date))} · ${s.exercises.reduce((n,e)=>n+e.sets.length,0)} sets</small></span>${icon("arrow")}</button>`).join("");
-}
 function dateOffset(date, days){
  const value=new Date(date+"T12:00:00Z");value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10);
 }
@@ -273,11 +267,25 @@ function dashboardWeek(){
  const from=dateOffset(now,-weekday+homeWeekOffset*7);
  return calendarDays(from,dateOffset(from,6),S.sessions,S.calendarEvents||[],activeSchedule());
 }
+const TYPE_LABEL={pull:"Pull",push:"Push",legs:"Legs",other:"Other"};
+const typeTag=type=>{const t=TYPE_LABEL[type]?type:"other";return `<span class="tag tag-${t}">${TYPE_LABEL[t]}</span>`;};
+const capitalize=s=>String(s||"").replace(/^./,c=>c.toUpperCase());
+const clockState=clock=>({idle:"Ready",running:"Training",paused:"Paused",stopped:"Stopped"})[clock.state];
+function draftProgress(d){const sets=[...d.ex,...d.extra].flatMap(e=>e.sets);return {done:sets.filter(s=>s.completed===true).length,total:sets.length};}
+function nextSetLabel(d){
+ for(const e of [...d.ex,...d.extra]){const j=e.sets.findIndex(s=>s.completed!==true);if(j>=0)return `${e.name||"Extra exercise"}, set ${j+1}`;}
+ return "All sets done";
+}
+function planStepLabel(){
+ const s=activeSchedule();if(!s)return "";
+ return s.mode==="cycle"?`${esc(s.name)} · step ${scheduleIndex(s)+1}/${s.days.length}`:`${esc(s.name)} · ${WEEKDAYS[scheduleIndex(s)]}`;
+}
+function lastDoneLabel(id){const s=sortSessions(S.sessions).find(x=>x.dayId===id);return s?" · last "+fmtDate(s.date):"";}
 function activityOverview(){
  const end=today(),start=dateOffset(end,-83),counts=new Map();
  for(const session of S.sessions)if(session.date>=start&&session.date<=end)counts.set(session.date,(counts.get(session.date)||0)+1);
  const total=[...counts.values()].reduce((a,b)=>a+b,0);
- return `<section class="section activity-overview"><h2>Training activity</h2><p class="muted">${total} sessions · last 12 weeks</p><div class="activity-grid" role="img" aria-label="${total} sessions across ${counts.size} training days in the last 12 weeks">${Array.from({length:84},(_,i)=>{const date=dateOffset(start,i),count=counts.get(date)||0;return `<span class="activity-cell ${count?'trained':''}" title="${date}: ${count} sessions" aria-hidden="true"></span>`;}).join("")}</div><button class="btn small" data-destination="history">View workout history →</button></section>`;
+ return `<section class="section activity-overview"><div class="section-heading"><h2>Consistency</h2><span class="muted">${total} sessions · last 12 weeks</span></div><div class="activity-grid" role="img" aria-label="${total} sessions across ${counts.size} training days in the last 12 weeks">${Array.from({length:84},(_,i)=>{const date=dateOffset(start,i),count=counts.get(date)||0;return `<span class="activity-cell ${count?'trained':''}" title="${date}: ${count} sessions" aria-hidden="true"></span>`;}).join("")}</div><div class="axis-row"><span>${esc(fmtDate(start))}</span><span>Today</span></div></section>`;
 }
 function backupInfo(){
  let exported=0,snoozed=0;
@@ -291,22 +299,40 @@ function backupStatus(){
 }
 function backupReminder(){
  if(!backupInfo().due)return "";
- return `<aside class="section backup-reminder" aria-label="Backup reminder"><h2>Keep a copy of your training</h2><p class="muted">${backupInfo().exported?'It has been at least 30 days since your last export.':'You have training data on this device and no recorded export.'}</p><div class="row-actions"><button class="btn" data-destination="data">Back up my data</button><button class="btn small" data-act="snoozebackup">Remind me in a week</button></div></aside>`;
+ return `<aside class="backup-reminder" aria-label="Backup reminder">${icon('download')}<div><h2>Keep a copy of your training</h2><p class="muted">${backupInfo().exported?'It has been at least 30 days since your last export.':'Your log lives only on this device and has never been exported.'}</p></div><div class="row-actions"><button class="btn small" data-destination="data">Back up my data</button><button class="btn small ghost" data-act="snoozebackup">Remind me in a week</button></div></aside>`;
+}
+function weekOverview(week,count){
+ return `<section class="section week-overview" aria-label="Weekly training overview"><div class="week-heading"><button class="icon-btn" data-act="homeweek" data-delta="-1" aria-label="Previous week">${icon('back')}</button><div><h2>${homeWeekOffset===0?'This week':esc(fmtDate(week[0].date))+' – '+esc(fmtDate(week[6].date))}</h2>${homeWeekOffset===0?`<p class="muted"><b>${count}</b> session${count===1?'':'s'} · Mon–Sun</p>`:'<button class="week-reset" data-act="homeweekreset">Back to this week</button>'}</div><button class="icon-btn" data-act="homeweek" data-delta="1" aria-label="Next week">${icon('next')}</button></div>
+ <div class="week-strip">${week.map((d,i)=>`<div class="week-day ${d.type}" ${d.date===today()?'aria-current="date"':''} aria-label="${esc(fmtDate(d.date))}: ${d.type==='none'?'No scheduled workout':d.type}"><span>${['M','T','W','T','F','S','S'][i]}</span><strong>${Number(d.date.slice(-2))}</strong><small aria-hidden="true">${d.type==='completed'?icon('check'):d.type==='planned'?'•':d.type==='rest'?'Rest':d.type==='skipped'?'×':''}</small></div>`).join('')}</div></section>`;
+}
+function todayHero(active,day){
+ if(active&&day){
+  const d=getDraft(day.id),{done,total}=draftProgress(d),clock=d.workoutTimer;
+  return `<section class="today-workout hero is-active" aria-label="Workout in progress"><div class="hero-row"><p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>In progress · <span data-clock-state>${clockState(clock)}</span></p><strong class="hero-clock" data-timer="workout" role="timer" aria-label="Workout elapsed time">${timerLabel(timerTools.workoutElapsed(clock))}</strong></div><h2>${esc(day.name)}</h2><div class="hero-progress"><div><span>Next: ${esc(nextSetLabel(d))}</span><span>${done} / ${total}</span></div><span class="bar" aria-hidden="true"><span style="width:${total?Math.round(done/total*100):0}%"></span></span></div><button class="btn primary" data-act="homecontinue" data-id="${esc(day.id)}">Resume workout ${icon('arrow')}</button></section>`;
+ }
+ if(day){
+  const sets=day.ex.reduce((n,e)=>n+e.s,0);
+  return `<section class="today-workout hero type-${esc(day.type)}" aria-label="Up next"><div class="hero-row"><p class="eyebrow">${activeSchedule()?'Up next · '+planStepLabel():'Up next'}</p>${typeTag(day.type)}</div><h2>${esc(day.name)}</h2><div class="hero-stats"><span><b>${day.ex.length}</b>exercises</span><span><b>${sets}</b>sets</span><span><b>~${Math.round(sets*2.5/5)*5}</b>minutes</span></div><ul class="hero-thumbs" aria-label="Exercises in ${esc(day.name)}">${day.ex.slice(0,5).map(e=>`<li>${exerciseThumbnail(e.n)}</li>`).join('')}${day.ex.length>5?`<li class="more">+${day.ex.length-5}</li>`:''}</ul><button class="btn primary" data-act="homestart" data-id="${esc(day.id)}">Start workout ${icon('arrow')}</button><button class="btn ghost" data-act="opensheet" data-sheet="swap">${icon('swap')} Swap workout</button></section>`;
+ }
+ if(activeSchedule())return `<section class="today-workout hero is-rest" aria-label="Recovery day"><p class="eyebrow">Recovery day · ${planStepLabel()}</p><h2>Time to recover</h2><p class="muted">Rest is part of your plan. You can still train whenever you are ready.</p><button class="btn primary" data-act="opensheet" data-sheet="swap">Choose a workout</button>${activeSchedule().mode==='cycle'?'<button class="btn ghost" data-act="skipscheduled">Mark rest complete</button>':''}</section>`;
+ const ppl=S.schedules.some(s=>s.id==="starter-ppl");
+ return `<section class="today-workout hero is-choose" aria-label="Choose how you train"><p class="eyebrow">${S.sessions.length?'No active plan':'Welcome'}</p><h2>Choose how you train</h2><p class="muted">Pick a starting point. You can change exercises, sets and the schedule any time.</p><div class="starter-list">
+ <button class="pick" data-act="reviewstarter" data-preset="full"><span class="badge badge-accent">FB</span><span><strong>Full body</strong><small>1 workout · 5 exercises · ~40 min</small></span></button>
+ <button class="pick" data-act="reviewstarter" data-preset="upper"><span class="badge badge-pull">UP</span><span><strong>Upper body</strong><small>Upper/lower split · 6 exercises</small></span></button>
+ <button class="pick" data-act="reviewstarter" data-preset="lower"><span class="badge badge-legs">LO</span><span><strong>Lower body</strong><small>Upper/lower split · 6 exercises</small></span></button>
+ ${ppl?`<button class="pick" data-act="activateschedule" data-id="starter-ppl"><span class="badge badge-push">PPL</span><span><strong>Push / Pull / Legs</strong><small>6 workouts · repeating plan</small></span></button>`:''}
+ <button class="pick dashed" data-act="homecreate"><span class="badge">${icon('plus')}</span><span><strong>Create my own workout</strong><small>Pick exercises and targets</small></span></button></div>
+ <button class="btn ghost" data-act="opensheet" data-sheet="swap">Choose a workout</button>${S.sessions.length?'':'<button class="link-btn" data-destination="data">Have a backup? Restore it →</button>'}</section>`;
 }
 function viewHome(){
  const active=activeWorkoutId(),day=getDay(active||nextSlot()),last=sortSessions(S.sessions)[0],week=dashboardWeek();
- const sets=day?.ex.reduce((n,e)=>n+e.s,0)||0,body=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1);
+ const body=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1);
  const thisWeekStart=dateOffset(today(),-((new Date(today()+"T12:00:00Z").getUTCDay()+6)%7));
  const weeklyCount=S.sessions.filter(x=>x.date>=thisWeekStart&&x.date<=today()).length;
- return `<section class="today-dashboard" aria-label="Today dashboard">
- <section class="section week-overview" aria-label="Weekly training overview"><div class="week-heading"><button class="btn small" data-act="homeweek" data-delta="-1" aria-label="Previous week">‹</button><div><h2>${homeWeekOffset===0?'This week':esc(fmtDate(week[0].date))+' – '+esc(fmtDate(week[6].date))}</h2>${homeWeekOffset!==0?'<button class="week-reset" data-act="homeweekreset">Back to this week</button>':''}</div><button class="btn small" data-act="homeweek" data-delta="1" aria-label="Next week">›</button></div>
- <div class="week-strip">${week.map((d,i)=>`<div class="week-day ${d.type}" ${d.date===today()?'aria-current="date"':''} aria-label="${esc(fmtDate(d.date))}: ${d.type==='none'?'No scheduled workout':d.type}"><span>${['M','T','W','T','F','S','S'][i]}</span><strong>${Number(d.date.slice(-2))}</strong><small>${d.type==='completed'?'✓':d.type==='planned'?'•':d.type==='rest'?'–':d.type==='skipped'?'×':'·'}</small></div>`).join('')}</div><p class="week-legend muted">✓ Completed · • Planned · – Rest</p><button class="btn small" data-destination="plan">View your training plan →</button></section>
- <section class="section today-workout"><p class="eyebrow">${active?'IN PROGRESS':day?'READY TO TRAIN':activeSchedule()?'RECOVERY DAY':'YOUR TRAINING'}</p><h2>${esc(day?.name||(activeSchedule()?'Time to recover':'Choose how you train'))}</h2><p class="muted">${active?'Pick up where you left off.':day?`${day.ex.length} exercises · ${sets} sets · About ${Math.round(sets*2.5/5)*5} min`:activeSchedule()?'Rest is part of your plan. Choose a workout whenever you are ready.':'Create your own workout or choose a template. No training split is selected for you.'}</p>
- ${day?`<button class="btn primary" data-act="${active?'homecontinue':'homestart'}" data-id="${esc(day.id)}">${active?'Resume workout':'Start workout'} ${icon('arrow')}</button><details class="today-exercises"><summary>Preview ${day.ex.length} exercises</summary><ul class="today-preview">${day.ex.map(e=>`<li>${exerciseThumbnail(e.n)}<span class="exercise-preview-name">${esc(e.n)}</span><span>${e.s} × ${e.lo}–${e.hi}</span></li>`).join('')}</ul></details>`:''}
- <button class="btn ${!day?'primary':''}" data-act="homechoose">${day?'Choose another workout':'Choose a workout'}</button>${!activeSchedule()?'<button class="btn" data-act="homecreate">Create my own workout</button>':''}${!day&&activeSchedule()?.mode==='cycle'?'<button class="btn small" data-act="skipscheduled">Mark rest complete</button>':''}</section>
- <div class="home-metrics"><section class="section"><p class="muted">This week</p><strong class="metric-value">${weeklyCount}</strong><p class="muted">sessions · ${S.sessions.length} total</p></section><section class="section"><p class="muted">Body weight</p><strong class="metric-value">${body?esc(body.weight)+' <small>'+esc(body.unit||DEFAULT_UNIT)+'</small>':'—'}</strong><p class="muted">${body?esc(fmtDate(body.date)):'No entries yet'}</p><button class="btn small" data-act="homebody">Log weight →</button></section></div>
- <section class="section today-last"><h2>Last session</h2>${last?recentSessionRows(1):'<p class="muted">Your first completed workout will appear here.</p>'}</section>
- <button class="btn" data-destination="library">Browse workouts & exercises →</button>${backupReminder()}</section>`;
+ const lastTile=last?`<button class="tile today-last" data-act="opensession" data-id="${esc(last.id)}"><span class="eyebrow">Last session</span><strong class="tile-title">${esc(last.dayName)}</strong><span class="muted">${esc(fmtDate(last.date))} · ${last.exercises.reduce((n,e)=>n+e.sets.length,0)} sets</span><span class="tile-action">View session →</span></button>`
+  :`<div class="tile today-last"><span class="eyebrow">Last session</span><p class="muted">Your first completed workout will appear here.</p></div>`;
+ return `<section class="today-dashboard" aria-label="Today dashboard">${weekOverview(week,weeklyCount)}${todayHero(active,day)}
+ <div class="home-metrics"><button class="tile" data-act="homebody"><span class="eyebrow">Body weight</span><strong class="metric-value">${body?esc(body.weight)+' <small>'+esc(body.unit||DEFAULT_UNIT)+'</small>':'—'}</strong><span class="muted">${body?esc(fmtDate(body.date)):'No entries yet'}</span><span class="tile-action">+ Log weight</span></button>${lastTile}</div>${backupReminder()}</section>`;
 }
 const STARTER_WORKOUTS={
  full:{name:"Full Body",description:"One balanced session · squat, push, pull and core",names:["Back squat","Dumbbell bench press","Seated cable row","Romanian deadlift","Cable crunch"]},
@@ -314,87 +340,159 @@ const STARTER_WORKOUTS={
  lower:{name:"Lower Body",description:"Upper/lower split · legs, hips and core",names:["Back squat","Romanian deadlift","Leg extension","Lying leg curl","Standing calf raise","Cable crunch"]}
 };
 function starterChoices(){
- return `<section class="section starter-choices" aria-label="Starter workout choices"><h2>Start your way</h2><p class="muted">Review and customize a workout before saving. Nothing is selected automatically.</p><div class="starter-grid">${Object.entries(STARTER_WORKOUTS).map(([id,p])=>`<button class="btn" data-act="reviewstarter" data-preset="${id}"><strong>${p.name}</strong><span>${p.description}</span><small>${p.names.length} exercises · ${p.names.length*3} sets · about ${Math.round(p.names.length*7.5/5)*5} min</small></button>`).join("")}<button class="btn" data-act="newworkout"><strong>Create my own</strong><span>Choose your exercises and set targets.</span></button></div><p class="muted">Prefer Push / Pull / Legs? Preview the PPL templates below. Combine saved workouts into a repeating or weekly schedule under Plan.</p></section>`;
+ return `<section class="starter-choices" aria-label="Starter workout choices"><h2 class="eyebrow">Add from starters</h2><div class="chip-row">${Object.entries(STARTER_WORKOUTS).map(([id,p])=>`<button class="chip-btn" data-act="reviewstarter" data-preset="${id}" title="${esc(p.description)}">${icon('plus')} ${esc(p.name)}</button>`).join("")}</div><p class="muted">Starters open in the editor so you can review them before saving. Combine saved workouts into a schedule under Schedule.</p></section>`;
 }
 function viewLibrary(){
  if(S.editing)return viewEditor();
  if(templateId&&getDay(templateId)){
   const day=getDay(templateId);
-  return `<button class="btn small" data-act="closetemplate">← Workout templates</button><section class="section template-detail"><p class="eyebrow">WORKOUT TEMPLATE</p><h2>${esc(day.name)}</h2><p class="muted">Starting a session keeps this reusable template unchanged.</p><ol class="template-exercises">${day.ex.map(e=>`<li class="exercise-photo-row">${exerciseThumbnail(e.n)}<div><strong>${esc(e.n)}</strong><span>${e.s} sets · ${e.lo}–${e.hi} reps</span>${exercisePhotoDetail(e.n)}</div></li>`).join("")}</ol><div class="row-actions"><button class="btn primary" data-act="starttemplate" data-id="${esc(day.id)}">Start this workout</button><button class="btn" data-act="${BASE_DAY[day.id]?'copytemplate':'editday'}" data-id="${esc(day.id)}">${BASE_DAY[day.id]?'Customize a copy':'Edit template'}</button></div></section>`;
+  return `<button class="btn small ghost back-btn" data-act="closetemplate">${icon('back')} Workouts</button><section class="section template-detail type-${esc(day.type)}"><div class="hero-row"><p class="eyebrow">Workout template</p>${typeTag(day.type)}</div><h2 class="display-title">${esc(day.name)}</h2><p class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets · starting a session keeps this template unchanged.</p><ol class="template-exercises">${day.ex.map(e=>`<li class="exercise-photo-row">${exerciseThumbnail(e.n)}<div><strong>${esc(e.n)}</strong><span class="muted">${e.s} sets · ${e.lo}–${e.hi} reps</span>${exercisePhotoDetail(e.n)}</div></li>`).join("")}</ol><div class="row-actions two"><button class="btn primary" data-act="starttemplate" data-id="${esc(day.id)}">Start this workout</button><button class="btn" data-act="${BASE_DAY[day.id]?'copytemplate':'editday'}" data-id="${esc(day.id)}">${BASE_DAY[day.id]?'Customize a copy':'Edit template'}</button></div></section>`;
  }
- return `${starterChoices()}<section aria-label="Workout templates"><div class="section-heading"><h2>Workout templates</h2><button class="btn small" data-act="newworkout">+ New workout</button></div><p class="muted">Choose a template to preview, start, or edit.</p><div class="template-grid">${allDays().map(day=>`<button class="section template-card" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(day.type)}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets</span></button>`).join("")}</div></section><details class="section exercise-library" data-disclosure="library" ${openDisclosures.has("library")?"open":""}><summary>Exercise library</summary>${exerciseSearchBox()}<ul>${[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort().map(n=>`<li class="exercise-photo-row" data-exercise-search-item="${esc(n)}">${exerciseThumbnail(n)}<div>${esc(n)}${exercisePhotoDetail(n)}</div></li>`).join("")}</ul></details>`;
+ return `<section aria-label="Workout templates"><div class="section-heading"><h2>Your workouts</h2><button class="btn small accent" data-act="newworkout">${icon('plus')} New workout</button></div><div class="template-grid">${allDays().map(day=>`<button class="template-card type-${esc(day.type)}" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(TYPE_LABEL[day.type]||"Other")}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets${BASE_DAY[day.id]?'':' · custom'}</span></button>`).join("")}</div></section>${starterChoices()}`;
+}
+function viewExercises(){
+ const names=[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort((a,b)=>a.localeCompare(b));
+ return `${exerciseSearchBox()}<details class="section exercise-library" open><summary>All exercises · ${names.length}</summary><ul>${names.map(n=>`<li class="exercise-photo-row" data-exercise-search-item="${esc(n)}">${exerciseThumbnail(n)}<div><strong>${esc(n)}</strong>${exercisePhotoDetail(n)}</div></li>`).join("")}</ul></details>`;
+}
+function viewPlan(){
+ if(S.scheduleEditing)return viewScheduleEditor();
+ if(S.manageSchedules)return viewScheduleManager();
+ const s=activeSchedule();
+ if(!s)return `<section class="section plan-overview is-empty" aria-label="Schedule overview"><p class="eyebrow">No active schedule</p><h2 class="display-title">Train your way</h2><p class="muted">Log any workout from Today, or set up a repeating sequence or weekly plan. Nothing is selected for you.</p><button class="btn primary" data-act="manageschedules">Manage schedules</button></section>`;
+ const idx=scheduleIndex(s);
+ const steps=s.days.map((id,i)=>{
+  const w=id?getDay(id):null,state=i===idx?"current":s.mode==="cycle"&&i<idx?"done":"";
+  return `<li class="plan-step ${state} type-${esc(w?.type||'rest')}" ${i===idx?'aria-current="step"':''}><span class="plan-step__num">${s.mode==="weekly"?WEEKDAYS[i].slice(0,3):i+1}</span><span class="dot" aria-hidden="true"></span><span class="plan-step__name">${esc(id?w?.name||"Missing workout":"Rest")}</span>${i===idx?`<span class="eyebrow accent">${s.mode==="weekly"?"Today":"Next"}</span>`:state==="done"?icon('check'):""}</li>`;
+ }).join("");
+ return `<section class="section plan-overview" aria-label="Active schedule"><div class="plan-overview-head"><div><p class="eyebrow">Active schedule</p><h2 class="display-title">${esc(s.name)}</h2><p class="muted">${s.mode==="weekly"?"Weekly plan · follows your calendar":"Repeating sequence · "+s.days.length+" steps · not tied to weekdays"}</p></div><button class="btn small" data-act="manageschedules">Manage schedules</button></div><ol class="plan-steps">${steps}</ol>
+ ${nextSlot()==null?`<p class="notice">${s.mode==="weekly"?"Today is a rest day.":"Rest is next in your sequence."} You can still log any workout from Today.</p>`:""}
+ <div class="row-actions two">${s.mode==="cycle"?`<button class="btn ghost" data-act="skipscheduled">${nextSlot()==null?"Mark rest complete":"Skip "+esc(getDay(nextSlot())?.name||"step")}</button>`:""}<button class="btn" data-act="editschedule" data-id="${esc(s.id)}">Edit ${s.mode==="weekly"?"week":"sequence"}</button></div></section>`;
 }
 function viewSettings(){
  const theme=document.documentElement?.dataset?.themePreference||"system";
- return `<section class="section settings-form" aria-label="Training settings"><h2>Preferences</h2><label>Appearance<select id="theme-preference" aria-label="Color theme">${['system','light','dark'].map(t=>`<option value="${t}" ${theme===t?'selected':''}>${t[0].toUpperCase()+t.slice(1)}</option>`).join('')}</select></label><label>Default weight unit<select data-setting="unit">${['kg','lb'].map(u=>`<option ${(S.defaultUnit||DEFAULT_UNIT)===u?'selected':''}>${u}</option>`).join('')}</select></label><p class="muted">Used for new sessions. Existing sets keep their units.</p><label>Default rest time<select data-setting="rest">${[...new Set([30,60,90,120,180,240,300,S.globalRestSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${S.globalRestSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><label class="check-setting"><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?'':'checked'}> Show progression suggestions</label></section><section class="section"><h2>Your data</h2>${backupStatus()}<p class="muted">Workouts are stored on this device. Export a backup to keep another copy.</p><button class="btn" data-destination="data">Data & Backups →</button></section>`;
+ return `<section class="section settings-form" aria-label="Training settings"><h2 class="eyebrow">Preferences</h2><label class="setting-row"><span>Appearance</span><select id="theme-preference" aria-label="Color theme">${['system','light','dark'].map(t=>`<option value="${t}" ${theme===t?'selected':''}>${t==='system'?'Auto':t[0].toUpperCase()+t.slice(1)}</option>`).join('')}</select></label><label class="setting-row"><span>Default weight unit</span><select data-setting="unit">${['kg','lb'].map(u=>`<option ${(S.defaultUnit||DEFAULT_UNIT)===u?'selected':''}>${u}</option>`).join('')}</select></label><p class="muted setting-help">Used for new sessions. Existing sets keep their units.</p><label class="setting-row"><span>Default rest time</span><select data-setting="rest">${[...new Set([30,60,90,120,180,240,300,S.globalRestSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${S.globalRestSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><label class="setting-row check-setting"><span>Show progression suggestions</span><input type="checkbox" data-act="progressiontoggle" ${S.progressionEnabled===false?'':'checked'}></label></section>
+ <section class="section settings-data"><h2 class="eyebrow">Your data</h2>${backupStatus()}<p class="muted">Workouts are stored only in this browser. ${S.sessions.length} sessions · ${S.custom.length} custom workouts · ${S.body.length} body entries.</p><button class="btn" data-destination="data">${icon('download')} Data &amp; Backups →</button></section>`;
 }
 function sessionOverview(session){
- return `<ul class="session-review-list">${session.exercises.map(e=>`<li><strong>${esc(e.name)}</strong><span>${e.sets.map(x=>`${x.w} ${esc(e.unit)} × ${x.r}`).join(' · ')}</span></li>`).join('')}</ul>`;
+ return `<ul class="session-review-list">${session.exercises.map(e=>`<li><strong>${esc(e.name)}</strong><span>${e.sets.map(x=>`${x.w} × ${x.r}`).join(' · ')} ${esc(e.unit)}</span></li>`).join('')}</ul>`;
+}
+function scheduleAdvanceHint(dayId){
+ const s=activeSchedule();
+ if(!s||s.mode!=="cycle"||nextSlot()!==dayId)return "Saved on this device";
+ const next=s.days[(s.cursor+1)%s.days.length];
+ return `Saved on this device · advances ${esc(s.name)} to ${esc(next?getDay(next)?.name||"the next step":"a rest day")}`;
 }
 function viewSessionReview(){
  if(!sessionReview)return viewLog();
  const count=sessionReview.exercises.reduce((n,e)=>n+e.sets.length,0),draft=getDraft(S.dayId),total=[...draft.ex,...draft.extra].reduce((n,e)=>n+e.sets.length,0);
- return `<section class="section session-review"><p class="eyebrow">REVIEW YOUR WORKOUT</p><h2>${esc(sessionReview.dayName)}</h2><p>${count} logged sets · ${sessionReview.exercises.length} exercises · ${esc(fmtDate(sessionReview.date))}</p><p class="muted">${total-count>0?`${total-count} unlogged or unchecked sets will be left out. `:''}Your workout timer is paused. Save to record this session.</p><label class="session-date">Workout date<input type="date" id="review-workout-date" value="${esc(sessionReview.date)}"></label>${sessionReview.date!==today()?'<p class="muted">This draft is dated earlier or later than today. Check the date before saving.</p>':''}<button class="btn small" data-act="reviewtoday">Use today (${esc(today())})</button>${sessionOverview(sessionReview)}${sessionReview.notes?`<p>${esc(sessionReview.notes)}</p>`:''}<div class="row-actions"><button class="btn primary" data-act="save">Save session</button><button class="btn" data-act="backtosession">Keep training</button></div><p id="session-validation" role="alert" hidden></p></section>`;
+ const units=[...new Set(sessionReview.exercises.map(e=>e.unit))];
+ const volume=units.length===1?Math.round(sessionReview.exercises.reduce((n,e)=>n+e.sets.reduce((m,x)=>m+x.w*x.r,0),0)):null;
+ return `<section class="session-review" aria-labelledby="review-heading"><button class="link-btn back-btn" data-act="backtosession">${icon('back')} Keep training</button><h1 id="review-heading" class="eyebrow-heading">Review session</h1><p class="muted">Clock paused at ${timerLabel(timerTools.workoutElapsed(draft.workoutTimer))}</p><h2 class="display-title">${esc(sessionReview.dayName)}</h2>
+ <div class="stats"><div class="stat"><b>${count}</b><small>sets logged</small></div><div class="stat"><b>${sessionReview.exercises.length}</b><small>exercises</small></div>${volume!=null?`<div class="stat"><b>${volume.toLocaleString()}</b><small>${esc(units[0])} volume</small></div>`:''}</div>
+ ${total-count>0?`<p class="notice warn" role="status">${icon('info')} ${total-count} unlogged or unchecked sets will be left out.</p>`:''}${sessionOverview(sessionReview)}
+ <div class="review-fields"><label class="field-label session-date">Workout date<input type="date" id="review-workout-date" value="${esc(sessionReview.date)}"></label>${sessionReview.date!==today()?'<p class="muted">This draft is dated earlier or later than today. Check the date before saving.</p>':''}<button class="btn small ghost" data-act="reviewtoday">Use today (${esc(today())})</button><label class="field-label">How did it feel? (optional)<textarea id="review-notes" rows="2" placeholder="Energy, sleep, a new best…">${esc(draft.notes||'')}</textarea></label></div>
+ <p id="session-validation" class="notice warn" role="alert" hidden></p><div class="bottom-actions"><button class="btn primary" data-act="save">Save session</button><p class="muted">${scheduleAdvanceHint(S.dayId)}</p></div></section>`;
 }
 function viewSessionSummary(){
  if(!savedSummary)return viewHome();
- return `<section class="section session-summary"><p class="eyebrow">SESSION SAVED</p><h2>Workout complete</h2><p>${esc(savedSummary.dayName)} · ${esc(fmtDate(savedSummary.date))}</p><p class="muted">${savedSummary.exercises.reduce((n,e)=>n+e.sets.length,0)} sets recorded. Your history and progress are up to date.</p>${sessionOverview(savedSummary)}<div class="row-actions"><button class="btn primary" data-destination="home">Back to Today</button><button class="btn" data-destination="history">View history</button></div></section>`;
+ const meta=savedSummaryMeta||{},sets=savedSummary.exercises.reduce((n,e)=>n+e.sets.length,0);
+ return `<section class="session-summary" aria-labelledby="summary-heading"><span class="summary-mark" aria-hidden="true">${icon('check')}</span><p class="eyebrow">${esc(savedSummary.dayName)} · ${esc(fmtDate(savedSummary.date))} · saved</p><h1 id="summary-heading" class="display-title">Workout complete</h1>
+ <div class="summary-stats">${meta.elapsed?`<div><b>${timerLabel(meta.elapsed)}</b><small>duration</small></div>`:''}<div><b>${sets}</b><small>sets</small></div><div><b>${savedSummary.exercises.length}</b><small>exercises</small></div></div>
+ ${meta.records?.length?`<section class="section pr-list" aria-label="New personal records"><p><span class="tag tag-pr">${meta.records.length} PR${meta.records.length===1?'':'s'}</span> New personal records</p>${meta.records.map(r=>`<div class="pr-row"><span>${esc(r.name)}</span><span><b>${r.value} ${esc(r.unit)}</b> <small class="muted">${esc(r.label)}</small></span></div>`).join('')}</section>`:''}
+ ${sessionOverview(savedSummary)}${meta.next?`<p class="muted next-up">${icon('calendar')} Up next in ${esc(meta.next.schedule)}: <b>${esc(meta.next.label)}</b></p>`:''}
+ <div class="bottom-actions two"><button class="btn" data-destination="history">View history</button><button class="btn primary" data-destination="home">Back to Today</button></div></section>`;
 }
-
 /* ---------- render ---------- */
+const TAB_FOR={log:"home",review:"home",summary:"home",history:"progress",lifts:"progress",body:"progress",calendar:"progress",data:"more",library:"plan",exercises:"plan"};
+const TITLES={home:"Today",plan:"Plan",library:"Plan",exercises:"Plan",history:"Progress",calendar:"Progress",progress:"Progress",lifts:"Progress",body:"Progress",more:"Settings",data:"Data & Backups"};
+function subnav(label,items){
+ return `<nav class="subnav" aria-label="${label}">${items.map(([dest,text])=>`<button data-destination="${dest}" ${S.tab===dest||(dest==="history"&&S.tab==="calendar")?'aria-current="page"':''}>${text}</button>`).join("")}</nav>`;
+}
+function viewFor(tab){
+ const planNav=subnav("Plan views",[["plan","Schedule"],["library","Workouts"],["exercises","Exercises"]]);
+ const progressNav=subnav("Progress views",[["progress","Overview"],["lifts","Lifts"],["history","History"],["body","Body"]]);
+ switch(tab){
+  case "home":return viewHome();
+  case "log":return viewLog();
+  case "review":return viewSessionReview();
+  case "summary":return viewSessionSummary();
+  case "plan":return planNav+viewPlan();
+  case "library":return planNav+viewLibrary();
+  case "exercises":return planNav+viewExercises();
+  case "progress":return progressNav+viewProgress();
+  case "lifts":return progressNav+viewLifts();
+  case "history":case "calendar":return progressNav+viewHistory();
+  case "body":return progressNav+viewBody();
+  case "more":return viewSettings();
+  default:return `<nav class="subnav" aria-label="Settings views"><button data-destination="more">${icon('back')} Settings</button></nav>${viewData()}`;
+ }
+}
 function render(){
-  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === ({log:"home",review:"home",summary:"home",history:"progress",data:"more",calendar:"plan",library:"plan"}[S.tab] || S.tab) ? "page" : "false"));
-  const active = document.activeElement, clockFocus=active?.dataset?.act, key = active && active.dataset ? active.dataset.key : null;
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.tab === (TAB_FOR[S.tab] || S.tab) ? "page" : "false"));
+  const active = document.activeElement, key = active && active.dataset ? active.dataset.key : null;
   const mapFocus = S.tab==="progress" && active?.matches?.(".muscle-map [data-muscle]") ? {muscle:active.dataset.muscle,id:active.id} : null;
   const selStart = key && "selectionStart" in active ? active.selectionStart : null;
+  // Re-rendering replaces dialog content; return focus to the same control afterwards.
+  const dialogControl = active?.closest?.(".sheet,[data-rest-overlay]") && active.dataset?.act ? `[data-act="${CSS.escape(active.dataset.act)}"]`+["type","g","i","j","kind","direction","u","seconds"].filter(k=>active.dataset[k]!=null).map(k=>`[data-${k}="${CSS.escape(active.dataset[k])}"]`).join("") : null;
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
-  if(document.documentElement)document.documentElement.dataset.view=S.tab;
-  const titles={home:"Today",log:getDay(S.dayId)?.name||"Workout",review:"Review session",summary:"Well done",plan:"Plan",calendar:"Calendar",library:S.editing?"Edit template":"Workouts",history:"Workout history",progress:"Progress",more:"Settings",data:"Data & Backups"};
-  const planNav=`<nav class="subnav" aria-label="Plan views"><button data-destination="plan" ${S.tab==='plan'?'aria-current="page"':''}>Schedule</button><button data-destination="library" ${S.tab==='library'?'aria-current="page"':''}>Workouts & exercises</button></nav>`;
-  const progressNav=`<nav class="subnav" aria-label="Progress views"><button data-destination="progress" ${S.tab==='progress'?'aria-current="page"':''}>Overview</button><button data-destination="history" ${S.tab==='history'?'aria-current="page"':''}>History</button></nav>`;
-  app.innerHTML=`<div class="page-intro"><div><p class="eyebrow">${esc(S.tab==='home'?new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}):S.tab==='log'?'ACTIVE SESSION':'YOUR TRAINING')}</p><h1>${esc(titles[S.tab]||'Today')}</h1></div>${S.tab==='log'?'<button class="btn small" data-destination="home">← Today</button>':''}</div>`+
-   (S.tab==='home'?viewHome():S.tab==='log'?viewLog():S.tab==='review'?viewSessionReview():S.tab==='summary'?viewSessionSummary():S.tab==='library'?planNav+viewLibrary():S.tab==='plan'||S.tab==='calendar'?planNav+(S.scheduleEditing?viewScheduleEditor():S.manageSchedules?viewScheduleManager():viewCalendar()):S.tab==='progress'?progressNav+viewProgress():S.tab==='history'?progressNav+viewHistory():S.tab==='more'?viewSettings():`<nav class="subnav" aria-label="Settings views"><button data-destination="more">← Settings</button></nav>${viewData()}`)+timerDockMarkup();
-  if(restOverlayOpen){const {draft:d}=timerContext();app.insertAdjacentHTML("beforeend",restOverlayMarkup(d));app.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});}
-  if(timerControlsOpen&&!restOverlayOpen){const target=clockFocus&&app.querySelector(`.timer-popover [data-act="${CSS.escape(clockFocus)}"]`);(target||app.querySelector("[data-act=clockclose]"))?.focus({preventScroll:true});}
+  const modal=!!(sheet||restOverlayOpen),root=document.documentElement;
+  if(root){root.dataset.view=S.tab;if(modal)root.dataset.modal="true";else delete root.dataset.modal;}
+  document.querySelector("header.top")?.toggleAttribute?.("inert",modal);
+  const intro=["log","review","summary"].includes(S.tab)?"":`<div class="page-intro"><div>${S.tab==="home"?`<p class="eyebrow">${esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}))}</p>`:""}<h1>${esc(TITLES[S.tab]||"Today")}</h1></div></div>`;
+  const restDraft=restOverlayOpen?timerContext().draft:null;
+  app.innerHTML=`<div class="view view-${S.tab}"${modal?' inert aria-hidden="true"':''}>${intro}${viewFor(S.tab)}${resumeBar()}</div>${sheetMarkup()}${restDraft?restOverlayMarkup(restDraft):""}`;
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
+  if(dialogControl)app.querySelector(`.sheet ${dialogControl},[data-rest-overlay] ${dialogControl}`)?.focus({preventScroll:true});
   if(mapFocus){const el=[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.id===mapFocus.id&&x.dataset.muscle===mapFocus.muscle)||[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.dataset.muscle===mapFocus.muscle);el?.focus({preventScroll:true});}
 }
 
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
 let restOverlayOpen=false;
-// Contain keyboard focus in the modal rest timer and restore it on dismissal.
+// Contain keyboard focus in the open sheet or rest dialog and restore it on dismissal.
 document.addEventListener("keydown",e=>{
- if(!restOverlayOpen)return;
- const dialog=document.querySelector("[data-rest-overlay]");
+ const dialog=restOverlayOpen?document.querySelector("[data-rest-overlay]"):sheet?document.querySelector(".sheet"):null;
  if(!dialog)return;
  if(e.key==="Escape"){
-  e.preventDefault();e.stopPropagation();restOverlayOpen=false;timerControlsOpen=true;render();
-  document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});
+  e.preventDefault();e.stopPropagation();
+  if(restOverlayOpen){restOverlayOpen=false;render();document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});}
+  else closeSheet();
   return;
  }
  if(e.key!=="Tab")return;
- const controls=[...dialog.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),a[href]')].filter(x=>x.getClientRects().length);
+ const controls=[...dialog.querySelectorAll('button:not([disabled]):not([tabindex="-1"]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href]')].filter(x=>x.getClientRects().length);
  if(!controls.length)return;
  const first=controls[0],last=controls[controls.length-1];
  if(e.shiftKey&&(document.activeElement===first||!dialog.contains(document.activeElement))){e.preventDefault();last.focus();}
  else if(!e.shiftKey&&(document.activeElement===last||!dialog.contains(document.activeElement))){e.preventDefault();first.focus();}
 },true);
+function openSheet(next,opener){
+ sheet=next;restOverlayOpen=false;
+ sheetReturn=opener?.dataset?`[data-act="${CSS.escape(opener.dataset.act)}"]`+["sheet","g","i","j","id"].filter(k=>opener.dataset[k]!=null).map(k=>`[data-${k}="${CSS.escape(opener.dataset[k])}"]`).join(""):null;
+ render();
+ const panel=document.querySelector(".sheet");
+ (panel?.querySelector("[data-autofocus]")||panel?.querySelector('button:not([disabled]):not([tabindex="-1"]),input,select,textarea'))?.focus({preventScroll:true});
+}
+function closeSheet(){
+ if(!sheet)return;
+ sheet=null;render();
+ if(sheetReturn)document.querySelector(sheetReturn)?.focus({preventScroll:true});
+}
 function restOverlayMarkup(d){
  const rest=d.restTimer,remaining=timerTools.remaining(rest),paused=rest?.pausedRemainingMs!=null;
  return `<div class="rest-overlay" role="dialog" aria-modal="true" aria-label="Rest timer" aria-describedby="rest-timer-instructions" data-rest-overlay>
- <div class="rest-overlay__card"><button type="button" class="btn rest-overlay__close" data-act="timerclose" aria-label="Close rest timer">✕</button>
- <p class="eyebrow">RECOVER AND RESET</p><h2>Rest timer</h2>
- <p class="muted" id="rest-timer-instructions">Your countdown stays accurate when the app is in the background.</p>
+ <div class="rest-overlay__card"><button type="button" class="icon-btn rest-overlay__close" data-act="timerclose" aria-label="Close rest timer">${icon('close')}</button>
+ <p class="eyebrow">Recover and reset</p><h2 class="display-title">Rest</h2>
  <strong class="rest-overlay__count" data-timer="overlay-rest" role="timer" aria-label="Remaining rest time">${rest?timerLabel(remaining):"00:00"}</strong>
  <span class="rest-overlay__state" data-rest-state>${!rest?"Timer is not running":remaining===0?"Rest complete":paused?"Paused":"Time to recover"}</span>
+ <p class="muted" id="rest-timer-instructions">Your countdown stays accurate when the app is in the background.</p>
  <div class="rest-overlay__adjust" role="group" aria-label="Adjust rest duration">
  <button type="button" class="btn" data-act="timeradjust" data-seconds="-15" ${!rest?"disabled":""}>−15 sec</button>
  <button type="button" class="btn" data-act="timeradjust" data-seconds="15" ${!rest?"disabled":""}>+15 sec</button></div>
  <div class="rest-overlay__buttons" role="group" aria-label="Rest timer controls">
- <button type="button" class="btn primary" data-act="${paused?"timerresume":"timerpause"}" ${!rest?"disabled":""}>${paused?"Resume":"Pause"}</button>
+ <button type="button" class="btn primary" data-act="${paused?"timerresume":"timerpause"}" ${!rest?"disabled":""}>${paused?"Resume rest":"Pause rest"}</button>
  <button type="button" class="btn" data-act="timerskip" ${!rest?"disabled":""}>Skip rest</button></div>
  </div></div>`;
 }
@@ -420,20 +518,18 @@ function startWorkoutFor(id){
  if(d.restTimer?.pausedRemainingMs!=null)d.restTimer=timerTools.resume(d.restTimer);
  timerWorkoutId=id;saveDrafts();
 }
-function timerDockMarkup(){
- if(!activeWorkoutId()&&S.tab!=="log")return "";
- const {id,draft:d}=timerContext(),clock=d.workoutTimer,rest=d.restTimer;
- if(clock.state==="idle"&&!rest&&!draftHasData(d))return "";
- const status={idle:"Ready",running:"Training",paused:"Paused",stopped:"Stopped"}[clock.state];
- const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
- const startAction=clock.state==="running"?'clockpause':'clockstart';
- const startLabel=clock.state==="running"?'Pause workout':clock.state==="paused"?'Resume workout':clock.state==="stopped"?'Restart workout timer':'Start workout timer';
- return `<aside class="timer-dock" aria-label="Persistent workout timer"><button class="timer-dock-toggle" type="button" data-act="clocktoggle" aria-label="Workout timer controls" aria-expanded="${timerControlsOpen}" aria-controls="workout-clock-controls">
- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 2h6"/></svg><span class="timer-dock-state" data-clock-state>${status}</span><strong data-timer="workout" role="timer" aria-label="Workout elapsed time">${timerLabel(timerTools.workoutElapsed(clock))}</strong><span class="timer-dock-rest">Rest <strong data-timer="rest" aria-label="Rest time remaining">${restText}</strong></span></button></aside>
- ${timerControlsOpen?`<section class="timer-popover" id="workout-clock-controls" role="dialog" aria-modal="false" aria-label="Workout timer controls"><div class="timer-popover-heading"><div><p class="eyebrow">WORKOUT TIMER</p><h2>${esc(getDay(id).name)}</h2></div><button type="button" class="btn small" data-act="clockclose" aria-label="Close timer controls">✕</button></div>
- <div class="clock-readout"><span>${status}</span><strong data-timer="workout-panel">${timerLabel(timerTools.workoutElapsed(clock))}</strong></div>
- <div class="clock-actions"><button type="button" class="btn primary" data-act="${startAction}">${startLabel}</button><button type="button" class="btn" data-act="clockstop" ${clock.state==="idle"||clock.state==="stopped"?'disabled':''}>Stop timer</button><button type="button" class="btn small" data-act="clockreset">Reset timer</button></div><p class="muted timer-hint">Stopping the timer keeps your workout draft.</p>
- <section class="rest-controls" aria-label="Rest timer controls"><div class="rest-controls-heading"><h3>Rest</h3><strong data-timer="rest-panel">${restText}</strong></div><label>Rest duration<select data-act="restpreset" aria-label="Rest duration">${[...new Set([30,60,90,120,180,240,300,d.restSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${d.restSeconds===n?'selected':''}>${n} seconds</option>`).join('')}</select></label><div class="clock-actions"><button type="button" class="btn" data-act="reststart">Start rest</button>${rest?`<button type="button" class="btn" data-act="${rest.pausedRemainingMs!=null?'timerresume':'timerpause'}">${rest.pausedRemainingMs!=null?'Resume rest':'Pause rest'}</button><button type="button" class="btn" data-act="timerskip">Skip rest</button>`:''}</div><button type="button" class="btn small" data-act="timeropen">Open rest timer</button><details class="rest-preferences"><summary>Rest preferences</summary><button type="button" class="btn small" data-act="saveglobalrest">Save global rest default</button></details></section><button type="button" class="btn" data-act="clockfinish">Finish workout</button><button type="button" class="btn small" data-act="clockreturn">Back to ${esc(getDay(id).name)} →</button></section>`:''}`;
+// A minimized workout stays one tap away on every other screen.
+function resumeBar(){
+ if(["home","log","review","summary"].includes(S.tab))return "";
+ const id=activeWorkoutId();if(!id)return "";
+ const d=getDraft(id),day=getDay(id),{done,total}=draftProgress(d);
+ return `<button type="button" class="resume-bar" data-act="homecontinue" data-id="${esc(id)}" aria-label="Resume ${esc(day.name)}"><span class="live-dot" aria-hidden="true"></span><span class="resume-bar__name"><b>${esc(day.name)}</b> · ${done}/${total} sets</span><strong data-timer="workout">${timerLabel(timerTools.workoutElapsed(d.workoutTimer))}</strong><span class="resume-bar__cta">Resume</span></button>`;
+}
+function restBar(d){
+ const rest=d.restTimer;if(!rest||restOverlayOpen)return "";
+ const remaining=timerTools.remaining(rest),paused=rest.pausedRemainingMs!=null;
+ const width=rest.durationSeconds?Math.min(100,Math.round(remaining/rest.durationSeconds*100)):0;
+ return `<section class="rest-bar ${paused?"is-paused":""}" aria-label="Rest timer"><span class="rest-bar__track" aria-hidden="true"><span data-rest-progress style="width:${width}%"></span></span><button type="button" class="rest-bar__main" data-act="timeropen" aria-label="Open rest timer"><span><span class="eyebrow">${paused?"Rest paused":"Rest"}</span><small>Next: ${esc(nextSetLabel(d))}</small></span><strong data-timer="rest" role="timer">${remaining>0?timerLabel(remaining):"Done"}</strong></button><div class="rest-bar__actions"><button type="button" class="btn" data-act="timeradjust" data-seconds="-15" aria-label="Subtract 15 seconds">−15s</button><button type="button" class="btn" data-act="timeradjust" data-seconds="15" aria-label="Add 15 seconds">+15s</button><button type="button" class="btn light" data-act="timerskip">Skip rest</button></div></section>`;
 }
 function updateTimers(){
  if(!S.ready||(!activeWorkoutId()&&S.tab!=="log"))return;
@@ -441,36 +537,33 @@ function updateTimers(){
  const restText=!rest?"—":timerTools.remaining(rest)>0?timerLabel(timerTools.remaining(rest)):"Done";
  const restState=document.querySelector('[data-rest-state]');
  if(restState){const text=!rest?"Timer is not running":timerTools.remaining(rest)===0?"Rest complete":rest.pausedRemainingMs!=null?"Paused":"Time to recover";if(restState.textContent!==text)restState.textContent=text;}
+ const track=document.querySelector('[data-rest-progress]');
+ if(track&&rest?.durationSeconds)track.style.width=Math.min(100,Math.round(timerTools.remaining(rest)/rest.durationSeconds*100))+"%";
  for(const el of document.querySelectorAll('[data-timer]')){
   const key=el.dataset.timer;
   const value=key==="workout"||key==="workout-panel"?timerLabel(timerTools.workoutElapsed(d.workoutTimer))
-   :key==="rest"||key==="rest-panel"||key==="inline-rest"?restText:key==="overlay-rest"?rest?timerLabel(timerTools.remaining(rest)):"00:00":null;
+   :key==="rest"?restText:key==="overlay-rest"?rest?timerLabel(timerTools.remaining(rest)):"00:00":null;
   if(value!=null&&el.textContent!==value)el.textContent=value;
  }
 }
 if(typeof setInterval === 'function')timerTicker=setInterval(updateTimers,1000);
 document.addEventListener("visibilitychange",updateTimers);
+const SET_TYPE_BADGE={warmup:"W",drop:"D","reverse-drop":"R"};
 function setRows(i, prefix, name, sets, last, lo, hi, unit){
   return sets.map((s, j) => {
     const ph = last && last.sets[j] ? { w: tidy(conv(last.sets[j].w ?? 0, last.unit, unit), unit), r: last.sets[j].r } : null;
-    return `<div class="setrow workout-set-row ${s.completed===true?"is-complete":""}" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">Set ${j+1}</span>
+    const badge = SET_TYPE_BADGE[s.type] || (s.toFailure ? "F" : "");
+    return `<div class="setrow workout-set-row ${s.completed===true?"is-complete":""}" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">${j+1}${badge?`<small class="set-badge" title="${esc(s.type||"to failure")}">${badge}</small>`:""}</span>
       <input type="number" inputmode="decimal" step="any" min="0" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
       <input type="number" inputmode="numeric" step="1" min="0" aria-label="${esc(name)} set ${j+1} reps" data-f="r" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}r-${i}-${j}" value="${esc(s.r)}" placeholder="${ph ? esc(ph.r ?? "") : (lo ? lo+"–"+hi : "reps")}">
-      <select aria-label="${esc(name)} set ${j+1} type" data-act="settype" data-g="${prefix}" data-i="${i}" data-j="${j}">${["working","warmup","drop","reverse-drop"].map(t=>`<option value="${t}" ${(s.type||"working")===t?"selected":""}>${t}</option>`).join("")}</select>
-      <input type="number" min="0" max="10" step="1" inputmode="numeric" aria-label="${esc(name)} set ${j+1} RIR" data-f="rir" data-g="${prefix}" data-i="${i}" data-j="${j}" value="${s.rir??""}" placeholder="RIR">
-      <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}" title="${s.completed===true?"Mark set incomplete":"Complete set and start rest timer"}">${s.completed===true ? "✓ Done" : "○ Done"}</button>
-      <details class="set-technique"><summary>Set technique & rest${s.toFailure?' · To failure':''}${s.type==='drop'?' · Drop set':s.type==='reverse-drop'?' · Reverse drop set':''}</summary><label><input type="checkbox" data-act="setfailure" data-g="${prefix}" data-i="${i}" data-j="${j}" ${s.toFailure?'checked':''}> To failure (record actual reps)</label><label>Rest after this set (seconds)<input type="number" min="0" max="600" step="5" data-f="setrest" data-g="${prefix}" data-i="${i}" data-j="${j}" value="${s.restSeconds??''}" placeholder="Default"></label><button type="button" class="btn small" data-act="chainset" data-kind="drop" data-g="${prefix}" data-i="${i}" data-j="${j}">Add drop set</button><button type="button" class="btn small" data-act="chainset" data-kind="reverse-drop" data-g="${prefix}" data-i="${i}" data-j="${j}">Add reverse drop set</button></details><div class="set-adjustments"><button type="button" data-act="adjustweight" data-g="${prefix}" data-i="${i}" data-j="${j}" data-direction="-1" aria-label="Decrease ${esc(name)} set ${j+1} weight" ${s.completed?'disabled':''}>− Weight</button><button type="button" data-act="adjustweight" data-g="${prefix}" data-i="${i}" data-j="${j}" data-direction="1" aria-label="Increase ${esc(name)} set ${j+1} weight" ${s.completed?'disabled':''}>+ Weight</button>${ph?`<button type="button" data-act="uselastset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="Use previous ${esc(name)} set ${j+1}" ${s.completed?'disabled':''}>Use last: ${esc(ph.w)} ${unit} × ${esc(ph.r)}</button>`:''}</div>
+      <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}" title="${s.completed===true?"Mark set incomplete":"Complete set and start rest timer"}">${icon('check')}</button>
+      <button type="button" class="set-more" data-act="opensheet" data-sheet="set" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} options">${icon('moreV')}</button>
     </div>`; }).join("");
 }
 function lastBlock(name, e, unit){
   const last = lastFor(name);
-  if (!last || !name) return { last:null, html:`<p class="last">No history yet for this exercise. Start light and focus on form.</p>` };
-  let html = `<p class="last workout-previous" aria-label="Previous performance"><strong>Previous performance</strong> · Last time (${esc(fmtDate(last.date))}): ${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;${last.unit} × ${esc(s.r)}`).join(", ")}${last.unit !== unit ? ` <span>(grey targets converted to ${unit})</span>` : ""}</p>`;
-  if (e) {
-    const allTop = last.sets.length >= e.s && last.sets.every(s => (num(s.r)||0) >= e.hi);
-    html += allTop ? `<p class="hint">Every set hit ${e.hi} reps. Add ${unit === "kg" ? "2.5 kg" : "5 lb"} today, or the smallest jump available.</p>` : `<p class="hint">Aim to beat it by one rep on any set.</p>`;
-  }
-  return { last, html };
+  if (!last || !name) return { last:null, html:`<p class="last workout-previous">No history yet. Start light and focus on form.</p>` };
+  return { last, html:`<p class="last workout-previous" aria-label="Previous performance"><span class="eyebrow">Last time · ${esc(fmtDate(last.date))}</span> <span>${last.sets.map(s => `${esc(s.w ?? 0)}&thinsp;×&thinsp;${esc(s.r)}`).join(" · ")} ${esc(last.unit)}</span>${last.unit !== unit ? ` <small>(placeholders converted to ${unit})</small>` : ""}</p>` };
 }
 
 function exerciseDefaultControls(e,i,group,d){
@@ -478,12 +571,18 @@ function exerciseDefaultControls(e,i,group,d){
  const inc=e.loadIncrement??saved.loadIncrement??"",unit=e.incrementUnit||saved.incrementUnit||e.unit||"kg";
  const converted=inc!==""?convertIncrement(Number(inc),unit,e.unit||unit):null;
  const unitLabel=converted==null?"":`≈ ${converted} ${esc(e.unit||unit)}`;
- return `<div class="exercise-default-controls"><label>Rest (sec) <input type="number" min="15" max="600" step="5" data-f="exrest" data-g="${group}" data-i="${i}" value="${e.restSeconds??saved.restSeconds??d.restSeconds}"></label><label>Load increment <input type="number" min="0.1" max="100" step="0.1" data-f="increment" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} load increment" value="${esc(inc)}"></label><label>Increment unit <select data-act="incrementunit" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} increment unit"><option value="kg" ${unit==="kg"?"selected":""}>kg</option><option value="lb" ${unit==="lb"?"selected":""}>lb</option></select></label><span class="muted" aria-label="Converted load increment">${unitLabel}</span><button type="button" class="btn small" data-act="savedefault" data-g="${group}" data-i="${i}">Save default</button><button type="button" class="btn small" data-act="resetdefault" data-g="${group}" data-i="${i}">Reset default</button></div>`;
+ return `<div class="exercise-default-controls"><label class="field-label">Rest (sec)<input type="number" min="15" max="600" step="5" data-f="exrest" data-g="${group}" data-i="${i}" data-key="exrest-${group}-${i}" value="${e.restSeconds??saved.restSeconds??d.restSeconds}"></label><label class="field-label">Load increment<input type="number" min="0.1" max="100" step="0.1" data-f="increment" data-g="${group}" data-i="${i}" data-key="increment-${group}-${i}" aria-label="${esc(e.name)} load increment" value="${esc(inc)}"></label><label class="field-label">Increment unit<select data-act="incrementunit" data-g="${group}" data-i="${i}" aria-label="${esc(e.name)} increment unit"><option value="kg" ${unit==="kg"?"selected":""}>kg</option><option value="lb" ${unit==="lb"?"selected":""}>lb</option></select></label><span class="muted" aria-label="Converted load increment">${unitLabel}</span><div class="row-actions"><button type="button" class="btn small" data-act="savedefault" data-g="${group}" data-i="${i}">Save default</button><button type="button" class="btn small ghost" data-act="resetdefault" data-g="${group}" data-i="${i}">Reset default</button></div></div>`;
 }
-function progressionHint(e,definition){
+function suggestionFor(e,definition){
  const settings=S.exerciseDefaults?.[exerciseKey(e.name,e.exerciseId)]||{};
- const result=recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false});
- return `<p class="progression-hint" role="status"><strong>Next workout:</strong> ${esc(result.weight==null?"No load suggestion":result.weight+" "+result.unit)} — ${esc(result.reason)}</p>`;
+ return recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false});
+}
+// The single weight suggestion per exercise; it never edits the draft unless the user taps Fill.
+function progressionHint(e,definition,group="",i=0){
+ const result=suggestionFor(e,definition);
+ const title=result.weight==null?"No load suggestion":(result.kind==="increase"?"Try ":"Stay at ")+result.weight+" "+result.unit;
+ const fillable=result.weight!=null&&e.sets.some(s=>s.completed!==true&&String(s.w??"").trim()==="");
+ return `<div class="progression-hint suggestion kind-${esc(result.kind)}" role="status">${icon('trend')}<span><strong>${esc(title)}</strong><small>${esc(result.reason)}</small></span>${fillable?`<button type="button" class="btn small" data-act="applysuggestion" data-g="${group}" data-i="${i}" aria-label="Fill ${esc(result.weight+" "+result.unit)} into empty ${esc(e.name)} sets">Fill</button>`:""}</div>`;
 }
 let exerciseQuery="";
 function exerciseNameSuggestions(){
@@ -491,9 +590,9 @@ function exerciseNameSuggestions(){
  return `<datalist id="exercise-name-suggestions">${names.map(n=>`<option value="${esc(n)}"></option>`).join("")}</datalist>`;
 }
 function exerciseSearchBox(){
- return `<div class="section exercise-search-panel" role="search" aria-label="Find an exercise"><label for="exercise-search">Search exercises</label>
- <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Search exercises" value="${esc(exerciseQuery)}" autocomplete="off">
- <button class="btn small" type="button" data-act="clearexercisesearch">Clear search</button>
+ return `<div class="exercise-search-panel" role="search" aria-label="Find an exercise"><label class="search-field" for="exercise-search">${icon('search')}<span class="sr-only">Search exercises</span>
+ <input id="exercise-search" type="search" data-exercise-search aria-describedby="exercise-search-count" placeholder="Search exercises" value="${esc(exerciseQuery)}" autocomplete="off"></label>
+ <button class="btn small ghost" type="button" data-act="clearexercisesearch">Clear search</button>
  <p id="exercise-search-count" class="muted" data-exercise-search-count role="status" aria-live="polite"></p>
  <p class="muted" data-exercise-search-empty hidden>No matching exercises. Clear search to show all.</p></div>`;
 }
@@ -518,85 +617,139 @@ function exerciseActivationInfo(name){
  const metadata=resolveExerciseMetadata(name);
  return `<details class="exercise-activation"><summary>Muscles worked</summary>${renderExerciseMusclePreview(metadata)}</details>`;
 }
+function muscleSummary(name){
+ const m=resolveExerciseMetadata(name);
+ return m?[m.primaryMuscle,...(m.secondaryMuscles||[]).slice(0,1)].filter(Boolean).map(capitalize).join(", "):"";
+}
 const workoutExpanded = new Set();
-const workoutOptionsExpanded = new Set();
+
+/* ---------- bottom sheets ---------- */
+function sheetHead(eyebrow,title,meta=""){
+ return `<header class="sheet-head"><div><p class="eyebrow">${eyebrow}</p><h2 id="sheet-title" class="display-title">${title}</h2></div>${meta?`<p class="sheet-meta">${meta}</p>`:""}</header>`;
+}
+function swapSheet(){
+ const next=nextSlot(),active=activeWorkoutId();
+ return `${sheetHead("Choose a workout","Train instead")}<ul class="pick-list">${allDays().map(w=>`<li><button class="pick type-${esc(w.type)} ${w.id===next?"is-next":""}" data-act="homestart" data-id="${esc(w.id)}"><span class="stripe" aria-hidden="true"></span><span><strong>${esc(w.name)}</strong><small>${w.ex.length} exercises · ${w.ex.reduce((n,e)=>n+e.s,0)} sets${esc(lastDoneLabel(w.id))}</small></span>${w.id===active?'<span class="eyebrow accent">In progress</span>':w.id===next?'<span class="eyebrow accent">Up next</span>':""}</button></li>`).join("")}</ul>
+ <p class="muted">Logging a different workout keeps your schedule where it is.</p><div class="row-actions two"><button class="btn ghost" data-act="homecreate">${icon('plus')} New workout</button><button class="btn ghost" data-destination="library">Manage workouts</button></div>`;
+}
+function weightSheet(){
+ const last=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1),unit=S.bodyUnit||last?.unit||"kg";
+ return `${sheetHead("Quick log","Body weight",last?`Last ${esc(last.weight)} ${esc(last.unit||DEFAULT_UNIT)} · ${esc(fmtDate(last.date))}`:"")}<div class="weight-entry"><label class="sr-only" for="bWeight">Weight</label><input type="number" inputmode="decimal" step="any" id="bWeight" data-autofocus placeholder="${unit==="kg"?"80":"175"}"><select id="bUnit" aria-label="Body weight unit">${["kg","lb"].map(u=>`<option ${u===unit?"selected":""}>${u}</option>`).join("")}</select></div>
+ <div class="sheet-grid"><label class="field-label">Date<input type="date" id="bDate" value="${today()}"></label><label class="field-label">Waist cm (optional)<input type="number" inputmode="decimal" step="0.5" id="bWaist" placeholder="—"></label></div>
+ <div class="sheet-actions"><button class="btn primary" data-act="addbody">Add entry</button></div><button class="link-btn" data-destination="body">See your trend in Progress →</button>`;
+}
+function sessionSheet(){
+ const day=getDay(S.dayId),d=getDraft(S.dayId),clock=d.workoutTimer;
+ const startAction=clock.state==="running"?"clockpause":"clockstart";
+ const startLabel=clock.state==="running"?"Pause workout":clock.state==="paused"?"Resume workout":clock.state==="stopped"?"Restart workout timer":"Start workout timer";
+ return `${sheetHead("Session options",esc(day.name),`<span>${clockState(clock)}</span> <strong data-timer="workout-panel">${timerLabel(timerTools.workoutElapsed(clock))}</strong>`)}
+ <div class="sheet-group"><p class="eyebrow">Workout timer</p><div class="row-actions"><button type="button" class="btn" data-act="${startAction}">${startLabel}</button><button type="button" class="btn" data-act="clockstop" ${clock.state==="idle"||clock.state==="stopped"?"disabled":""}>Stop timer</button><button type="button" class="btn ghost" data-act="clockreset">Reset timer</button></div><p class="muted">Stopping the timer keeps your workout draft.</p></div>
+ <div class="sheet-group"><p class="eyebrow">Rest</p><div class="sheet-grid"><label class="field-label">Rest duration<select data-act="restpreset" aria-label="Rest duration">${[...new Set([30,60,90,120,180,240,300,d.restSeconds])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${d.restSeconds===n?"selected":""}>${n} seconds</option>`).join("")}</select></label><button type="button" class="btn" data-act="reststart">Start rest</button></div>
+ <details class="training-rest"><summary>Rest between exercises &amp; supersets</summary>${[["betweenExercisesRest","Between exercises",120],["supersetTransitionRest","Between superset exercises",0],["supersetRoundRest","After a superset round",90]].map(([key,label,fallback])=>`<label class="field-label">${label} (seconds)<input type="number" min="0" max="600" data-f="${key}" data-key="${key}" value="${d[key]??fallback}"></label>`).join("")}<p class="muted">Pair adjacent exercises in their options. A set-specific rest overrides these defaults. Zero means no timer.</p></details></div>
+ <div class="sheet-group"><label class="field-label session-date">Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label><label class="field-label" for="notes">Notes</label><textarea id="notes" data-f="notes" data-key="notes" rows="2" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></div>
+ <div class="sheet-actions"><button type="button" class="btn primary" data-act="closesheet">Done</button></div>`;
+}
+function exerciseSheet(g,i){
+ const d=getDraft(S.dayId),e=(g==="x"?d.extra:d.ex)[i];if(!e)return "";
+ const definition=g==="x"?null:getDay(S.dayId).ex[i],options=definition?.alt?.length?[definition.n,...definition.alt]:null;
+ return `${sheetHead("Exercise options",esc(e.name||"Extra exercise"))}
+ ${options?`<label class="field-label exercise-substitution">Swap exercise<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${options.map(o=>`<option ${o===e.name?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`:""}
+ <div class="sheet-group"><p class="eyebrow">Weight unit</p>${unitSeg(g,i,e.unit)}</div>
+ ${g!=="x"&&i<d.ex.length-1?`<label class="toggle-row"><span>Superset with ${esc(d.ex[i+1].name)}</span><input type="checkbox" data-act="supersetpair" data-i="${i}" ${e.supersetNext?"checked":""}></label>`:""}
+ <div class="sheet-group"><p class="eyebrow">Defaults for this exercise</p>${exerciseDefaultControls(e,i,g,d)}</div>
+ ${e.name.trim()?exerciseActivationInfo(e.name):""}
+ <div class="sheet-actions">${g==="x"?`<button type="button" class="btn danger" data-act="rmextra" data-i="${i}">Remove exercise</button>`:""}<button type="button" class="btn primary" data-act="closesheet">Done</button></div>`;
+}
+function setSheet(g,i,j){
+ const d=getDraft(S.dayId),e=(g==="x"?d.extra:d.ex)[i],s=e?.sets[j];if(!s)return "";
+ const name=e.name||"Extra exercise",previous=lastFor(e.name),prior=previous?.sets[j];
+ const ph=prior?{w:tidy(conv(prior.w??0,previous.unit,e.unit),e.unit),r:prior.r}:null;
+ const saved=settingFor(e,i,g),amount=Number(e.loadIncrement||saved.loadIncrement)||(e.unit==="kg"?2.5:5);
+ const step=Math.round(convertIncrement(amount,e.incrementUnit||saved.incrementUnit||e.unit,e.unit)*100)/100;
+ const at=`data-g="${g}" data-i="${i}" data-j="${j}"`;
+ return `${sheetHead(esc(name),`Set ${j+1}`,`${esc(String(s.w??"").trim()||"—")} ${esc(e.unit)} × ${esc(String(s.r??"").trim()||"—")}`)}
+ <div class="sheet-group"><p class="eyebrow" id="set-type-label">Set type</p><div class="seg" role="group" aria-labelledby="set-type-label">${[["working","Working"],["warmup","Warm-up"],["drop","Drop"],["reverse-drop","Rev. drop"]].map(([t,l])=>`<button type="button" data-act="settype" data-type="${t}" ${at} aria-pressed="${(s.type||"working")===t}">${l}</button>`).join("")}</div></div>
+ <div class="sheet-grid"><label class="field-label">Reps in reserve<input type="number" min="0" max="10" step="1" inputmode="numeric" aria-label="${esc(name)} set ${j+1} RIR" data-f="rir" ${at} data-key="rir-${g}-${i}-${j}" value="${s.rir??""}" placeholder="—"></label><label class="field-label">Rest after (sec)<input type="number" min="0" max="600" step="5" data-f="setrest" ${at} data-key="setrest-${g}-${i}-${j}" value="${s.restSeconds??""}" placeholder="Default"></label></div>
+ <div class="sheet-group"><p class="eyebrow">Weight</p><div class="row-actions"><button type="button" class="btn" data-act="adjustweight" ${at} data-direction="-1" aria-label="Decrease ${esc(name)} set ${j+1} weight" ${s.completed?"disabled":""}>− ${step}</button><button type="button" class="btn" data-act="adjustweight" ${at} data-direction="1" aria-label="Increase ${esc(name)} set ${j+1} weight" ${s.completed?"disabled":""}>+ ${step}</button>${ph?`<button type="button" class="btn ghost" data-act="uselastset" ${at} aria-label="Use previous ${esc(name)} set ${j+1}" ${s.completed?"disabled":""}>Use last: ${esc(ph.w)} ${esc(e.unit)} × ${esc(ph.r)}</button>`:""}</div></div>
+ <label class="toggle-row"><span>Taken to failure</span><input type="checkbox" data-act="setfailure" ${at} ${s.toFailure?"checked":""}></label>
+ <div class="row-actions two"><button type="button" class="btn ghost" data-act="chainset" data-kind="drop" ${at}>+ Drop set</button><button type="button" class="btn ghost" data-act="chainset" data-kind="reverse-drop" ${at}>+ Reverse drop</button></div>
+ <div class="sheet-actions"><button type="button" class="btn danger" data-act="rmsetat" ${at} ${e.sets.length<2?"disabled":""}>Remove set</button><button type="button" class="btn primary" data-act="closesheet">Done</button></div>`;
+}
+function sheetMarkup(s=sheet){
+ if(!s||!S.ready)return "";
+ const body=s.kind==="swap"?swapSheet():s.kind==="weight"?weightSheet():s.kind==="session"&&getDay(S.dayId)?sessionSheet():s.kind==="exercise"?exerciseSheet(s.g||"",+s.i):s.kind==="set"?setSheet(s.g||"",+s.i,+s.j):"";
+ if(!body)return "";
+ return `<div class="sheet-layer" data-sheet-layer><button type="button" class="sheet-backdrop" data-act="closesheet" tabindex="-1" aria-label="Close"></button><section class="sheet sheet-${esc(s.kind)}" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><span class="sheet-grabber" aria-hidden="true"></span>${body}</section></div>`;
+}
+
+function exerciseCard(d,day,i,isOpen){
+ const e=day?day.ex[i]:null,de=e?d.ex[i]:d.extra[i],g=e?"":"x",id=(e?"base-":"extra-")+i;
+ const name=de.name||"",lb=lastBlock(name.trim(),e,de.unit),done=de.sets.filter(z=>z.completed===true).length,allDone=done===de.sets.length;
+ const superset=e&&(de.supersetNext||d.ex[i-1]?.supersetNext)?" · Superset":"";
+ const muscles=name.trim()?muscleSummary(name):"";
+ const next=e&&i<day.ex.length-1?d.ex[i+1]:null;
+ return `<details class="ex active-exercise focused-exercise ${allDone?"is-done":""}" data-exercise-id="${id}" ${isOpen?"open":""} data-exercise-search-item="${esc([name,...(e?[e.n,...(e.alt||[])]:[])].join(" "))}">
+  <summary class="focused-exercise-summary">${exerciseThumbnail(name)}<span class="focused-exercise-summary-title">${esc(name||"Extra exercise")}<small>${done}/${de.sets.length} sets${e?` · ${e.lo}–${e.hi} reps`:""}${superset}</small></span>${allDone?`<span class="done-badge" role="img" aria-label="All sets done">${icon('check')}</span>`:`<span class="set-count" aria-hidden="true">${done}/${de.sets.length}</span>`}</summary>
+  <div class="focused-exercise-body">
+   <div class="exercise-head">${e?`<p class="target">Target <b>${e.s} × ${e.lo}–${e.hi}</b>${muscles?` · ${esc(muscles)}`:""}</p>`:`<input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(name)}">`}<button type="button" class="icon-btn" data-act="opensheet" data-sheet="exercise" data-g="${g}" data-i="${i}" aria-label="Exercise options for ${esc(name||"extra exercise")}">${icon('more')}</button></div>
+   ${name.trim()?lb.html+progressionHint(de,e,g,i):""}
+   <div class="colhead workout-set-heading" aria-hidden="true"><span>Set</span><span>${esc(de.unit)}</span><span>Reps</span><span>Done</span><span></span></div>
+   <div class="sets">${setRows(i, g, name||"Extra exercise", de.sets, lb.last, e?.lo, e?.hi, de.unit)}</div>
+   <div class="row-actions two"><button class="btn small" data-act="addset" ${g?'data-g="x" ':''}data-i="${i}">${icon('plus')} Add set</button><button class="btn small" data-act="copyforward" ${g?'data-g="x" ':''}data-i="${i}">Copy last sets</button></div>
+   ${next?`<button class="btn ghost next-exercise" data-act="nextexercise" data-i="${i+1}"><span><span class="muted">Next ·</span> ${esc(next.name)}</span>${icon('arrow')}</button>`:""}
+   ${name.trim()?`<div class="exercise-media">${exercisePhotoDetail(name,true)}</div>`:""}
+  </div></details>`;
+}
 function viewLog(){
   if (S.editing) return viewEditor();
   const day = getDay(S.dayId) || getDay(nextDayId());
   S.dayId = day.id;
-  const d = getDraft(day.id);
-  const cards = day.ex.map((e, i) => {
-    const de = d.ex[i];
-    const opts = [e.n, ...(e.alt||[])].map(o => `<option ${o===de.name?"selected":""}>${esc(o)}</option>`).join("");
-    const lb = lastBlock(de.name, e, de.unit);
-    const head = (e.alt && e.alt.length) ? `<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${opts}</select>` : `<span class="ex-name" style="padding-top:6px">${esc(de.name)}</span>`;
-    return `<details class="ex active-exercise focused-exercise ${esc(day.type)}" data-exercise-id="base-${i}" ${workoutExpanded.size ? (workoutExpanded.has("base-"+i)?"open":"") : (i===Math.max(0,d.ex.findIndex(x=>x.sets.some(z=>!z.completed)))?"open":"")} data-exercise-search-item="${esc([e.n,...(e.alt||[]),de.name].join(" "))}">
-      <summary class="focused-exercise-summary">${exerciseThumbnail(de.name)}<span class="focused-exercise-summary-title">${esc(de.name)}<small>${de.sets.filter(z=>z.completed===true).length}/${de.sets.length} sets complete · ${e.lo}–${e.hi} reps${de.supersetNext||d.ex[i-1]?.supersetNext?" · Superset":""}</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="exercise-meta"><span class="target">${e.s} sets · ${e.lo}–${e.hi} reps</span><span class="muted">${e.alt?.length ? "Alternatives available ↗" : ""}</span></div>
-      ${exercisePhotoDetail(de.name,true)}${lb.html}${d.restTimer?`<div class="inline-rest"><span>Rest <strong data-timer="inline-rest">${timerLabel(timerTools.remaining(d.restTimer))}</strong></span><button class="btn small" data-act="timerskip">Skip rest</button></div>`:""}
-      <div class="colhead workout-set-heading"><span>Set</span><span class="wcell">Weight ${unitSeg("", i, de.unit)}</span><span>Reps</span></div>
-      <details class="exercise-options" data-options-id="base-${i}" ${workoutOptionsExpanded.has("base-"+i)?"open":""}><summary>Exercise options</summary>${exerciseActivationInfo(de.name)}
-       <label class="exercise-substitution">Exercise / substitution ${head}</label>${exerciseDefaultControls(de,i,"",d)}${i<d.ex.length-1?`<label><input type="checkbox" data-act="supersetpair" data-i="${i}" ${de.supersetNext?'checked':''}> Superset with ${esc(d.ex[i+1].name)}</label>`:''}
-      ${progressionHint(de,e)}</details><div class="sets">${setRows(i, "", de.name, de.sets, lb.last, e.lo, e.hi, de.unit)}</div>
-      <div class="row-actions"><button class="btn small" data-act="copyforward" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-i="${i}">Add set</button>${de.sets.length>1?`<button class="btn small" data-act="rmset" data-i="${i}">Remove last set</button>`:""}</div>
-      ${i>0?`<button class="btn previous-exercise" data-act="nextexercise" data-i="${i-1}">← Previous: ${esc(day.ex[i-1].n)}</button>`:""}
-      ${i<day.ex.length-1?`<button class="btn next-exercise" data-act="nextexercise" data-i="${i+1}">Next: ${esc(day.ex[i+1].n)} →</button>`:""}
-    </div></details>`;
-  }).join("");
-  const extras = d.extra.map((x, i) => {
-    const lb = lastBlock(x.name.trim(), null, x.unit);
-    return `<details class="ex active-exercise focused-exercise other" data-exercise-id="extra-${i}" ${workoutExpanded.has("extra-"+i)?"open":""} data-exercise-search-item="${esc(x.name)}">
-      <summary class="focused-exercise-summary">${exerciseThumbnail(x.name)}<span class="focused-exercise-summary-title">${esc(x.name||"Extra exercise")}<small>${x.sets.filter(z=>z.completed===true).length}/${x.sets.length} sets complete</small></span><span class="focused-chevron" aria-hidden="true">⌄</span></summary><div class="focused-exercise-body"><div class="ex-head"><input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(x.name)}"><button class="btn small danger" data-act="rmextra" data-i="${i}">Remove</button></div>
-      ${x.name.trim() ? exercisePhotoDetail(x.name,true)+lb.html : ""}
-      <div class="colhead"><span></span><span class="wcell">Weight ${unitSeg("x", i, x.unit)}</span><span>Reps</span></div>
-      <details class="exercise-options" data-options-id="extra-${i}" ${workoutOptionsExpanded.has("extra-"+i)?"open":""}><summary>Exercise options</summary>${x.name.trim()?exerciseActivationInfo(x.name):""}
-       ${exerciseDefaultControls(x,i,"x",d)}
-      ${progressionHint(x,null)}</details><div class="sets">${setRows(i, "x", x.name, x.sets, lb.last, null, null, x.unit)}</div>
-      <div class="row-actions"><button class="btn small" data-act="copyforward" data-g="x" data-i="${i}">Copy last sets</button><button class="btn small" data-act="addset" data-g="x" data-i="${i}">Add set</button>${x.sets.length>1?`<button class="btn small" data-act="rmset" data-g="x" data-i="${i}">Remove last set</button>`:""}</div>
-    </div></details>`;
-  }).join("");
-  return `
-    <details class="section training-rest"><summary>Rest between exercises & supersets</summary>${[['betweenExercisesRest','Between exercises',120],['supersetTransitionRest','Between superset exercises',0],['supersetRoundRest','After a superset round',90]].map(([key,label,fallback])=>`<label>${label} (seconds)<input type="number" min="0" max="600" data-f="${key}" value="${d[key]??fallback}"></label>`).join('')}<p class="muted">Pair adjacent exercises in Exercise options. Complete one set of each exercise per round. A set-specific rest overrides these defaults. Zero means no timer.</p></details><section class="session-completion" aria-label="Workout completion"><div><span>Session progress</span><strong>${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length} / ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets complete</strong></div><progress aria-label="Completed sets" max="${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)||1}" value="${[...d.ex,...d.extra].flatMap(e=>e.sets).filter(s=>s.completed===true).length}"></progress></section>
-    <section class="session-toolbar" aria-label="Session overview"><p class="muted">${day.ex.length+d.extra.length} exercises · ${[...d.ex,...d.extra].reduce((n,e)=>n+e.sets.length,0)} sets</p>${d.workoutTimer.state!=='running'?'<button class="btn" data-act="workoutbegin">Resume timer</button>':''}<button class="btn primary" data-act="reviewworkout">Finish workout</button></section>
-    <div class="workout-layout redesigned-workout" id="workout-editor" tabindex="-1"><div class="workout-main">
-      <details class="section exercise-jump"><summary>Jump to an exercise · ${day.ex.length+d.extra.length} exercises</summary><nav aria-label="Workout exercises">${day.ex.map((e,i)=>`<button class="btn" data-act="jumptoexercise" data-i="${i}"><span>${i+1}. ${esc(d.ex[i].name)}</span><small>${d.ex[i].sets.filter(s=>s.completed).length}/${d.ex[i].sets.length} sets</small></button>`).join("")}${d.extra.map((e,i)=>`<button class="btn" data-act="jumpextra" data-i="${i}">${esc(e.name||"Extra exercise")}</button>`).join("")}</nav></details><div class="editor-heading"><h3>Exercises</h3><span class="muted">Open a card to log your sets</span></div>
-      ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="muted" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
-      ${exerciseNameSuggestions()}${cards}${extras}
-      <button class="btn add-exercise" data-act="addextra">+ Add an exercise</button>
-      <details class="section notes-card"><summary>Session notes & date</summary><label class="session-date">Session date<input type="date" data-f="date" data-key="date" value="${esc(d.date)}"></label><label for="notes">How did you feel today?</label>
-        <textarea id="notes" data-f="notes" data-key="notes" placeholder="Energy, sleep, a new personal best…">${esc(d.notes)}</textarea></details>
-    </div><aside class="session-sidebar">
-      <div class="session-card"><h3>Ready to finish?</h3><p class="muted"><span id="plannedSets">${[...d.ex,...d.extra].reduce((a,e)=>a+e.sets.length,0)}</span> sets in this workout</p>
-        <div class="meter-track"><div id="setMeter"></div></div><p class="meter-caption"><span id="loggedSets">0</span> sets logged <span>Keep showing up.</span></p>
-        <button class="btn primary finish-session-action" data-act="reviewworkout" aria-describedby="session-save-help">Review & finish workout ${icon("arrow")}</button><p id="session-save-help" class="muted">Your draft saves locally while you train. Review your logged sets before saving the session.</p><p id="session-validation" role="alert" hidden></p><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small" data-act="reloadconflict">Reload stored data</button></div>
-      </div>
-
-    </aside></div>`;
-
+  const d = getDraft(day.id), clock=d.workoutTimer, {done,total}=draftProgress(d);
+  const firstOpen = Math.max(0,d.ex.findIndex(x=>x.sets.some(z=>!z.completed)));
+  const isOpen=(id,i)=>workoutExpanded.size?workoutExpanded.has(id):id==="base-"+firstOpen;
+  const startAction=clock.state==="running"?"clockpause":"clockstart";
+  const clockLabel=clock.state==="running"?"Pause workout":clock.state==="paused"?"Resume workout":clock.state==="stopped"?"Restart workout timer":"Start workout timer";
+  const cards=day.ex.map((e,i)=>exerciseCard(d,day,i,isOpen("base-"+i,i))).join("")+d.extra.map((x,i)=>exerciseCard(d,null,i,workoutExpanded.has("extra-"+i))).join("");
+  const position=Math.min(day.ex.length+d.extra.length,firstOpen+1);
+  return `<header class="session-bar session-toolbar" aria-label="Session controls">
+    <button type="button" class="icon-btn" data-act="minimize" aria-label="Minimize workout">${icon('down')}</button>
+    <div class="page-intro session-title"><h1>${esc(day.name)}</h1><button type="button" class="session-clock state-${clock.state}" data-act="${startAction}" aria-label="${clockLabel}"><span class="clock-dot" aria-hidden="true"></span><strong data-timer="workout">${timerLabel(timerTools.workoutElapsed(clock))}</strong><span class="sr-only" data-clock-state>${clockState(clock)}</span></button></div>
+    <button type="button" class="icon-btn" data-act="opensheet" data-sheet="session" aria-label="Session options">${icon('more')}</button>
+    <button type="button" class="btn primary finish-btn" data-act="reviewworkout" aria-label="Finish workout">Finish</button>
+    <div class="session-progress"><div><span>Exercise ${position} of ${day.ex.length+d.extra.length}</span><span><b id="loggedSets">${done}</b> / ${total} sets done</span></div><progress aria-label="Completed sets" max="${total||1}" value="${done}" data-session-meter></progress></div>
+  </header>
+  <p id="session-validation" class="notice warn" role="alert" hidden></p>
+  <div class="workout-layout" id="workout-editor" tabindex="-1">
+   ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="notice warn" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
+   ${exerciseNameSuggestions()}${cards}
+   <button class="btn add-exercise" data-act="addextra">${icon('plus')} Add an exercise</button>
+   <div class="save-status"><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><div class="row-actions"><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small ghost" data-act="reloadconflict">Reload stored data</button></div></div></div>
+  </div>${restBar(d)}`;
 }
 
 function viewEditor(){
   const w = S.editing, isNew = !S.custom.some(c => c.id === w.id);
-  const colors = TYPES.map(([t,label]) => `<label><input type="radio" name="edtype" data-ed="type" value="${t}" ${w.type===t?"checked":""}><span class="swatch" style="background:var(--${t})"></span>${label}</label>`).join("");
+  const colors = TYPES.map(([t,label]) => `<label class="choice"><input type="radio" name="edtype" data-ed="type" value="${t}" ${w.type===t?"checked":""}><span class="swatch type-${t}" aria-hidden="true"></span>${label}</label>`).join("");
   const rows = w.ex.map((e, i) => `<div class="edrow" data-exercise-search-item="${esc(e.n)}">
       <input type="text" aria-label="Exercise ${i+1} name" list="exercise-name-suggestions" placeholder="Exercise name" data-ef="n" data-i="${i}" data-key="ed-n-${i}" value="${esc(e.n)}">
       <input type="number" inputmode="numeric" min="1" max="10" aria-label="Sets" data-ef="s" data-i="${i}" data-key="ed-s-${i}" value="${esc(e.s)}">
       <input type="number" inputmode="numeric" min="1" max="50" aria-label="Minimum reps" data-ef="lo" data-i="${i}" data-key="ed-lo-${i}" value="${esc(e.lo)}">
       <input type="number" inputmode="numeric" min="1" max="50" aria-label="Maximum reps" data-ef="hi" data-i="${i}" data-key="ed-hi-${i}" value="${esc(e.hi)}">
-      <button class="iconbtn" data-act="edrmex" data-i="${i}" aria-label="Remove exercise ${i+1}">×</button>
+      <button class="icon-btn" data-act="edrmex" data-i="${i}" aria-label="Remove exercise ${i+1}">${icon('close')}</button>
     </div>`).join("");
-  return `<div class="section">
-    <h3>${isNew ? "New workout" : "Edit workout"}</h3>
-    <label class="muted" style="font-size:14px;display:block">Name
-      <input type="text" style="width:100%;margin-top:3px" data-ed="name" data-key="ed-name" placeholder="e.g. Arms + abs, Upper body, Home workout" value="${esc(w.name)}"></label>
-    <p class="muted" style="font-size:14px;margin:12px 0 0">Workout category</p>
+  return `<div class="section workout-editor">
+    <h2 class="display-title">${isNew ? "New workout" : "Edit workout"}</h2>
+    <label class="field-label">Name
+      <input type="text" data-ed="name" data-key="ed-name" placeholder="e.g. Arms + abs, Upper body, Home workout" value="${esc(w.name)}"></label>
+    <p class="eyebrow">Workout category</p>
     <div class="colors" role="radiogroup" aria-label="Workout category">${colors}</div>
-    <p class="muted" style="font-size:14px;margin:12px 0 0">Default weight unit</p>
-    <div class="colors" role="radiogroup" aria-label="Default weight unit">${["lb","kg"].map(u => `<label><input type="radio" name="edunit" data-ed="unit" value="${u}" ${(w.unit||DEFAULT_UNIT)===u?"checked":""}>${u}</label>`).join("")}</div>
-    ${exerciseSearchBox()}${exerciseNameSuggestions()}<div class="edhead"><span>Exercise</span><span>Sets</span><span>Min reps</span><span>Max reps</span><span></span></div>
+    <p class="eyebrow">Default weight unit</p>
+    <div class="colors" role="radiogroup" aria-label="Default weight unit">${["lb","kg"].map(u => `<label class="choice"><input type="radio" name="edunit" data-ed="unit" value="${u}" ${(w.unit||DEFAULT_UNIT)===u?"checked":""}>${u}</label>`).join("")}</div>
+    ${exerciseSearchBox()}${exerciseNameSuggestions()}<div class="edhead" aria-hidden="true"><span>Exercise</span><span>Sets</span><span>Min</span><span>Max</span><span></span></div>
     ${rows}
-    <div class="row-actions"><button class="btn small" data-act="edaddex">Add exercise</button></div>
-    <p class="muted" style="font-size:13px">Add this workout to any repeating or weekly schedule using Manage schedules.</p>
-    <div class="stack" style="margin-top:14px">
+    <div class="row-actions"><button class="btn small" data-act="edaddex">${icon('plus')} Add exercise</button></div>
+    <p class="muted">Add this workout to any repeating or weekly schedule using Manage schedules.</p>
+    <div class="stack editor-actions">
       <button class="btn primary" data-act="edsave">Save workout</button>
       <button class="btn" data-act="edcancel">Cancel</button>
       ${isNew ? "" : `<button class="btn danger" data-act="eddelete">${S.armedDelete===w.id ? "Tap again to delete this workout" : "Delete workout"}</button>`}
@@ -606,16 +759,16 @@ function viewEditor(){
 function viewSavedSessionEdit(){
  const s=savedSessionEdit;
  if(!s)return '';
- return `<div class="section stack" aria-label="Edit saved session"><h2>Edit saved session</h2>
+ return `<div class="section stack session-editor" aria-label="Edit saved session"><h2 class="display-title">Edit saved session</h2>
  <p class="muted">Changes are not saved until you confirm. Your schedule will not advance.</p>
- <label>Date <input aria-label="Saved session date" type="date" data-history-field="date" value="${esc(s.date)}"></label>
- <label>Notes <textarea aria-label="Saved session notes" data-history-field="notes">${esc(s.notes||"")}</textarea></label>
+ <label class="field-label">Date <input aria-label="Saved session date" type="date" data-history-field="date" value="${esc(s.date)}"></label>
+ <label class="field-label">Notes <textarea aria-label="Saved session notes" data-history-field="notes">${esc(s.notes||"")}</textarea></label>
  ${s.exercises.map((ex,i)=>`<fieldset><legend>${esc(ex.name)} (${esc(ex.unit||s.unit||DEFAULT_UNIT)})</legend>
- ${(ex.sets||[]).map((set,j)=>`<div class="row-actions"><label>Weight <input aria-label="${esc(ex.name)} set ${j+1} weight" type="number" min="0" step="any" data-history-set="w" data-i="${i}" data-j="${j}" value="${esc(set.w??0)}"></label>
- <label>Reps <input aria-label="${esc(ex.name)} set ${j+1} reps" type="number" min="1" step="1" data-history-set="r" data-i="${i}" data-j="${j}" value="${esc(set.r??0)}"></label>
- <button class="btn small" data-act="historyrmset" data-i="${i}" data-j="${j}">Remove set ${j+1}</button></div>`).join("")}
+ ${(ex.sets||[]).map((set,j)=>`<div class="edit-set-row"><label class="field-label">Weight <input aria-label="${esc(ex.name)} set ${j+1} weight" type="number" min="0" step="any" data-history-set="w" data-i="${i}" data-j="${j}" value="${esc(set.w??0)}"></label>
+ <label class="field-label">Reps <input aria-label="${esc(ex.name)} set ${j+1} reps" type="number" min="1" step="1" data-history-set="r" data-i="${i}" data-j="${j}" value="${esc(set.r??0)}"></label>
+ <button class="btn small ghost" data-act="historyrmset" data-i="${i}" data-j="${j}">Remove set ${j+1}</button></div>`).join("")}
  <button class="btn small" data-act="historyaddset" data-i="${i}">Add set to ${esc(ex.name)}</button></fieldset>`).join("")}
- <div class="row-actions"><button class="btn primary" data-act="historysave">Save changes</button><button class="btn" data-act="historycancel">Cancel</button></div></div>`;
+ <div class="row-actions two"><button class="btn primary" data-act="historysave">Save changes</button><button class="btn" data-act="historycancel">Cancel</button></div></div>`;
 }
 function viewCalendar(){
  const month=calendarMonth||today().slice(0,7),period=calendarPeriod(month);
@@ -628,28 +781,32 @@ function viewCalendar(){
  const stats=calendarAdherence(monthDays);
  const label=new Date(month+"-01T12:00:00Z").toLocaleDateString(undefined,{month:"long",year:"numeric",timeZone:"UTC"});
  const activeDays=calendarMode==="week" ? days.slice(calendarWeekOffset*7,calendarWeekOffset*7+7) : days;
- const cards=activeDays.map(d=>`<div class="calendar-day ${d.date.slice(0,7)===month?"":"outside"}" data-calendar-date="${d.date}" aria-label="${esc(d.date)} ${esc(d.type)}">
-  <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state state-${d.type}">${d.type==="none"?"—":esc(d.type)}</span>
-  ${d.sessions.length?`<small>${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}
- </div>`).join("");
- return `<section class="section plan-overview" aria-label="Schedule overview"><div class="plan-overview-head"><div><p class="eyebrow">YOUR PLAN</p><h2>${esc(activeSchedule()?.name||"Your training schedule")}</h2><p class="muted">${activeSchedule()?(activeSchedule().mode==="weekly"?"Weekly routine":"Repeating workout sequence")+" · "+esc(nextScheduleLabel())+" next":"No active plan. Choose or create a schedule when you are ready."}</p></div><button class="btn primary" type="button" data-act="manageschedules">Manage schedules →</button></div></section>
- ${schedulePanel()}<details class="section calendar-disclosure" data-disclosure="calendar" ${openDisclosures.has("calendar")?"open":""}><summary>Training calendar</summary><section class="training-calendar" aria-label="Training calendar"><p class="muted">See completed sessions, planned days and rest days. Unlogged days are not counted as missed.</p>
-  <div class="calendar-toolbar"><h2>${esc(label)}</h2><div class="row-actions">
-   <button class="btn small" data-act="calendarprev" aria-label="Previous month">←</button>
-   <button class="btn small" data-act="calendartoday">Today</button>
-   <button class="btn small" data-act="calendarnext" aria-label="Next month">→</button>
+ const cards=activeDays.map(d=>{
+  const kind=d.sessions[0]?(getDay(d.sessions[0].dayId)?.type||d.sessions[0].type||"other"):"";
+  return `<button type="button" class="calendar-day ${d.date.slice(0,7)===month?"":"outside"} state-${esc(d.type)} ${d.date===today()?"is-today":""}" data-act="calendarday" data-date="${d.date}" data-calendar-date="${d.date}" aria-pressed="${d.date===calendarSelected}" aria-label="${esc(d.date)} ${esc(d.type)}">
+  <span class="calendar-number">${Number(d.date.slice(-2))}</span><span class="calendar-state">${d.type==="none"?"":esc(d.type)}</span>${d.sessions.length?`<span class="calendar-mark type-${esc(kind)}" aria-hidden="true"></span><small class="sr-only">${d.sessions.length} session${d.sessions.length===1?"":"s"}</small>`:""}</button>`;
+ }).join("");
+ const selected=calendarSelected&&days.find(d=>d.date===calendarSelected);
+ const detail=selected?`<section class="section calendar-detail" aria-live="polite"><p class="eyebrow">${esc(fmtDate(selected.date))} · ${esc(selected.type==="none"?"nothing logged":selected.type)}</p>${selected.sessions.length?selected.sessions.map(s=>`<div class="calendar-session"><div><h3 class="display-title">${esc(s.dayName)}</h3><p class="muted">${(s.exercises||[]).reduce((n,e)=>n+(e.sets||[]).length,0)} sets · ${(s.exercises||[]).slice(0,3).map(e=>esc(e.name)).join(" · ")}</p></div><button class="btn small" data-act="opensession" data-id="${esc(s.id)}">Open session</button></div>`).join(""):`<p class="muted">${selected.type==="planned"?"A workout is planned for this day.":selected.type==="rest"?"Planned rest day.":"No session logged."}</p>`}</section>`:"";
+ return `<section class="section training-calendar" aria-label="Training calendar"><div class="calendar-toolbar"><h2>${esc(label)}</h2><div class="row-actions">
+   <button class="icon-btn" data-act="calendarprev" aria-label="Previous month">${icon('back')}</button>
+   <button class="btn small ghost" data-act="calendartoday">Today</button>
+   <button class="icon-btn" data-act="calendarnext" aria-label="Next month">${icon('next')}</button>
   </div></div>
-  <div class="calendar-toolbar"><label>View <select data-calendar-mode aria-label="Calendar view"><option value="month" ${calendarMode==="month"?"selected":""}>Month</option><option value="week" ${calendarMode==="week"?"selected":""}>Week</option></select></label>
-  <p aria-live="polite">Adherence: ${stats.percent===null?"No recorded decisions":stats.percent+"%"} · ${stats.completed} completed, ${stats.skipped} skipped. Unlogged days are not counted as missed.</p></div>
-  <div class="calendar-weekdays" aria-hidden="true">${WEEKDAYS.map(d=>`<span>${d.slice(0,3)}</span>`).join("")}</div>
+  <div class="calendar-toolbar"><label class="inline-field">View <select data-calendar-mode aria-label="Calendar view"><option value="month" ${calendarMode==="month"?"selected":""}>Month</option><option value="week" ${calendarMode==="week"?"selected":""}>Week</option></select></label>
+  <p class="muted" aria-live="polite">Adherence: ${stats.percent===null?"No recorded decisions":stats.percent+"%"} · ${stats.completed} completed, ${stats.skipped} skipped</p></div>
+  <div class="calendar-weekdays" aria-hidden="true">${WEEKDAYS.map(d=>`<span>${d.slice(0,1)}</span>`).join("")}</div>
   <div class="calendar-grid" role="group" aria-label="${esc(label)} calendar">${cards}</div>
-  <p class="muted">Projected dates are shown for weekly schedules only. Repeating cycle schedules do not imply calendar dates. Completed workouts are based on your saved sessions.</p>
- </section></details>`;
+  <div class="calendar-legend" aria-hidden="true"><span><i class="type-pull"></i>Pull</span><span><i class="type-push"></i>Push</span><span><i class="type-legs"></i>Legs</span><span><i class="type-other"></i>Other</span></div>
+  <p class="muted">Unlogged days are not counted as missed. Projected dates are shown for weekly schedules only; repeating sequences do not imply calendar dates.</p>
+ </section>${detail}`;
 }
 function viewHistory(){
   if(savedSessionEdit)return viewSavedSessionEdit();
-  if (!S.sessions.length) return `<div class="empty">No sessions yet. Log your first workout and it will show up here.</div>`;
-  return `<div class="section history-list" aria-label="Completed workout history">` + S.sessions.map(s => {
+  const toolbar=`<div class="history-toolbar"><h2 id="history-heading" class="section-title">Workout history</h2><div class="seg" role="group" aria-label="History view"><button type="button" data-act="historymode" data-mode="list" aria-pressed="${historyMode!=="calendar"}">List</button><button type="button" data-act="historymode" data-mode="calendar" aria-pressed="${historyMode==="calendar"}">Calendar</button></div></div>`;
+  if(historyMode==="calendar")return toolbar+viewCalendar();
+  if (!S.sessions.length) return toolbar+`<div class="empty">No sessions yet. Log your first workout and it will show up here.</div>`;
+  return toolbar+`<div class="history-list" aria-labelledby="history-heading">` + S.sessions.map(s => {
     const gd = getDay(s.dayId); const day = { name: s.dayName || (gd && gd.name) || "Workout", type: (gd && gd.type) || s.type || "other" };
     const sets = (s.exercises||[]).reduce((a,e)=>a+(e.sets||[]).length,0);
     const units = [...new Set((s.exercises||[]).map(e => exUnit(e, s)))];
@@ -657,7 +814,7 @@ function viewHistory(){
     const vol = Math.round((s.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((b,x)=>b+(conv(x.w||0, exUnit(e,s), vu)||0)*(num(x.r)||0),0),0));
     const rows = (s.exercises||[]).map(e => `<tr><td>${esc(e.name)}</td><td>${(e.sets||[]).map(x=>`${esc(x.w ?? 0)}×${esc(x.r)}${x.type&&x.type!=="working"?" ["+esc(x.type)+"]":""}${x.toFailure?" · failure":""}${x.restSeconds!=null?" · "+x.restSeconds+"s rest":""}`).join(", ")} ${exUnit(e,s)}</td></tr>`).join("");
     const armed = S.armedDelete === s.id;
-    return `<details data-session-id="${esc(s.id)}" class="hist"><summary><span class="chip ${esc(day.type)}">${esc(day.name)}</span><span>${esc(fmtDate(s.date))}</span><span class="meta">${sets} sets · ${hardSetCount([s])} hard sets<br>${vol.toLocaleString()} ${vu}</span></summary>
+    return `<details data-session-id="${esc(s.id)}" class="hist type-${esc(day.type)}"><summary><span class="hist-stripe" aria-hidden="true"></span><span class="hist-main"><strong>${esc(day.name)}</strong><span class="muted">${esc(fmtDate(s.date))}</span></span><span class="meta">${sets} sets · ${hardSetCount([s])} hard sets<br>${vol.toLocaleString()} ${vu}</span></summary>
       <div class="body"><div class="responsive-table" tabindex="0" role="region" aria-label="Exercise sets in saved session"><table><thead><tr><th scope="col">Exercise</th><th scope="col">Logged sets</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${s.notes ? `<p class="muted">${esc(s.notes)}</p>` : ""}
       <div class="row-actions"><button class="btn small" data-act="historyedit" data-id="${esc(s.id)}">Edit session</button><button class="btn small danger" data-act="delsession" data-id="${esc(s.id)}" aria-label="${armed?"Confirm delete":"Delete"} session ${esc(day.name)} on ${esc(fmtDate(s.date))}">${armed ? "Confirm delete session" : "Delete session"}</button></div></div></details>`;
@@ -696,7 +853,7 @@ function cachedRecords(sessions,exercise,unit){
  return recordsCache.value;
 }
 function chartSVG(points, color, unit){
-  if (points.length < 2) return `<div class="empty" style="margin-top:10px">Log this at least twice to see a trend line.</div>`;
+  if (points.length < 2) return `<div class="empty">Log this at least twice to see a trend line.</div>`;
   const displayed=sampleChartPoints(points);
   const W=600,H=230,P={l:44,r:14,t:16,b:30};
   // Bounded-memory extrema: spread Math.min/Math.max fails for large histories.
@@ -705,26 +862,37 @@ function chartSVG(points, color, unit){
   const pad=(y1-y0)*0.12 || 2; y0-=pad; y1+=pad;
   const X=x=>P.l+((x-x0)/((x1-x0)||1))*(W-P.l-P.r), Y=y=>H-P.b-((y-y0)/((y1-y0)||1))*(H-P.t-P.b);
   const path=displayed.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(" ");
-  const dots=displayed.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
+  const dots=displayed.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${color}" stroke="var(--surface)" stroke-width="2"><title>${new Date(p.x).toLocaleDateString()}: ${round1(p.y)} ${unit}</title></circle>`).join("");
   const grid=[0,0.5,1].map(t=>{const v=y0+(y1-y0)*t;const y=Y(v);return `<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${P.l-6}" y="${y+4}" text-anchor="end" font-size="12" fill="var(--muted)">${Math.round(v)}</text>`;}).join("");
   const d0=new Date(x0).toLocaleDateString(undefined,{day:"numeric",month:"short"}), d1=new Date(x1).toLocaleDateString(undefined,{day:"numeric",month:"short"});
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" tabindex="0" aria-label="Trend chart: ${esc(unit)} with ${points.length} points, from ${esc(d0)} to ${esc(d1)}">${grid}
     <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${dots}
     <text x="${P.l}" y="${H-8}" font-size="12" fill="var(--muted)">${d0}</text><text x="${W-P.r}" y="${H-8}" font-size="12" text-anchor="end" fill="var(--muted)">${d1}</text></svg></div>`;
 }
-
+const compactNumber=n=>n>=10000?(Math.round(n/100)/10)+"k":String(Math.round(n));
+// One row of range presets plus an expandable set of exact filters; every Progress view shares them.
+function analyticsFilterBar(filter){
+ const preset=filter.to?"":!filter.from?"all":String([28,84,365].find(n=>filter.from===dateOffset(today(),-(n-1)))||"");
+ const workouts=[...new Map(S.sessions.map(s=>[s.dayId,s.dayName||s.dayId])).entries()];
+ const active=filter.workout||filter.exercise||(!preset&&(filter.from||filter.to));
+ return `<div class="filter-bar"><div class="range-chips" role="group" aria-label="Date range">${[["28","4W"],["84","12W"],["365","1Y"],["all","All"]].map(([value,label])=>`<button type="button" class="range-chip" data-act="analyticsrange" data-range="${value}" aria-pressed="${preset===value}">${label}</button>`).join("")}</div>
+ <details class="analytics-filters" ${analyticsFiltersOpen?"open":""}><summary>${icon('search')} Filters${active?" · Active":""}</summary><div class="analytics-controls" role="group" aria-label="Analytics filters"><label class="field-label">From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label class="field-label">To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label class="field-label">Workout <select data-analytics="workout"><option value="">All workouts</option>${workouts.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label class="field-label">Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div></details></div>`;
+}
 function progressHighlights(sessions){
  const rows=strengthHighlights(sessions,S.bodyUnit||"kg");
- return `<section class="section strength-highlights" aria-label="Recent strength highlights"><h2>Recent strength</h2><p class="muted">Best estimated 1RM in each exercise’s latest session versus its previous session, within your filters.</p>${rows.length?rows.map(r=>`<button class="btn strength-highlight" data-act="progresslift" data-name="${esc(r.name)}"><span><strong>${esc(r.name)}</strong><small>${esc(fmtDate(r.date))}</small></span><span><strong>${r.latest} ${r.unit}</strong><small>${r.previous===null?'First recorded session':Math.abs(r.latest-r.previous)<0.01?'Unchanged from previous':(r.latest>r.previous?'↑ +':'↓ ')+(Math.round((r.latest-r.previous)*100)/100)+' '+r.unit+' from previous'}</small><small>Best in range: ${r.best} ${r.unit}</small></span></button>`).join(""):'<p class="empty">Log working sets to see strength changes here.</p>'}<p class="muted">An estimate, not a tested maximum. Warm-ups and incomplete sets are excluded.</p></section>`;
+ return `<section class="section strength-highlights" aria-label="Recent strength highlights"><div class="section-heading"><h2>Recent strength</h2><span class="muted">est. 1RM vs previous</span></div>${rows.length?`<ul class="lift-list">${rows.map(r=>{const delta=r.previous===null?"First recorded session":Math.abs(r.latest-r.previous)<0.01?"= unchanged":(r.latest>r.previous?"▲ +":"▼ ")+(Math.round((r.latest-r.previous)*100)/100)+" "+r.unit;return `<li><button class="strength-highlight" data-act="progresslift" data-name="${esc(r.name)}"><span><strong>${esc(r.name)}</strong><small>${esc(fmtDate(r.date))} · best in range ${r.best} ${r.unit}</small></span><span class="lift-change"><b>${r.latest} ${r.unit}</b><small class="${r.previous!==null&&r.latest>r.previous+0.01?"up":r.previous!==null&&r.latest<r.previous-0.01?"down":""}">${delta}</small></span></button></li>`;}).join("")}</ul>`:'<p class="empty">Log working sets to see strength changes here.</p>'}<p class="muted">An estimate, not a tested maximum. Warm-ups and incomplete sets are excluded.</p></section>`;
 }
 function viewProgress(){
   const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
   const {filtered,summary}=cachedAnalytics(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
-  const workoutOptions=[...new Map(S.sessions.map(s=>[s.dayId,s.dayName||s.dayId])).entries()];
-  const analyticsControls=`<details class="analytics-filters" ${analyticsFiltersOpen?"open":""}><summary>Filter history${Object.values(filter).some(Boolean)?" · Active":""}</summary><div class="analytics-controls" role="group" aria-label="Analytics filters"><label>From <input type="date" data-analytics="from" value="${esc(filter.from||"")}"></label><label>To <input type="date" data-analytics="to" value="${esc(filter.to||"")}"></label><label>Workout <select data-analytics="workout"><option value="">All workouts</option>${workoutOptions.map(([id,name])=>`<option value="${esc(id)}" ${id===filter.workout?"selected":""}>${esc(name)}</option>`).join("")}</select></label><label>Exercise <select data-analytics="exercise"><option value="">All exercises</option>${[...new Set(S.sessions.flatMap(x=>(x.exercises||[]).map(e=>e.name)))].sort().map(n=>`<option ${n===filter.exercise?"selected":""}>${esc(n)}</option>`).join("")}</select></label></div></details>`;
   const weekPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.volume}));
   const hardPts=summary.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.hardSets}));
-  const analyticsHTML=`<section id="progress-training" class="section analytics-dashboard" aria-labelledby="training-analytics-heading"><h3 id="training-analytics-heading">Training analytics</h3><p class="muted">Your completed training, at a glance.</p>${analyticsControls}<div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div>${weekPts.length?`<h4>Weekly volume</h4>${chartSVG(weekPts,"var(--push)",summary.unit+"·reps")}`:'<p class="empty">No training sessions match these filters.</p>'}${hardPts.length?`<h4>Weekly hard sets</h4>${chartSVG(hardPts,"var(--pull)","hard sets")}`:""}${summary.weekly.length?`<details class="analytics-table-details"><summary>Weekly data table (exact values)</summary><div class="responsive-table" tabindex="0" role="region" aria-label="Exact weekly training analytics"><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></div></details>`:""}</section>`;
+  const recent=summary.weekly.slice(-12);
+  let peak=1;for(const w of recent)if(w.volume>peak)peak=w.volume;
+  const volumeBars=recent.length?`<div class="bar-chart" role="img" aria-label="Weekly volume for ${recent.length} week${recent.length===1?"":"s"}; latest week ${Math.round(recent.at(-1).volume)} ${esc(summary.unit)}·reps">${recent.map((w,i)=>`<span class="bar ${i===recent.length-1?"is-latest":""}" style="height:${Math.max(2,Math.round(w.volume/peak*100))}%" title="Week of ${esc(w.week)}: ${Math.round(w.volume)} ${esc(summary.unit)}·reps"></span>`).join("")}</div><div class="axis-row"><span>${esc(fmtDate(recent[0].week))}</span><span>${esc(fmtDate(recent.at(-1).week))} · <b>${compactNumber(recent.at(-1).volume)}</b></span></div>`:'<p class="empty">No training sessions match these filters.</p>';
+  const table=summary.weekly.length?`<details class="analytics-table-details"><summary>Weekly data table (exact values)</summary><div class="responsive-table" tabindex="0" role="region" aria-label="Exact weekly training analytics"><table><thead><tr><th>Week of</th><th>Volume (${summary.unit}·reps)</th><th>Hard sets</th></tr></thead><tbody>${summary.weekly.map(w=>`<tr><td>${esc(w.week)}</td><td>${w.volume}</td><td>${w.hardSets}</td></tr>`).join("")}</tbody></table></div></details>`:"";
+  const analyticsHTML=`<section id="progress-training" class="section analytics-dashboard" aria-labelledby="training-analytics-heading"><div class="section-heading"><h2 id="training-analytics-heading">Training analytics</h2><span class="muted">${filter.exercise?esc(filter.exercise):"All exercises"}</span></div><div class="stats"><div class="stat"><b>${summary.sessions}</b><small>Sessions</small></div><div class="stat"><b>${summary.hardSets}</b><small>Hard sets</small></div><div class="stat"><b>${Math.round(summary.volume)}</b><small>${filter.exercise?"Exercise volume":"Volume"} (${summary.unit}·reps)</small></div></div><h3 class="eyebrow">Weekly volume</h3>${volumeBars}
+   <details class="analytics-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Hard sets &amp; volume trends</summary>${hardPts.length?`<h4>Weekly hard sets</h4>${chartSVG(hardPts,"var(--accent-line)","hard sets")}`:""}${weekPts.length?`<h4>Weekly volume trend</h4>${chartSVG(weekPts,"var(--push)",summary.unit+"·reps")}`:""}${table}</details></section>`;
 
   const muscle=muscleVolumeSummary(filtered,{unit:S.bodyUnit||"kg",exercise:filter.exercise||"",secondaryCredit:0.5});
   const mapData=muscleMapData(muscle,{metric:muscleMapMetric});
@@ -744,79 +912,80 @@ function viewProgress(){
       for(const row of values)contributors.push({muscle:row.muscle,name,kind,hardSets:row.hardSets,volume:row.volume});
     }
   }
-
-  const muscleMapHTML=`<div class="muscle-map-controls"><label>Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected,contributors})}`;
+  const top=[...muscle.primary].filter(m=>m.hardSets>0).sort((a,b)=>b.hardSets-a.hardSets).slice(0,6);
+  let most=1;for(const m of top)if(m.hardSets>most)most=m.hardSets;
+  const muscleMapHTML=`<div class="muscle-map-controls"><label class="field-label">Muscle map metric <select data-muscle-map-metric><option value="hardSets" ${muscleMapMetric==="hardSets"?"selected":""}>Primary hard sets</option><option value="volume" ${muscleMapMetric==="volume"?"selected":""}>Primary volume</option></select></label></div>${renderMuscleMap(mapData,{selected:muscleMapSelected,contributors})}`;
   const muscleRows=(entries,kind)=>entries.map(entry=>`<tr><td>${esc(entry.muscle)}</td><td>${entry.hardSets}</td><td>${entry.volume}</td><td>${kind}</td></tr>`).join("");
-  const muscleHTML=`<section id="progress-muscles" class="section muscle-analytics" aria-label="Muscle-group volume"><h3>Muscle-group volume</h3>
+  const muscleHTML=`<section id="progress-muscles" class="section muscle-analytics" aria-label="Muscle balance"><div class="section-heading"><h2>Muscle balance</h2><span class="muted">primary hard sets</span></div>
+    ${top.length?`<ul class="meter-list">${top.map(m=>`<li><span>${esc(capitalize(m.muscle))}</span><span class="meter" aria-hidden="true"><span style="width:${Math.round(m.hardSets/most*100)}%"></span></span><b>${m.hardSets}</b></li>`).join("")}</ul>`:'<p class="empty">Log working sets to see which muscles you train.</p>'}
+    <details class="analytics-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Body map &amp; details</summary>
     <details class="analytics-explanation"><summary>How muscle estimates work</summary><p class="muted">Primary sets count once; secondary credit is shown separately at 0.5 per hard set. Warm-ups are excluded; drop sets add volume but not hard sets. Unclassified exercises appear under Unknown.</p></details>
     ${muscleMapHTML}
     <div class="stats"><div class="stat"><b>${muscle.hardSets}</b><small>Total hard sets</small></div><div class="stat"><b>${muscle.unknown.hardSets}</b><small>Unclassified hard sets</small></div></div>
-    <details class="analytics-breakdown"><summary>Detailed totals & weekly trends</summary><table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table>
-    <h4>Primary hard-set trend</h4>${muscle.weekly.length?chartSVG(muscle.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.primary.reduce((sum,m)=>sum+m.hardSets,0)})),"var(--pull)","primary hard sets"):""}
-    <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}</details>
+    <details class="analytics-breakdown"><summary>Detailed totals &amp; weekly trends</summary><div class="responsive-table"><table><caption>Muscle totals (${muscle.unit}·reps)</caption><thead><tr><th>Muscle</th><th>Hard sets</th><th>Volume</th><th>Credit</th></tr></thead><tbody>${muscleRows(muscle.primary,"Primary")}${muscleRows(muscle.secondary,"Secondary (0.5)")}${muscleRows([{...muscle.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></div>
+    <h4>Primary hard-set trend</h4>${muscle.weekly.length?chartSVG(muscle.weekly.map(w=>({x:Date.parse(w.week+"T12:00:00Z"),y:w.primary.reduce((sum,m)=>sum+m.hardSets,0)})),"var(--accent-line)","primary hard sets"):""}
+    <h4>Weekly muscle training</h4>${muscle.weekly.length?muscle.weekly.map(w=>`<details><summary>Week of ${esc(w.week)}</summary><table><tbody>${muscleRows(w.primary,"Primary")}${muscleRows(w.secondary,"Secondary")}${muscleRows([{...w.unknown,muscle:"Unknown"}],"Unclassified")}</tbody></table></details>`).join(""):'<p class="empty">No muscle-volume data in this range.</p>'}</details></details>
   </section>`;
+  return `${analyticsFilterBar(filter)}${analyticsHTML}${activityOverview()}${progressHighlights(filtered)}${muscleHTML}`;
+}
+function viewLifts(){
+  const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
+  const {filtered}=cachedAnalytics(S.sessions,{...filter,unit:S.bodyUnit||"kg"});
   const names = [...new Set(filtered.flatMap(s => (s.exercises||[]).map(e => e.name)).filter(n=>!filter.exercise||n===filter.exercise))].sort();
-  let exHtml;
-  if (!names.length) exHtml = `<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
-  else {
-    if (!names.includes(S.progressEx)) S.progressEx = names[0];
-    const records=cachedRecords(filtered,S.progressEx,S.bodyUnit||"kg");
-    const recordHTML=`<div class="pr-summary" aria-label="Personal records"><h3>Personal records</h3><div class="pr-grid"><span>Heaviest <strong>${records.heaviest?records.heaviest.value+" "+records.unit:"—"}</strong></span><span>Most reps <strong>${records.mostReps?records.mostReps.value:"—"}</strong></span><span>Best estimated 1RM <strong>${records.estimated1RM?records.estimated1RM.value+" "+records.unit:"—"}</strong></span><span>Best exercise-session volume <strong>${records.sessionVolume?records.sessionVolume.value+" "+records.unit+"·reps":"—"}</strong></span></div><p class="muted">Calculated for the selected exercise in matching sessions. Warm-up sets are excluded; drop sets contribute to volume. Ties share the record; estimated 1RM is calculated, not measured.</p></div>`;
-    const pts = [], dayType = (()=>{ for (const d of allDays()) if (d.ex.some(e=>e.n===S.progressEx||(e.alt||[]).includes(S.progressEx))) return d.type; return "other"; })();
-    let best=0, heaviest=0;
-    const pu = S.bodyUnit || DEFAULT_UNIT;
-    sortSessions(filtered).reverse().forEach(s => { const e=(s.exercises||[]).find(x=>x.name===S.progressEx); if(!e) return;
-      const eu = exUnit(e, s);
-      let top=0; e.sets.forEach(x=>{const w=num(x.w),r=num(x.r);if(x.type==="warmup"||x.completed===false||w==null||w<0||r==null||!Number.isInteger(r)||r<=0)return;const converted=conv(w,eu,pu)||0;top=Math.max(top,e1rm(converted,r));heaviest=Math.max(heaviest,converted);});
-      if (top>0){ pts.push({x:new Date(s.date+"T12:00:00").getTime(), y:top}); best=Math.max(best,top);} });
-    const first = pts[0] ? pts[0].y : 0, last = pts.length ? pts[pts.length-1].y : 0;
-    const change = first ? Math.round(((last-first)/first)*100) : 0;
-    exHtml = `<select aria-label="Exercise" data-act="progressEx" style="width:100%">${names.map(n=>`<option ${n===S.progressEx?"selected":""}>${esc(n)}</option>`).join("")}</select>
-      <div class="stats"><div class="stat"><b>${round1(best)}</b><small>Best est. 1RM (${pu})</small></div>
-      <div class="stat"><b>${round1(heaviest)}</b><small>Heaviest set (${pu})</small></div>
-      <div class="stat"><b>${change>0?"+":""}${change}%</b><small>Since first log</small></div></div>
-      ${recordHTML}${chartSVG(pts, `var(--${dayType})`, pu + " est. 1RM")}
-      <p class="muted" style="font-size:13px">Estimated 1RM uses the Epley formula on your best set each session, so heavier weights and extra reps both count as progress. Sessions logged in a different unit are converted.</p>`;
-  }
+  if (!names.length) return `${analyticsFilterBar(filter)}<div class="empty">Your strength trends appear here once you've logged a session.</div>`;
+  if (!names.includes(S.progressEx)) S.progressEx = names[0];
+  const records=cachedRecords(filtered,S.progressEx,S.bodyUnit||"kg");
+  const pts = [];
+  let best=0, heaviest=0;
+  const pu = S.bodyUnit || DEFAULT_UNIT;
+  sortSessions(filtered).reverse().forEach(s => { const e=(s.exercises||[]).find(x=>x.name===S.progressEx); if(!e) return;
+    const eu = exUnit(e, s);
+    let top=0; e.sets.forEach(x=>{const w=num(x.w),r=num(x.r);if(x.type==="warmup"||x.completed===false||w==null||w<0||r==null||!Number.isInteger(r)||r<=0)return;const converted=conv(w,eu,pu)||0;top=Math.max(top,e1rm(converted,r));heaviest=Math.max(heaviest,converted);});
+    if (top>0){ pts.push({x:new Date(s.date+"T12:00:00").getTime(), y:top}); best=Math.max(best,top);} });
+  const first = pts[0] ? pts[0].y : 0, last = pts.length ? pts[pts.length-1].y : 0;
+  const change = first ? Math.round(((last-first)/first)*100) : 0;
+  const record=(label,value,note)=>`<div class="pr-card"><span class="eyebrow">${label}</span><strong>${value}</strong>${note?`<small class="muted">${note}</small>`:""}</div>`;
+  return `${analyticsFilterBar(filter)}<label class="field-label lift-picker">Exercise<select aria-label="Exercise" data-act="progressEx">${names.map(n=>`<option ${n===S.progressEx?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
+   <section class="section lift-hero" aria-label="Estimated one-rep max trend"><p class="eyebrow">Best est. 1RM · ${esc(pu)}</p><div class="lift-value"><b>${round1(best)}</b><span>${esc(pu)}</span>${pts.length>1?`<span class="delta ${change>0?"up":change<0?"down":""}">${change>0?"▲ ":change<0?"▼ ":""}${Math.abs(change)}% since first log</span>`:""}</div>${chartSVG(pts, "var(--accent-line)", pu + " est. 1RM")}<p class="muted">Estimated 1RM uses the Epley formula on your best set each session, so heavier weights and extra reps both count as progress. Sessions logged in a different unit are converted.</p></section>
+   <section class="pr-summary" aria-label="Personal records"><h3>Personal records</h3><div class="pr-grid">${record("Heaviest",records.heaviest?records.heaviest.value+" "+records.unit:"—",`Heaviest set in range: ${round1(heaviest)} ${esc(pu)}`)}${record("Most reps",records.mostReps?records.mostReps.value:"—","")}${record("Best estimated 1RM",records.estimated1RM?records.estimated1RM.value+" "+records.unit:"—","")}${record("Best exercise-session volume",records.sessionVolume?records.sessionVolume.value+" "+records.unit+"·reps":"—","")}</div><p class="muted">Calculated for the selected exercise in matching sessions. Warm-up sets are excluded; drop sets contribute to volume. Ties share the record; estimated 1RM is calculated, not measured.</p></section>`;
+}
+function viewBody(){
+  const filter=S.analyticsFilter||{from:"",to:"",workout:"",exercise:""};
   const bu = S.body.length ? (S.body[S.body.length-1].unit || DEFAULT_UNIT) : (S.bodyUnit || "kg");
   const visibleBody=S.body.filter(b=>(!filter.from||b.date>=filter.from)&&(!filter.to||b.date<=filter.to));
   const bpts = visibleBody.filter(b=>num(b.weight)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:conv(b.weight, b.unit||DEFAULT_UNIT, bu)}));
   const wpts = visibleBody.filter(b=>num(b.waist)).map(b=>({x:new Date(b.date+"T12:00:00").getTime(), y:num(b.waist)}));
   const recent = visibleBody.slice().reverse().slice(0,8).map(b => `<li><span>${esc(fmtDate(b.date))}</span><span>${b.weight?esc(b.weight)+" "+(b.unit||DEFAULT_UNIT):""}${b.weight&&b.waist?" · ":""}${b.waist?esc(b.waist)+" cm waist":""}</span>
     <button class="btn small danger" data-act="delbody" data-id="${esc(b.id)}" aria-label="${S.armedDelete===b.id?"Confirm delete":"Delete"} body entry ${esc(fmtDate(b.date))}">${S.armedDelete===b.id?"Confirm delete entry":"Delete"}</button></li>`).join("");
-  const weekStart=new Date(today()+"T12:00:00");weekStart.setDate(weekStart.getDate()-6);
-  const weekKey=[weekStart.getFullYear(),String(weekStart.getMonth()+1).padStart(2,'0'),String(weekStart.getDate()).padStart(2,'0')].join('-');
-  const weekCount=S.sessions.filter(x=>x.date>=weekKey&&x.date<=today()).length;
-  return `${progressHighlights(filtered)}${activityOverview()}<section class="section progress-overview"><h2>Your consistency</h2><p><strong>${weekCount}</strong> sessions in the last 7 days · ${S.sessions.length} total</p><h3>Recent workouts</h3>${recentSessionRows()||'<p class="muted">Complete a workout to start seeing your progress.</p>'}</section><nav class="progress-jump" aria-label="Progress sections"><a href="#progress-training">Training</a><a href="#progress-lifts">Lifts</a><a href="#progress-muscles">Muscles</a><a href="#progress-body">Body</a></nav>${analyticsHTML?`<details class="section progress-detail" data-disclosure="analytics" ${openDisclosures.has("analytics")?"open":""}><summary>Training volume & detailed analytics</summary>${analyticsHTML}</details>`:""}<details class="section progress-detail" data-disclosure="muscles" ${openDisclosures.has("muscles")?"open":""}><summary>Muscle map & training balance</summary>${muscleHTML}</details><details id="progress-lifts" class="section progress-lifts" ${names.length?"open":""}><summary>Lifts & personal records</summary>${exHtml}</details>
-    <details id="progress-body" class="section progress-body"><summary>Body measurements</summary>
+  return `<section id="progress-body" class="section progress-body" aria-labelledby="body-heading"><h2 id="body-heading" class="section-title">Log a measurement</h2>
       <div class="form-row">
-        <label>Date<input type="date" id="bDate" value="${today()}"></label>
-        <label><span>Weight <select id="bUnit" aria-label="Body weight unit" style="min-height:28px;padding:2px 6px">${["kg","lb"].map(u=>`<option ${u===(S.bodyUnit||bu)?"selected":""}>${u}</option>`).join("")}</select></span><input type="number" inputmode="decimal" step="any" id="bWeight" placeholder="${(S.bodyUnit||bu)==="kg"?"87":"192"}"></label>
-        <label>Waist (cm)<input type="number" inputmode="decimal" step="0.5" id="bWaist" placeholder="optional"></label>
+        <label class="field-label">Date<input type="date" id="bDate" value="${today()}"></label>
+        <label class="field-label"><span>Weight <select id="bUnit" aria-label="Body weight unit" class="inline-select">${["kg","lb"].map(u=>`<option ${u===(S.bodyUnit||bu)?"selected":""}>${u}</option>`).join("")}</select></span><input type="number" inputmode="decimal" step="any" id="bWeight" placeholder="${(S.bodyUnit||bu)==="kg"?"87":"192"}"></label>
+        <label class="field-label">Waist (cm)<input type="number" inputmode="decimal" step="0.5" id="bWaist" placeholder="optional"></label>
       </div>
-      <div class="row-actions"><button class="btn" data-act="addbody">Add entry</button></div>
-      <p class="muted" style="font-size:13px">Weigh in a few mornings a week. The trend matters more than any single day.</p>
-      ${bpts.length ? `<p style="margin:12px 0 0;font-weight:600">Body weight</p>${chartSVG(bpts,"var(--ink)",bu)}` : ""}
-      ${wpts.length ? `<p style="margin:12px 0 0;font-weight:600">Waist</p>${chartSVG(wpts,"var(--muted)","cm")}` : ""}
-      ${recent ? `<ul class="list">${recent}</ul>` : `<div class="empty">No body entries yet.</div>`}
-    </details>`;
+      <div class="row-actions"><button class="btn primary" data-act="addbody">Add entry</button></div>
+      <p class="muted">Weigh in a few mornings a week. The trend matters more than any single day.</p></section>
+      ${bpts.length ? `<section class="section"><h2 class="section-title">Body weight</h2>${chartSVG(bpts,"var(--accent-line)",bu)}</section>` : ""}
+      ${wpts.length ? `<section class="section"><h2 class="section-title">Waist</h2>${chartSVG(wpts,"var(--muted)","cm")}</section>` : ""}
+      <section class="section"><h2 class="section-title">Recent entries</h2>${recent ? `<ul class="list">${recent}</ul>` : `<div class="empty">No body entries yet.</div>`}</section>`;
 }
 
 function viewData(){
-  return `<div class="data-grid" role="region" aria-label="Backup and restore settings"><div class="section stack"><span class="panel-icon">${icon("download")}</span><h3>Back up this device</h3>${backupStatus()}<p class="muted">Your workouts stay on this device until you export a file. Save a backup before replacing data or clearing your browser.</p><p class="muted">${S.sessions.length} sessions · ${S.body.length} body entries · ${S.custom.length} custom workouts</p>
+  return `<div class="data-grid" role="region" aria-label="Backup and restore settings"><div class="section stack"><span class="panel-icon">${icon("download")}</span><h2 class="section-title">Back up this device</h2>${backupStatus()}<p class="muted">Your workouts stay on this device until you export a file. Save a backup before replacing data or clearing your browser.</p><p class="muted">${S.sessions.length} sessions · ${S.body.length} body entries · ${S.custom.length} custom workouts</p>
     <p class="muted">Export workouts, schedules, schedule progress, session drafts and preferences in one JSON backup.</p><button class="btn primary" data-act="export">Export app data (.json)</button>
     <textarea id="exportOut" readonly hidden aria-label="Exported JSON"></textarea><button class="btn" data-act="copyexport" id="copyBtn" hidden>Copy JSON instead</button></div>
-    <div class="section stack"><span class="panel-icon">${icon("upload")}</span><h3>Restore a backup</h3><p class="muted">Supports Gym Tracker backup versions 1 through 4. Restoring never requires an account or network connection.</p><p class="muted">Choose a backup or paste its JSON. The complete file is validated before saving.</p><label class="file-label">Choose backup file<input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup"></label>
-    <label>Import mode<select id="importMode" aria-describedby="import-mode-help" style="display:block;width:100%"><option value="merge">Merge with existing data</option><option value="replace">Replace all local app data</option></select></label><p id="import-mode-help" class="muted">Merge combines records by ID. Replace deletes local records not included in the backup. Export your current data first.</p><p id="importResult" role="status" aria-live="polite" aria-atomic="true" hidden></p><textarea id="importText" placeholder='Paste your backup JSON here…' aria-label="Paste JSON backup"></textarea><button class="btn" data-act="import">Review and import backup</button></div></div>
-    <div class="section program-details"><div><p class="eyebrow">DEFAULT PROGRAM</p><h3>Your workouts, one simple file.</h3><p class="muted">Loaded from <code>ppl-default-workouts.json</code> · ${esc(programSource)}</p><p class="muted">These are starter workouts. Use Manage schedules in Train to choose your own order, rest days and weekly or repeating split.</p><div class="rotation">${ORDER.map(id=>`<span class="chip ${BASE_DAY[id].type}">${esc(BASE_DAY[id].name)}</span>`).join('<span aria-hidden="true">→</span>')}</div></div><div><button class="btn" data-act="reloadprogram">Reload program</button><label class="file-label" style="margin-top:12px">Load program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Load default workout program"></label></div></div>
+    <div class="section stack"><span class="panel-icon">${icon("upload")}</span><h2 class="section-title">Restore a backup</h2><p class="muted">Supports Gym Tracker backup versions 1 through 4. Restoring never requires an account or network connection.</p><p class="muted">Choose a backup or paste its JSON. The complete file is validated before saving.</p><label class="file-label">Choose backup file<input type="file" id="importFile" accept="application/json,.json" aria-label="Choose JSON backup"></label>
+    <label class="field-label">Import mode<select id="importMode" aria-describedby="import-mode-help"><option value="merge">Merge with existing data</option><option value="replace">Replace all local app data</option></select></label><p id="import-mode-help" class="muted">Merge combines records by ID. Replace deletes local records not included in the backup. Export your current data first.</p><p id="importResult" role="status" aria-live="polite" aria-atomic="true" hidden></p><textarea id="importText" placeholder='Paste your backup JSON here…' aria-label="Paste JSON backup"></textarea><button class="btn" data-act="import">Review and import backup</button></div></div>
+    <div class="section program-details"><div><p class="eyebrow">Default program</p><h2 class="section-title">Your workouts, one simple file.</h2><p class="muted">Loaded from <code>ppl-default-workouts.json</code> · ${esc(programSource)}</p><p class="muted">These are starter workouts. Use Plan → Schedule to choose your own order, rest days and weekly or repeating split.</p><div class="rotation">${ORDER.map(id=>`<span class="chip type-${BASE_DAY[id].type}">${esc(BASE_DAY[id].name)}</span>`).join('<span aria-hidden="true">→</span>')}</div></div><div class="stack"><button class="btn" data-act="reloadprogram">Reload program</button><label class="file-label">Load program JSON<input type="file" id="programFile" accept="application/json,.json" aria-label="Load default workout program"></label></div></div>
     <p class="storage-footnote">Saved on this device and browser. Use a JSON backup to transfer data; clearing browser data removes your log.</p>`;
 }
 function updateSessionMeter(){
   if (S.tab !== "log" || S.editing || S.scheduleEditing || S.manageSchedules || !S.ready) return;
-  const d = getDraft(S.dayId), sets = [...d.ex,...d.extra].flatMap(e=>e.sets), filled = sets.filter(s=>num(s.r)>0).length;
-  const caption = $("#loggedSets"), meter = $("#setMeter");
-  if (caption) caption.textContent = filled;
-  if (meter) meter.style.width = (sets.length ? filled/sets.length*100 : 0) + "%";
+  // One progress measure everywhere: sets explicitly marked done.
+  const {done,total} = draftProgress(getDraft(S.dayId));
+  const caption = $("#loggedSets"), meter = $("[data-session-meter]");
+  if (caption) caption.textContent = done;
+  if (meter) { meter.max = total || 1; meter.value = done; }
 }
 function programError(){
   setStatus("Program file needed");
@@ -834,13 +1003,14 @@ async function useProgramFile(file){
 
 /* ---------- events ---------- */
 // Browsing between views should behave like navigation without a network request.
-const NAV_VIEWS=new Set(["home","log","progress","plan","more","history","data","calendar","library","review","summary"]);
+const NAV_VIEWS=new Set(["home","log","progress","lifts","body","plan","exercises","more","history","data","calendar","library","review","summary"]);
 function navigateView(tab,{record=true}={}){
  if((tab==="review"&&!sessionReview)||(tab==="summary"&&!savedSummary))tab="home";
- if(!NAV_VIEWS.has(tab)||tab===S.tab)return;
+ if(tab==="calendar"){historyMode="calendar";tab="history";}
+ if(!NAV_VIEWS.has(tab)||tab===S.tab){if(sheet){sheet=null;render();}return;}
  if(S.tab==="review")sessionReview=null;
  exerciseQuery="";
- timerControlsOpen=false;restOverlayOpen=false;
+ sheet=null;restOverlayOpen=false;
  if(S.tab==="log"&&S.ready&&saveStatus==="pending")void flushDrafts();
  if(record&&typeof history!=="undefined")history.pushState({...history.state,gtView:tab},"",location.href);
  S.tab=tab;S.armedDelete=null;render();window.scrollTo({top:0});
@@ -853,7 +1023,6 @@ window.addEventListener("popstate",event=>{
 document.querySelector(".settings-launch")?.addEventListener("click",()=>navigateView("more"));
 document.querySelector("nav.tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
-  timerControlsOpen=false;restOverlayOpen=false;
   // Keep navigation intent even while IndexedDB is still hydrating.
   // render() shows a loading state until ready, then initStore renders the
   // selected tab. Dropping early clicks caused intermittent Firefox failures.
@@ -862,7 +1031,6 @@ document.querySelector("nav.tabs").addEventListener("click", e => {
 
 $("#app").addEventListener("click",e=>{
  const link=e.target.closest("button[data-destination]");if(!link)return;
- timerControlsOpen=false;restOverlayOpen=false;
  navigateView(link.dataset.destination);
 });
 
@@ -873,10 +1041,6 @@ document.addEventListener("toggle",e=>{
  if(n?.matches?.("details[data-exercise-id]")){
    const id=n.dataset.exerciseId;
    if(n.open){workoutExpanded.add(id);}else{workoutExpanded.delete(id);}
- }
- if(n?.matches?.("details[data-options-id]")){
-   if(n.open)workoutOptionsExpanded.add(n.dataset.optionsId);
-   else workoutOptionsExpanded.delete(n.dataset.optionsId);
  }
 },true);
 
@@ -947,52 +1111,47 @@ $("#app").addEventListener("change", async e => {
   if (t.id === "importFile" && t.files && t.files[0]) { t.files[0].text().then(txt => { $("#importText").value = txt; toast("File loaded. Tap Import JSON."); }); }
 });
 
-$("#app").addEventListener("keydown",e=>{
- if(e.key==="Escape"&&(timerControlsOpen||restOverlayOpen)){e.preventDefault();timerControlsOpen=false;restOverlayOpen=false;render();document.querySelector('[data-act=clocktoggle]')?.focus({preventScroll:true});}
-});
 $("#app").addEventListener("keydown",e=>{if(S.tab!=="progress"||!["Enter"," "].includes(e.key))return;const region=e.target.closest?.("[data-muscle]");if(!region||!region.closest?.(".muscle-map"))return;e.preventDefault();muscleMapSelected=region.dataset.muscle;render();});
 $("#app").addEventListener("click", async e => {
-  const jump=e.target.closest?.(".progress-jump a");if(jump){const target=document.querySelector(jump.getAttribute("href"));if(target){for(let el=target;el&&el.id!=="app";el=el.parentElement)if(el.tagName==="DETAILS")el.open=true;target.scrollIntoView({block:"start"});}}
   const muscleRegion=e.target.closest?.("[data-muscle]");
   if(muscleRegion&&S.tab==="progress"){muscleMapSelected=muscleRegion.dataset.muscle;render();return;}
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT") return;
   const act = b.dataset.act;
+  if(act==="opensheet"){openSheet({kind:b.dataset.sheet,g:b.dataset.g||"",i:b.dataset.i,j:b.dataset.j},b);return;}
+  if(act==="closesheet"){closeSheet();return;}
+  if(act==="minimize"){if(saveStatus==="pending")void flushDrafts();navigateView("home");return;}
+  if(act==="historymode"){historyMode=b.dataset.mode==="calendar"?"calendar":"list";render();return;}
+  if(act==="calendarday"){calendarSelected=calendarSelected===b.dataset.date?null:b.dataset.date;render();document.querySelector(`[data-act="calendarday"][data-date="${CSS.escape(b.dataset.date)}"]`)?.focus({preventScroll:true});return;}
+  if(act==="analyticsrange"){const days=Number(b.dataset.range);S.analyticsFilter={...(S.analyticsFilter||{workout:"",exercise:""}),from:days?dateOffset(today(),-(days-1)):"",to:""};render();return;}
   if(act==="reviewstarter"){
    const preset=STARTER_WORKOUTS[b.dataset.preset];if(!preset)return;
    const definitions=allDays().flatMap(d=>d.ex),ex=preset.names.map(name=>definitions.find(e=>e.n===name));
    if(ex.some(e=>!e)){toast("Some starter exercises are unavailable in this program. Create your own workout instead.");return;}
-   S.editing={id:uid("c"),name:preset.name,type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:ex.map(e=>({...structuredClone(e),s:3}))};render();window.scrollTo({top:0});return;
+   S.editing={id:uid("c"),name:preset.name,type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:ex.map(e=>({...structuredClone(e),s:3}))};templateId=null;
+   if(S.tab!=="library")navigateView("library");else{render();window.scrollTo({top:0});}return;
   }
   if(act==="snoozebackup"){try{localStorage.setItem("gt-backup-snooze",String(Date.now()+7*86400000));render();}catch{toast("Could not save reminder preference.");}return;}
-  if(act==="progresslift"){S.progressEx=b.dataset.name;render();const panel=document.getElementById("progress-lifts");panel.open=true;panel.scrollIntoView({block:"start"});return;}
+  if(act==="progresslift"){S.progressEx=b.dataset.name;if(S.tab==="lifts")render();else navigateView("lifts");return;}
   if(act==="reviewtoday"){const field=document.getElementById("review-workout-date");if(field)field.value=today();return;}
   if(act==="homecreate"){S.editing={id:uid("c"),name:"",type:"other",unit:S.defaultUnit||DEFAULT_UNIT,ex:[{n:"",s:3,lo:8,hi:12}]};navigateView("library");return;}
   if(act==="noschedule"){try{await saveScheduleList(S.schedules,null);render();toast("No active schedule. Choose workouts freely.");}catch(err){toast(err.message);}return;}
   if(act==="homeweek"){homeWeekOffset+=Number(b.dataset.delta);render();return;}
   if(act==="homeweekreset"){homeWeekOffset=0;render();return;}
-  if(act==="homebody"){navigateView("progress");const panel=document.getElementById("progress-body");panel.open=true;panel.scrollIntoView({block:"start"});document.getElementById("bWeight").focus({preventScroll:true});return;}
+  if(act==="homebody"){openSheet({kind:"weight"},b);return;}
 
   if(act==="workoutsettings"){navigateView("more");return;}
   if(act==="opentemplate"){templateId=b.dataset.id;render();window.scrollTo({top:0});return;}
   if(act==="closetemplate"){templateId=null;S.editing=null;render();return;}
   if(act==="copytemplate"){const day=getDay(b.dataset.id);S.editing={...structuredClone(day),id:uid("c"),name:day.name+" copy"};render();return;}
   if(act==="starttemplate"){S.dayId=b.dataset.id;workoutExpanded.clear();startWorkoutFor(S.dayId);navigateView("log");return;}
-  if(act==="opensession"){navigateView("history");const row=document.querySelector(`[data-session-id="${CSS.escape(b.dataset.id)}"]`);if(row){row.open=true;row.scrollIntoView({block:"start"});}return;}
+  if(act==="opensession"){historyMode="list";if(S.tab==="history")render();else navigateView("history");const row=document.querySelector(`[data-session-id="${CSS.escape(b.dataset.id)}"]`);if(row){row.open=true;row.scrollIntoView({block:"start"});}return;}
   if(act==="jumpextra"){workoutExpanded.clear();workoutExpanded.add("extra-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="extra-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
   if(act==="nextexercise"||act==="jumptoexercise"){workoutExpanded.clear();workoutExpanded.add("base-"+b.dataset.i);render();document.querySelector(`[data-exercise-id="base-${b.dataset.i}"]`)?.scrollIntoView({block:"start",behavior:"smooth"});return;}
   if(act==="reviewworkout")return saveSession(b,{reviewOnly:true});
   if(act==="backtosession"){startWorkoutFor(S.dayId);navigateView("log");return;}
-  if(act==="workoutbegin"){
-   if(getDraft(S.dayId).workoutTimer.state!=="running")startWorkoutFor(S.dayId);
-   timerWorkoutId=S.dayId;render();document.querySelector('#workout-editor')?.scrollIntoView?.({behavior:'smooth',block:'start'});return;
-  }
-  if(act==="clocktoggle"||act==="clockclose"){
-   timerControlsOpen=act==="clocktoggle"?!timerControlsOpen:false;
-   render();if(!timerControlsOpen)document.querySelector('[data-act=clocktoggle]')?.focus({preventScroll:true});return;
-  }
-  if(act==="clockfinish"){S.dayId=timerContext().id;timerControlsOpen=false;if(S.tab!=="log")navigateView("log");else render();return saveSession(b,{reviewOnly:true});}
-  if(act==="clockreturn"){S.dayId=timerContext().id;timerControlsOpen=false;sessionReview=null;if(S.tab==="log")render();else navigateView("log");return;}
   if(["clockstart","clockpause","clockstop","clockreset","reststart"].includes(act)){
+   // Session controls always act on the workout on screen.
+   if(S.tab==="log"&&getDay(S.dayId))timerWorkoutId=S.dayId;
    const {id,draft:d}=timerContext();
    if(act==="clockstart")startWorkoutFor(id);
    if(act==="clockpause"){d.workoutTimer=timerTools.pauseWorkout(d.workoutTimer);if(d.restTimer&&d.restTimer.pausedRemainingMs==null)d.restTimer=timerTools.pause(d.restTimer);}
@@ -1001,8 +1160,8 @@ $("#app").addEventListener("click", async e => {
    if(act==="reststart")d.restTimer=timerTools.start(d.restSeconds);
    saveDrafts();render();return;
   }
-  if(act==="timeropen"){restOverlayOpen=true;timerControlsOpen=false;render();return;}
-  if(act==="timerclose"){restOverlayOpen=false;timerControlsOpen=true;render();document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});return;}
+  if(act==="timeropen"){restOverlayOpen=true;sheet=null;render();document.querySelector("[data-act=timerclose]")?.focus({preventScroll:true});return;}
+  if(act==="timerclose"){restOverlayOpen=false;render();document.querySelector("[data-act=timeropen]")?.focus({preventScroll:true});return;}
   if(act==="timeradjust"){const {draft:d}=timerContext(),t=d.restTimer,delta=Number(b.dataset.seconds);if(t&&Number.isFinite(delta)){const ms=Math.max(0,(t.pausedRemainingMs!=null?t.pausedRemainingMs:t.deadline-Date.now())+delta*1000);d.restTimer={...t,deadline:Date.now()+ms,pausedRemainingMs:t.pausedRemainingMs!=null?ms:null,durationSeconds:Math.max(0,(t.durationSeconds||0)+delta)};saveDrafts();render();}return;}
 
   if(["homestart","homecontinue","homechoose","homeschedule","homeprogress","homehistory"].includes(act)){
@@ -1017,6 +1176,14 @@ $("#app").addEventListener("click", async e => {
   if (act === "reloadprogram") { if (await loadProgram()) { ensureSchedules(); S.dayId = nextDayId(); render(); toast(programSource === "JSON file" ? "Program refreshed" : "Using the saved program; file unavailable"); } else toast("Program file unavailable"); return; }
   if (act === "day") { if(saveStatus==="pending")void flushDrafts();S.dayId = b.dataset.id; render(); flushDrafts(); return; }
   const grp = () => { const d = getDraft(S.dayId); return (b.dataset.g === "x" ? d.extra : d.ex)[+b.dataset.i]; };
+  if(act==="settype"&&b.dataset.type){const entry=grp()?.sets[+b.dataset.j];if(!entry)return;entry.type=b.dataset.type;saveDrafts();render();return;}
+  if(act==="rmsetat"){const exercise=grp();if(!exercise||exercise.sets.length<2)return;exercise.sets.splice(+b.dataset.j,1);sheet=null;saveDrafts();render();toast("Set removed");return;}
+  if(act==="applysuggestion"){
+   const exercise=grp(),definition=b.dataset.g==="x"?null:getDay(S.dayId)?.ex[+b.dataset.i],result=exercise&&suggestionFor(exercise,definition);
+   if(!result||result.weight==null)return;
+   let filled=0;for(const set of exercise.sets)if(set.completed!==true&&String(set.w??"").trim()===""){set.w=String(result.weight);filled++;}
+   saveDrafts();render();toast(filled?`${result.weight} ${result.unit} added to ${filled} set${filled===1?"":"s"}`:"No empty sets to fill");return;
+  }
   if(act==="adjustweight"||act==="uselastset"){
    const exercise=grp(),entry=exercise.sets[+b.dataset.j];if(!entry||entry.completed)return;
    const previous=lastFor(exercise.name),last=previous?.sets[+b.dataset.j];
@@ -1051,7 +1218,6 @@ if(paired&&d.ex[partner]){
 if([...d.ex,...d.extra].every(e=>e.sets.every(s=>s.completed)))seconds=0;
 d.restTimer=seconds>0?timerTools.start(seconds):null;}saveDrafts();render();return; }
   if (["timerpause","timerresume","timerskip","timerreset"].includes(act)){const {draft:d}=timerContext();if(act==="timerpause"&&d.restTimer)d.restTimer=timerTools.pause(d.restTimer);if(act==="timerresume"&&d.restTimer)d.restTimer=timerTools.resume(d.restTimer);if(act==="timerskip"){d.restTimer=null;restOverlayOpen=false;}if(act==="timerreset"){d.restTimer=null;d.workoutTimer=timerTools.idleWorkout();}saveDrafts();render();return;}
-  if(act==="saveglobalrest"){const old=S.globalRestSeconds;S.globalRestSeconds=timerContext().draft.restSeconds;if(!await writeLocal()){S.globalRestSeconds=old;toast("Could not save global rest default");}else toast("Global rest default saved");return;}
    if(act==="resetdefault"){const e=grp(),key=settingKey(e,+b.dataset.i,b.dataset.g),prior=S.exerciseDefaults||{},before={restSeconds:e.restSeconds,loadIncrement:e.loadIncrement,incrementUnit:e.incrementUnit};const next={...prior};if(Object.hasOwn(next,exerciseKey(e.name)))next[key]={};else delete next[key];S.exerciseDefaults=next;delete e.restSeconds;delete e.loadIncrement;delete e.incrementUnit;if(!await writeLocal()){S.exerciseDefaults=prior;for(const field of ["restSeconds","loadIncrement","incrementUnit"]){if(before[field]===undefined)delete e[field];else e[field]=before[field];}toast("Could not reset defaults");}else{saveDrafts();render();toast("Exercise default reset");}return;}
   if(act==="savedefault"){const e=grp();const key=settingKey(e,+b.dataset.i,b.dataset.g);const rawIncrement=e.loadIncrement==null||e.loadIncrement===""?S.exerciseDefaults?.[key]?.loadIncrement:e.loadIncrement;
    if(rawIncrement!=null && rawIncrement!=="" && (!Number.isFinite(Number(rawIncrement))||Number(rawIncrement)<=0||Number(rawIncrement)>100)){e.loadIncrement=S.exerciseDefaults?.[key]?.loadIncrement??"";saveDrafts();if(!await flushDrafts()){toast("Could not restore saved increment; export a backup before reloading.");return;}toast("Load increment must be greater than 0 and no more than 100.");return;}
@@ -1064,7 +1230,7 @@ d.restTimer=seconds>0?timerTools.start(seconds):null;}saveDrafts();render();retu
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
   if (act === "addextra") { workoutExpanded.add("extra-"+getDraft(S.dayId).extra.length);getDraft(S.dayId).extra.push({ name:"", unit:(S.defaultUnit||getDay(S.dayId).unit||DEFAULT_UNIT), sets:[{w:"",r:""},{w:"",r:""},{w:"",r:""}] }); saveDrafts(); render();
     const el = document.querySelector(`[data-key="xname-${getDraft(S.dayId).extra.length-1}"]`); if (el) el.focus(); return; }
-  if (act === "rmextra") { getDraft(S.dayId).extra.splice(+b.dataset.i, 1); saveDrafts(); render(); return; }
+  if (act === "rmextra") { getDraft(S.dayId).extra.splice(+b.dataset.i, 1); sheet=null; saveDrafts(); render(); return; }
   if (act === "newworkout") { S.editing = { id: uid("c"), name:"", type:"other", unit:DEFAULT_UNIT, ex:[{n:"",s:3,lo:8,hi:12}] }; S.armedDelete = null; render(); window.scrollTo({top:0}); return; }
   if (act === "editday") { const c = S.custom.find(x => x.id === b.dataset.id); if (c) { S.editing = JSON.parse(JSON.stringify(c));if(S.drafts[c.id]&&(draftHasData(S.drafts[c.id])||S.drafts[c.id].workoutTimer?.state!=="idle")){S.editing.id=uid("c");S.editing.name=c.name+" copy";toast("Editing a copy keeps your active session safe.");} S.armedDelete = null; render(); window.scrollTo({top:0}); } return; }
   if (act === "edaddex") { S.editing.ex.push({n:"",s:3,lo:8,hi:12}); render(); const el = document.querySelector(`[data-key="ed-n-${S.editing.ex.length-1}"]`); if (el) el.focus(); return; }
@@ -1136,6 +1302,18 @@ function reportSessionValidation(message, field){
  if(field){for(let el=field.parentElement;el;el=el.parentElement)if(el.tagName==="DETAILS")el.open=true;field.setAttribute('aria-invalid','true');field.setAttribute('aria-describedby','session-validation');field.focus();}
  toast(message);
 }
+// Records the saved session set, compared with history before it, for the summary only.
+function newRecords(before,session){
+ const found=[];
+ try{
+  for(const e of session.exercises){
+   const old=calculateRecords(before,e.name,e.unit),now=calculateRecords(S.sessions,e.name,e.unit);
+   if(old.heaviest&&now.heaviest&&now.heaviest.value>old.heaviest.value+1e-9)found.push({name:e.name,value:now.heaviest.value,unit:e.unit,label:"heaviest"});
+   else if(old.estimated1RM&&now.estimated1RM&&now.estimated1RM.value>old.estimated1RM.value+1e-9)found.push({name:e.name,value:now.estimated1RM.value,unit:e.unit,label:"est. 1RM"});
+  }
+ }catch{}
+ return found.slice(0,4);
+}
 async function saveSession(btn,{reviewOnly=false}={}){
   if(sessionSavePending)return;
  const notice=document.querySelector('#session-validation');if(notice){notice.hidden=true;notice.textContent='';}
@@ -1143,6 +1321,8 @@ async function saveSession(btn,{reviewOnly=false}={}){
   const day = getDay(S.dayId), d = getDraft(S.dayId);
   const reviewDate=document.querySelector("#review-workout-date");
   if(!reviewOnly&&sessionReview&&reviewDate){if(!validDataDate(reviewDate.value)){reportSessionValidation("Pick a valid workout date.",reviewDate);return;}d.date=reviewDate.value;}
+  const reviewNotes=document.querySelector("#review-notes");
+  if(!reviewOnly&&sessionReview&&typeof reviewNotes?.value==="string")d.notes=reviewNotes.value;
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
   const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(),...(e.supersetNext&&d.ex[d.ex.indexOf(e)+1]?.sets.some(s=>num(s.r)>0&&s.completed!==false)?{supersetNext:true}:{}), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.toFailure?{toFailure:true}:{}),...(s.restSeconds!=null?{restSeconds:s.restSeconds}:{}),...(s.toFailure?{rir:0}:s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){reportSessionValidation("RIR must be a whole number from 0 to 10.",document.querySelector("#app [data-f=rir]"));return;}
@@ -1157,8 +1337,10 @@ async function saveSession(btn,{reviewOnly=false}={}){
   sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {
     clearTimeout(draftTimer);
+    const before=S.sessions,elapsed=timerTools.workoutElapsed(d.workoutTimer);
     await putSession(s,true);
     setSaveStatus("saved");
+    savedSummaryMeta={elapsed,records:newRecords(before,s),next:activeSchedule()?{schedule:activeSchedule().name,label:nextScheduleLabel()}:null};
     savedSummary=s;sessionReview=null;timerWorkoutId=null;navigateView("summary");
     toast("Session saved");
   } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); } finally { sessionSavePending=false; }
@@ -1190,7 +1372,7 @@ async function addBody(){
   const date = $("#bDate").value, weight = num($("#bWeight").value), waist = num($("#bWaist").value), unit = $("#bUnit").value === "lb" ? "lb" : "kg"; S.bodyUnit = unit;
   if (!validDataDate(date) || (weight!=null && weight<=0) || (waist!=null && waist<=0) || (!weight && !waist)) { toast("Add a weight or waist measurement."); return; }
   const b = { id: "b" + date, date, weight: weight ?? null, waist: waist ?? null, unit, createdAt: Date.now() };
-  try { await putBody(b); render(); toast("Entry added"); }
+  try { await putBody(b); if(sheet?.kind==="weight")closeSheet(); else render(); toast("Entry added"); }
   catch { toast("Couldn't save. Try again."); }
 }
 

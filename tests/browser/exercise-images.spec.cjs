@@ -1,5 +1,5 @@
 const {test,expect}=require('@playwright/test');
-const {enterSession,library}=require('./flow-helpers.cjs');
+const {enterSession,library,openExerciseOptions,closeSheet}=require('./flow-helpers.cjs');
 test('exercise photos follow substitutions and remain available offline',async({page,context})=>{
  await page.setViewportSize({width:390,height:844});
  await page.goto('/gym-tracker/');
@@ -10,8 +10,9 @@ test('exercise photos follow substitutions and remain available offline',async({
  await enterSession(page);
  const first=page.locator('[data-exercise-id="base-0"]');
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/Wide-Grip_Lat_Pulldown/);
- await first.locator('.exercise-options>summary').click();
- await first.getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
+ await openExerciseOptions(page,0);
+ await page.getByRole('dialog').getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
+ await closeSheet(page);
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/V-Bar_Pulldown/);
  const video=first.locator('.exercise-video-link');
  await expect(video).toHaveAttribute('href',/search_query=Neutral-grip%20pulldown/);

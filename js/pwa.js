@@ -6,8 +6,12 @@ banner.setAttribute('aria-live','polite');
 banner.className='pwa-status-banner';
 banner.hidden=true;
 document.body.append(banner);
+let hideTimer;
 const message=(text,action)=>{
+ clearTimeout(hideTimer);
  banner.replaceChildren(document.createTextNode(text));
+ // Informational notices step aside so they never cover workout controls; update prompts stay until handled.
+ if(!action)hideTimer=setTimeout(()=>{banner.hidden=true;},8000);
  if(action){const button=document.createElement('button');button.type='button';button.textContent='Update now';button.className='pwa-status-action';button.addEventListener('click',action);banner.append(button);}
  if(!action){const close=document.createElement('button');close.type='button';close.className='pwa-status-dismiss';close.textContent='Dismiss';close.setAttribute('aria-label','Dismiss PWA notification');close.addEventListener('click',()=>{banner.hidden=true;});banner.append(close);}
  banner.hidden=false;

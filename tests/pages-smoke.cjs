@@ -72,7 +72,12 @@ async function verify(){
   });
   if(cache.name!==actualRevision||!cache.keys.includes(new URL('js/app.js',root).href))
    throw Error('Active cache does not contain expected release app shell');
-  if(taskFlow)await page.getByRole('button',{name:'Start workout',exact:true}).click();
+  if(taskFlow){
+   // A fresh profile has no plan; pick Pull A from the workout sheet instead.
+   const start=page.getByRole('button',{name:'Start workout',exact:true});
+   if(await start.count())await start.click();
+   else{await page.getByRole('button',{name:'Choose a workout',exact:true}).click();await page.getByRole('dialog').locator('.pick',{hasText:'Pull A'}).click();}
+  }
   await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
   await page.locator('[data-save-status][data-state="saved"]').waitFor({timeout:12000});
   // Offline browser profile is disposable: this never touches a user's data.
@@ -94,7 +99,8 @@ async function verify(){
   if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
    throw Error('Service-worker update check discarded an active draft');
   console.log('PASS deployed PWA: scope, cache revision, offline startup, IndexedDB draft and update check');
-  // History is nested under Progress in the three-tab navigation.
+  // History is nested under Progress in the three-tab navigation; the full-screen session hides the tabs.
+  if(await page.locator('.session-toolbar').count())await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
   await page.locator('nav.tabs button[data-tab="progress"]').click();
   await page.locator('#app .subnav button[data-destination="history"]').click();
   await page.getByRole('heading',{name:taskFlow?'Workout history':'The work adds up.',exact:true}).waitFor({timeout:10000});

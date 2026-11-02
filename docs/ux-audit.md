@@ -1,37 +1,42 @@
 # Screen and flow redesign
 
-The app is organized around doing today's workout, planning the next sessions, and reviewing results. The former Home/Train split and five-tab navigation have been replaced with three destinations.
+The app is organized around three questions, each owned by one tab. Anything that keeps you on the same screen opens as a bottom sheet rather than navigating to another tab, and each object lives in exactly one place.
 
-| Destination | Default screen | Secondary actions |
-| --- | --- | --- |
-| Today | Next workout or saved session, exercise preview, estimated duration, Start/Resume, last completed session | Choose another workout, view plan |
-| Plan | Active routine and upcoming sequence | Manage schedules, expandable calendar, workout templates, searchable exercise library |
-| Progress | Recent sessions, seven-day consistency, lift trends when data exists | History, detailed analytics and filters, muscle map, body measurements |
-| Settings button | Appearance, default weight unit, rest duration, progression preference | Data & Backups |
+| Destination | Answers | Sections | Sheets |
+| --- | --- | --- | --- |
+| Today | What do I do now? | This week (the only week view), next or in-progress workout, body weight and last session tiles, backup reminder; first-run starter choices when no plan is active | Swap workout, log body weight |
+| Plan | How do I train? | Schedule (active plan, sequence, skip/edit, manage schedules), Workouts (templates and starters), Exercises (searchable library) | — |
+| Progress | How am I doing? | Overview (totals, weekly volume, consistency, recent strength, muscle balance and body map), Lifts (trend and records), History (list or month/week calendar with day details), Body (measurements) | — |
+| Settings button | — | Appearance, default unit, default rest, progression suggestions, Data & Backups | — |
+
+Progress views share one filter bar: 4W, 12W, 1Y and All presets plus exact date, workout and exercise filters.
 
 ## Active workout
 
-Start opens a dedicated session with expandable exercise cards. The first unfinished exercise opens by default; users can jump freely between exercises. Each card shows targets, previous performance, weight/reps/completion controls, and a Next exercise action. Substitutions, RIR, set types and defaults are inside Exercise options. Session notes and date are optional.
+Start opens a full-screen session; the tab bar and Settings are hidden. The top bar holds Minimize, the workout name and clock (tap to pause or resume), Session options and one Finish button, above a single progress bar that counts sets marked done. The first unfinished exercise is open; others are compact rows with their done count. Each open card shows the photo, target, last performance and one weight suggestion (with Fill for empty sets). Set rows contain only weight, reps, Done and a ⋯ button.
 
-Finish opens a review of the actual sets that will be saved, including a count of omitted sets. The clock pauses during review. Keep training resumes it; Save session performs the existing atomic session/draft/schedule transaction and displays a saved summary. A failed storage write retains the draft. Navigation away from review invalidates that transient review, preventing a stale review from saving another workout.
+- Set sheet: set type, reps in reserve, rest after the set, weight steps and Use last, to failure, drop and reverse-drop sets, remove set.
+- Exercise sheet: substitution, weight unit, superset with the next exercise, rest and load-increment defaults, muscles worked.
+- Session sheet: workout timer start/pause/stop/reset, rest duration and Start rest, rest between exercises and supersets, session date and notes.
 
-Templates are separate from sessions. Built-in templates can be customized as copies. Editing a custom template with an active draft also creates a copy so its existing session stays intact. Starting another workout pauses the previous workout and preserves both drafts.
+Finish opens a review of the sets that will be saved, including a count of omitted sets, the date and optional notes. The clock pauses during review. Keep training resumes it; Save session performs the existing atomic session/draft/schedule transaction and shows a summary with duration and any new personal records. A failed storage write retains the draft. Navigating away from review invalidates it, so a stale review cannot save another workout.
 
-## Timer and layout
+Templates are separate from sessions. Built-in templates can be customized as copies. Editing a custom template with an active draft creates a copy so its session stays intact. Starting another workout pauses the previous one and preserves both drafts.
 
-The bottom-right floating button appears for an active session, remains available across destinations, and displays elapsed workout and remaining rest time. It reserves no horizontal content space and sits above mobile navigation. The control panel opens upward; offline/update messages occupy a separate area beside it. Rest is also shown beside the open exercise.
+## Timers
 
-Browsing, opening the app and entering sets do not start the workout clock. Starting or explicitly resuming a session does. Pause, Resume, Stop and Reset remain available. Stopping retains elapsed time and the draft; restarting after Stop starts a fresh clock. Completing a set starts its configured rest countdown without restarting a stopped workout clock. Saving clears the saved draft's timer after storage succeeds. Running and paused clocks recover across reloads; legacy automatic clocks reopen paused when they contain data.
+Completing a set starts its rest countdown in a bar pinned to the bottom of the session (−15s, +15s, Skip). Tapping the bar opens the full-screen rest timer, which adds pause/resume and traps keyboard focus; Escape returns focus to the bar. Minimizing keeps the workout running: Today shows an in-progress card with the live clock and a Resume button, and every other screen shows a Resume bar above the tabs.
 
-## Compatibility and verification
+Browsing, opening the app and entering sets do not start the workout clock. Starting or resuming a workout does. Stopping retains elapsed time and the draft; restarting after Stop starts a fresh clock. Completing a set starts its rest countdown without restarting a stopped workout clock. Running and paused clocks recover across reloads; legacy automatic clocks reopen paused when they contain data.
 
-Sessions, schedule progression, history editing, offline storage, optimistic concurrency and existing analytics calculations are preserved. Backups remain version 4. The optional `preferences.defaultUnit` field joins the existing optional workout-clock metadata; older v1–v4 backups continue to import. Older application builds may reject backups with new optional fields. Default-unit changes apply to new sessions; existing sets retain their units.
+## Consistency fixes
 
-Browser checks cover the new Start → Log → Review → Save → Summary flow, three-tab navigation, template editing, Settings persistence, timer controls, keyboard/modal focus, draft recovery, backups, offline operation and storage conflicts. Responsive checks cover 320, 390, 768 and 1440 pixels in light and dark themes. Existing analytics accuracy and 1,000/10,000-session performance checks are retained.
+- "This week" always means Monday–Sunday.
+- One progress measure (sets marked done) replaces the previous done-count bar and filled-reps meter.
+- One weight suggestion per exercise replaces the separate last-session hint and progression hint.
+- One Finish button, one place for default rest (Settings) and one month calendar (Progress → History).
+- Repeating sequences never imply calendar dates, so Today's week strip only marks completed sessions and weekly-plan days.
 
-### Local verification
+## Compatibility
 
-- Desktop/mobile Chromium: 88 checks passed with two existing profile skips; final workout-flow follow-ups passed all 16 checks, and the subsequent history/clock safeguard selection passed all eight checks.
-- Mobile WebKit: 18 checks passed. The repeated-reload clock check aborts in the native WebKit process (`std::optional` assertion). A real-time reproduction without clock mocking also fails on current main after Home/Train navigation, so it is not specific to the redesigned screens. The failing assertion remains enabled in CI; no forced clicks, disabled assertions, or increased timeouts were introduced.
-- Node regression/timer, backup-schema parity, service-worker revision/upgrade and release-readiness checks passed. The Pages startup/offline smoke script passed against a dedicated local server.
-- Firefox was not run locally; its CI project remains enabled.
+Sessions, schedule progression, history editing, offline storage, optimistic concurrency and analytics calculations are unchanged. Backups remain version 4 with no new fields. The visual design uses one stylesheet (`css/styles.css`) with light and dark tokens plus `css/muscle-map.css`; any change to app-shell files requires `node tests/version-sw.cjs`.

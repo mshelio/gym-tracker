@@ -1,12 +1,17 @@
 const {expect}=require('@playwright/test');
+// The workout, review and summary screens hide the tab bar. Step back to a tabbed screen first.
+async function leaveSession(page){
+ if(await page.locator('.session-review').count())await page.getByRole('button',{name:'Keep training'}).click();
+ if(await page.locator('.session-summary').count())await page.getByRole('button',{name:'Back to Today',exact:true}).click();
+ if(await page.locator('.session-toolbar').count())await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
+}
 async function enterSession(page){
  await expect(page.locator('#status')).toContainText(/Saved/);
+ if(await page.locator('.session-review').count())await page.getByRole('button',{name:'Keep training'}).click();
  if(await page.locator('.session-toolbar').count())return;
- // Reopen an existing session without changing its timer state.
- if(await page.getByRole('button',{name:'Workout timer controls',exact:true}).count()){
-  await page.getByRole('button',{name:'Workout timer controls',exact:true}).click();
-  await page.locator('[data-act="clockreturn"]').click();
- }else{
+ await leaveSession(page);
+ if(await page.locator('.resume-bar').count())await page.locator('.resume-bar').click();
+ else{
   await page.locator('nav.tabs [data-tab="home"]').click();
   const start=page.getByRole('button',{name:/^(Start|Resume) workout$/});
   if(await start.count())await start.click();
@@ -16,8 +21,9 @@ async function enterSession(page){
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
 }
 async function library(page){
+ await leaveSession(page);
  await page.locator('nav.tabs [data-tab="plan"]').click();
- await page.getByRole('button',{name:'Workouts & exercises',exact:true}).click();
+ await page.locator('.subnav [data-destination="library"]').click();
  if(await page.locator('[data-act=closetemplate]').count())await page.locator('[data-act=closetemplate]').click();
 }
 async function startTemplate(page,name){
@@ -34,6 +40,7 @@ async function saveSession(page){
 }
 async function openDetails(page,selector){const d=page.locator(selector);if(await d.getAttribute('open')===null)await d.locator(':scope > summary').click();}
 async function openNested(page,destination){
+ await leaveSession(page);
  if(destination==='history'){
   await page.locator('nav.tabs [data-tab="progress"]').click();
   await page.locator('.subnav [data-destination="history"]').click();
@@ -42,4 +49,18 @@ async function openNested(page,destination){
   await page.locator('[data-destination="data"]').click();
  }
 }
-module.exports={enterSession,library,startTemplate,saveSession,openDetails,openNested};
+// Exercise and set details live in bottom sheets opened from the workout card.
+async function openExerciseOptions(page,index=0,group=''){
+ await openDetails(page,`[data-exercise-id="${group==='x'?'extra':'base'}-${index}"]`);
+ await page.locator(`[data-act="opensheet"][data-sheet="exercise"][data-g="${group}"][data-i="${index}"]`).click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+}
+async function openSetOptions(page,exercise,set){
+ await page.getByRole('button',{name:`${exercise} set ${set} options`,exact:true}).click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+}
+async function closeSheet(page){
+ await page.locator('.sheet [data-act="closesheet"]').click();
+ await expect(page.locator('.sheet')).toHaveCount(0);
+}
+module.exports={enterSession,leaveSession,library,startTemplate,saveSession,openDetails,openNested,openExerciseOptions,openSetOptions,closeSheet};

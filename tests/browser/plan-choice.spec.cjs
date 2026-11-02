@@ -4,7 +4,7 @@ test('fresh start offers an unselected custom workout and never selects PPL',asy
  await page.goto('/gym-tracker/');
  await expect(page.getByRole('heading',{name:'Choose how you train'})).toBeVisible();
  await expect(page.locator('[data-act=homestart]')).toHaveCount(0);
- await expect(page.locator('.timer-dock')).toHaveCount(0);
+ await expect(page.locator('.resume-bar')).toHaveCount(0);
  await page.reload();
  await expect(page.getByRole('heading',{name:'Choose how you train'})).toBeVisible();
  await page.getByRole('button',{name:'Create my own workout'}).click();
@@ -24,7 +24,7 @@ test('PPL is opt-in and turning off a plan survives a reload',async({page})=>{
  await expect(page.locator('#toast')).toHaveText('No active schedule. Choose workouts freely.');
  await page.reload();
  await expect(page.locator('.today-workout h2')).toHaveText('Choose how you train');
- await expect(page.locator('.timer-dock')).toHaveCount(0);
+ await expect(page.locator('.resume-bar')).toHaveCount(0);
 });
 test('new repeating plans do not prefill a PPL workout',async({page})=>{
  await page.goto('/gym-tracker/');await schedules(page);
