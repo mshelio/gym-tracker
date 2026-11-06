@@ -520,13 +520,14 @@ function render(){
   // Build the complete view before applying full-screen navigation styles. If
   // a render fails, the previous screen and its navigation remain available.
   app.innerHTML=`<div class="view view-${S.tab}"${modal?' inert aria-hidden="true"':''}>${intro}${viewFor(S.tab)}${resumeBar()}</div>${sheetMarkup()}${restDraft?restOverlayMarkup(restDraft):""}`;
-  if(root){root.dataset.view=S.tab;if(modal)root.dataset.modal="true";else delete root.dataset.modal;}
-  document.querySelector("header.top")?.toggleAttribute?.("inert",modal);
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
   if(dialogControl)app.querySelector(`.sheet ${dialogControl},[data-rest-overlay] ${dialogControl}`)?.focus({preventScroll:true});
   if(mapFocus){const el=[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.id===mapFocus.id&&x.dataset.muscle===mapFocus.muscle)||[...app.querySelectorAll(".muscle-map [data-muscle]")].find(x=>x.dataset.muscle===mapFocus.muscle);el?.focus({preventScroll:true});}
+  // Commit full-screen/navigation state only after every render step succeeds.
+  if(root){root.dataset.view=S.tab;if(modal)root.dataset.modal="true";else delete root.dataset.modal;}
+  document.querySelector("header.top")?.toggleAttribute?.("inert",modal);
 }
 
 function timerLabel(seconds){const n=Math.max(0,seconds);return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
