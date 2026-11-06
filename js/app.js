@@ -272,6 +272,8 @@ const typeTag=type=>{const t=TYPE_LABEL[type]?type:"other";return `<span class="
 const capitalize=s=>String(s||"").replace(/^./,c=>c.toUpperCase());
 const clockState=clock=>({idle:"Ready",running:"Training",paused:"Paused",stopped:"Stopped"})[clock.state];
 function draftProgress(d){const sets=[...d.ex,...d.extra].flatMap(e=>e.sets);return {done:sets.filter(s=>s.completed===true).length,total:sets.length};}
+// Only ticked sets are saved; the review can opt in sets that have reps but no tick.
+function loggedSet(s,includeUnticked){return s.completed===true||(!!includeUnticked&&num(s.r)>0&&s.completed!==false);}
 function nextSetLabel(d){
  for(const e of [...d.ex,...d.extra]){const j=e.sets.findIndex(s=>s.completed!==true);if(j>=0)return `${e.name||"Extra exercise"}, set ${j+1}`;}
  return "All sets done";
@@ -385,11 +387,15 @@ function scheduleAdvanceHint(dayId){
 function viewSessionReview(){
  if(!sessionReview)return viewLog();
  const count=sessionReview.exercises.reduce((n,e)=>n+e.sets.length,0),draft=getDraft(S.dayId),total=[...draft.ex,...draft.extra].reduce((n,e)=>n+e.sets.length,0);
+ const pending=sessionReview.pending||0,empty=[...draft.ex,...draft.extra].reduce((n,e)=>n+e.sets.filter(s=>!(num(s.r)>0)).length,0);
+ const unticked=total-count-empty-(sessionReview.includeUnticked?0:pending),plural=n=>n===1?"":"s";
+ const leftOut=[empty>0?`${empty} empty set${plural(empty)}`:"",unticked>0?`${unticked} unticked set${plural(unticked)}`:""].filter(Boolean);
  const units=[...new Set(sessionReview.exercises.map(e=>e.unit))];
  const volume=units.length===1?Math.round(sessionReview.exercises.reduce((n,e)=>n+e.sets.reduce((m,x)=>m+x.w*x.r,0),0)):null;
  return `<section class="session-review" aria-labelledby="review-heading"><button class="link-btn back-btn" data-act="backtosession">${icon('back')} Keep training</button><h1 id="review-heading" class="eyebrow-heading">Review session</h1><p class="muted">Clock paused at ${timerLabel(timerTools.workoutElapsed(draft.workoutTimer))}</p><h2 class="display-title">${esc(sessionReview.dayName)}</h2>
  <div class="stats"><div class="stat"><b>${count}</b><small>sets logged</small></div><div class="stat"><b>${sessionReview.exercises.length}</b><small>exercises</small></div>${volume!=null?`<div class="stat"><b>${volume.toLocaleString()}</b><small>${esc(units[0])} volume</small></div>`:''}</div>
- ${total-count>0?`<p class="notice warn" role="status">${icon('info')} ${total-count} unlogged or unchecked sets will be left out.</p>`:''}${sessionOverview(sessionReview)}
+ ${pending>0?`<p class="notice" id="review-pending" role="status">${icon('info')} ${pending} ${pending===1?"set has reps but isn't":"sets have reps but aren't"} ticked.${sessionReview.forcedInclude?" Nothing is ticked, so they're included.":""}</p><label class="toggle-row"><span>Include them</span><input type="checkbox" id="review-include-unticked" data-act="reviewinclude" aria-describedby="review-pending" ${sessionReview.includeUnticked?"checked":""} ${sessionReview.forcedInclude?"disabled":""}></label>`:''}
+ ${leftOut.length?`<p class="notice warn" role="status">${icon('info')} ${leftOut.join(' and ')} will be left out.</p>`:''}${sessionOverview(sessionReview)}
  <div class="review-fields"><label class="field-label session-date">Workout date<input type="date" id="review-workout-date" value="${esc(sessionReview.date)}"></label>${sessionReview.date!==today()?'<p class="muted">This draft is dated earlier or later than today. Check the date before saving.</p>':''}<button class="btn small ghost" data-act="reviewtoday">Use today (${esc(today())})</button><label class="field-label">How did it feel? (optional)<textarea id="review-notes" rows="2" placeholder="Energy, sleep, a new best…">${esc(draft.notes||'')}</textarea></label></div>
  <p id="session-validation" class="notice warn" role="alert" hidden></p><div class="bottom-actions"><button class="btn primary" data-act="save">Save session</button><p class="muted">${scheduleAdvanceHint(S.dayId)}</p></div></section>`;
 }
@@ -1079,7 +1085,9 @@ $("#app").addEventListener("input", e => {
    if(f==='setrest')(t.dataset.g==='x'?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].restSeconds=n;else d[f]=n;
   }
   else if (f === "exrest") { const n=Number(t.value);if(Number.isInteger(n)&&n>=15&&n<=600)(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].restSeconds=n;else toast("Rest interval must be 15–600 seconds."); }
-   else if (f === "w" || f === "r" || f==="rir") {const set=(t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j];set[f]=f==="rir"?(t.value===""?null:Number(t.value)):t.value;if(set.completed===true && f!=="rir"){set.completed=false;delete set.completedAt;}}
+   else if (f === "w" || f === "r" || f==="rir") {const set=(t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j];set[f]=f==="rir"?(t.value===""?null:Number(t.value)):t.value;
+    // Correcting a ticked set keeps it ticked; it only unticks once it has no reps, as completeset requires them.
+    if(set.completed===true && f==="r" && !(num(set.r)>0)){set.completed=false;delete set.completedAt;const row=t.closest?.(".setrow"),tick=row?.querySelector(".set-complete");row?.classList.remove("is-complete");if(tick){tick.setAttribute("aria-pressed","false");tick.setAttribute("aria-label",tick.getAttribute("aria-label").replace(/mark incomplete$/,"mark complete"));tick.title="Complete set and start rest timer";}}}
   else if (f === "xname") d.extra[+t.dataset.i].name = t.value;
   else if (f === "notes") d.notes = t.value;
   else if (f === "date") d.date = t.value;
@@ -1087,6 +1095,14 @@ $("#app").addEventListener("input", e => {
 });
 
 $("#app").addEventListener("change", async e => {
+  if(e.target.dataset.act==="reviewinclude"&&sessionReview){
+   // Rebuild the review with or without the unticked sets, keeping the date and notes typed so far.
+   const date=document.querySelector("#review-workout-date")?.value,notes=document.querySelector("#review-notes")?.value;
+   if(typeof notes==="string")getDraft(S.dayId).notes=notes;
+   await saveSession(null,{reviewOnly:true,includeUnticked:e.target.checked});
+   if(sessionReview&&typeof date==="string")sessionReview.date=date;
+   render();document.querySelector("#review-include-unticked")?.focus?.();return;
+  }
   if(e.target.dataset.setting){
    const field=e.target.dataset.setting==='unit'?'defaultUnit':'globalRestSeconds',old=S[field];
    S[field]=field==='defaultUnit'?(e.target.value==='lb'?'lb':'kg'):Number(e.target.value);
@@ -1225,7 +1241,14 @@ d.restTimer=seconds>0?timerTools.start(seconds):null;}saveDrafts();render();retu
    const value=normalizeExerciseSetting({restSeconds:e.restSeconds,loadIncrement:rawIncrement==null||rawIncrement===""?undefined:Number(rawIncrement),incrementUnit:e.incrementUnit||S.exerciseDefaults?.[key]?.incrementUnit||e.unit||"kg"});
    if(e.restSeconds!=null&&!Object.hasOwn(value,"restSeconds")){toast("Rest interval must be 15–600 seconds.");return;}
    const prev=S.exerciseDefaults||{};S.exerciseDefaults={...prev,[key]:value};if(!await writeLocal()){S.exerciseDefaults=prev;toast("Could not save defaults");}else {render();toast("Exercise defaults saved");}return;}
-  if(act==="copyforward"){const e=grp(),prev=lastFor(e.name);if(!prev){toast("No previous sets available");return;}const converted=prev.sets.map(x=>({w:String(tidy(conv(x.w||0,prev.unit,e.unit),e.unit)),r:String(x.r||"")}));if(!converted.length)return;e.sets=converted;saveDrafts();render();toast("Previous sets copied to draft");return;}
+  if(act==="copyforward"){const e=grp(),prev=lastFor(e.name);if(!prev){toast("No previous sets available");return;}
+   // Fill only empty, unticked rows in place (keeping their id, type and rest); never overwrite what was typed or ticked.
+   let copied=0;const blank=v=>String(v??"").trim()==="";
+   prev.sets.forEach((x,j)=>{const w=String(tidy(conv(x.w||0,prev.unit,e.unit),e.unit)),r=String(x.r||""),type=x.type&&x.type!=="working"?x.type:null,target=e.sets[j];
+    if(!target){e.sets.push({w,r,...(type?{type}:{})});copied++;return;}
+    if(target.completed===true||!blank(target.w)||!blank(target.r))return;
+    target.w=w;target.r=r;if(type&&(!target.type||target.type==="working"))target.type=type;copied++;});
+   if(!copied){toast("No empty sets to fill");return;}saveDrafts();render();toast(`Copied ${copied} set${copied===1?"":"s"} from last time`);return;}
   if (act === "addset") { grp().sets.push({w:"",r:""}); saveDrafts(); render(); return; }
   if (act === "rmset") { const de = grp(); if (de.sets.length>1) de.sets.pop(); saveDrafts(); render(); return; }
   if (act === "unit") { const de = grp(); de.unit = b.dataset.u; saveDrafts(); render(); return; }
@@ -1316,7 +1339,7 @@ function newRecords(before,session){
  }catch{}
  return found.slice(0,4);
 }
-async function saveSession(btn,{reviewOnly=false}={}){
+async function saveSession(btn,{reviewOnly=false,includeUnticked}={}){
   if(sessionSavePending)return;
  const notice=document.querySelector('#session-validation');if(notice){notice.hidden=true;notice.textContent='';}
  document.querySelectorAll('#app [aria-invalid="true"][data-f]').forEach(input=>{input.removeAttribute?.('aria-invalid');if(input.getAttribute?.('aria-describedby')==='session-validation')input.removeAttribute?.('aria-describedby');});
@@ -1326,15 +1349,21 @@ async function saveSession(btn,{reviewOnly=false}={}){
   const reviewNotes=document.querySelector("#review-notes");
   if(!reviewOnly&&sessionReview&&typeof reviewNotes?.value==="string")d.notes=reviewNotes.value;
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
-  const exercises = [...d.ex, ...d.extra.filter(x => x.name.trim())].map(e => ({ name:e.name.trim(),...(e.supersetNext&&d.ex[d.ex.indexOf(e)+1]?.sets.some(s=>num(s.r)>0&&s.completed!==false)?{supersetNext:true}:{}), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => num(s.r) > 0 && s.completed !== false).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.toFailure?{toFailure:true}:{}),...(s.restSeconds!=null?{restSeconds:s.restSeconds}:{}),...(s.toFailure?{rir:0}:s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
+  const named=[...d.ex, ...d.extra.filter(x => x.name.trim())];
+  let include=includeUnticked ?? (!reviewOnly&&sessionReview?.includeUnticked===true),forcedInclude=false;
+  const pending=named.reduce((n,e)=>n+e.sets.filter(s=>loggedSet(s,true)&&!loggedSet(s,false)).length,0);
+  const build=include=>named.map(e => ({ name:e.name.trim(),...(e.supersetNext&&d.ex[d.ex.indexOf(e)+1]?.sets.some(s=>loggedSet(s,include))?{supersetNext:true}:{}), ...(resolveExerciseIdentity(e.name,e.exerciseId) ? {exerciseId:resolveExerciseIdentity(e.name,e.exerciseId)} : {}), unit: e.unit || DEFAULT_UNIT, sets: e.sets.filter(s => loggedSet(s,include)).map(s => ({ w: num(s.w) ?? 0, r: num(s.r), completed: true, type:s.type||"working",...(s.toFailure?{toFailure:true}:{}),...(s.restSeconds!=null?{restSeconds:s.restSeconds}:{}),...(s.toFailure?{rir:0}:s.rir===null||s.rir===""||s.rir===undefined?{}:{rir:Number(s.rir)}), ...(s.completedAt ? {completedAt:s.completedAt} : {}) })) })).filter(e => e.sets.length);
+  let exercises=build(include);
   if([...d.ex,...d.extra].some(e=>e.sets.some(x=>x.rir!=null&&( !Number.isInteger(Number(x.rir))||Number(x.rir)<0||Number(x.rir)>10)))){reportSessionValidation("RIR must be a whole number from 0 to 10.",document.querySelector("#app [data-f=rir]"));return;}
-  if (!exercises.length) { reportSessionValidation("Enter reps for at least one set first.",document.querySelector("#app [data-f=r]")); return; }
+  // Nothing ticked yet but some sets have reps: open the review with them included, or nothing could be saved.
+  if(!exercises.length&&reviewOnly&&!include&&pending>0){include=forcedInclude=true;exercises=build(true);}
+  if (!exercises.length) { if(named.some(e=>e.sets.some(s=>num(s.r)>0)))reportSessionValidation("Tick ✓ at least one set first.");else reportSessionValidation("Enter reps for at least one set first.",document.querySelector("#app [data-f=r]")); return; }
   if (!validDataDate(d.date)) { reportSessionValidation("Pick a valid date for this session.",document.querySelector("#app [data-f=date]")); return; }
   const s = { id: uid("s"), dayId: day.id, dayName: day.name, type: day.type, ...Object.fromEntries(["betweenExercisesRest","supersetTransitionRest","supersetRoundRest"].filter(k=>d[k]!=null).map(k=>[k,d[k]])), date: d.date, notes: (d.notes||"").trim(), exercises, createdAt: Date.now() };
   if(reviewOnly){
     d.workoutTimer=timerTools.pauseWorkout(d.workoutTimer);
     if(d.restTimer&&d.restTimer.pausedRemainingMs==null)d.restTimer=timerTools.pause(d.restTimer);
-    sessionReview=s;saveDrafts();navigateView("review");return;
+    sessionReview={...s,includeUnticked:include,forcedInclude,pending};saveDrafts();navigateView("review");return;
   }
   sessionSavePending=true;btn.disabled = true; btn.textContent = "Saving…";
   try {

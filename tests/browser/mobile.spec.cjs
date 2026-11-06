@@ -1,5 +1,5 @@
 const {test,expect}=require('@playwright/test');
-const {enterSession,saveSession,openNested,openSetOptions,closeSheet}=require('./flow-helpers.cjs');
+const {enterSession,saveSession,logSet,openNested,openSetOptions,closeSheet}=require('./flow-helpers.cjs');
 
 test('mobile viewport, touch navigation, draft recovery and backup', { tag: ['@mobile-webkit'] },async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
@@ -9,7 +9,7 @@ test('mobile viewport, touch navigation, draft recovery and backup', { tag: ['@m
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
 });
 test('mobile session completion and IndexedDB cleanup survive reload', { tag: ['@mobile-webkit'] },async({page})=>{
- await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('10');await saveSession(page);await page.reload();await openNested(page,'history');await expect(page.locator('details.hist')).toHaveCount(1);
+ await page.goto('/gym-tracker/');await enterSession(page);await logSet(page,'Barbell row',1,{r:10});await saveSession(page);await page.reload();await openNested(page,'history');await expect(page.locator('details.hist')).toHaveCount(1);
  const draft=await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result.drafts.pullA)})});expect(draft).toBeUndefined();
 });
 test('training dashboard action and three-tab navigation remain usable on mobile', { tag: ['@mobile-webkit'] },async({page})=>{

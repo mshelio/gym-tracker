@@ -1,4 +1,4 @@
-const {enterSession,leaveSession,library,startTemplate,saveSession,openDetails,openNested,openExerciseOptions,openSetOptions,closeSheet}=require('./flow-helpers.cjs');
+const {enterSession,leaveSession,library,startTemplate,saveSession,logSet,openDetails,openNested,openExerciseOptions,openSetOptions,closeSheet}=require('./flow-helpers.cjs');
 async function openAnalyticsFilters(page){await openDetails(page,'[data-disclosure=analytics]');await openDetails(page,'.analytics-filters');}
 async function openRestTimer(page){await page.getByRole('button',{name:'Open rest timer',exact:true}).click();return page.getByRole('dialog',{name:'Rest timer'});}
 const {test,expect} = require('@playwright/test');
@@ -146,7 +146,7 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
  await openSetOptions(page,'Barbell row',1);
  await page.getByRole('dialog').getByRole('button',{name:'Warm-up',exact:true}).click();
  await closeSheet(page);
- await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+ await logSet(page,'Barbell row',1,{r:8});
  await saveSession(page);
  await expect(page.locator('#app')).toContainText('0 hard sets');
 });
@@ -237,8 +237,7 @@ test('second tab refuses stale draft overwrite', async ({browser})=>{
 });
 test('copying previous sets requires explicit action',async ({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:/Barbell row set 1 weight/}).fill('100');
- await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+ await logSet(page,'Barbell row',1,{w:100,r:8});
  await saveSession(page);
  await page.locator('nav.tabs [data-tab=home]').click();
  await library(page);
@@ -246,6 +245,100 @@ test('copying previous sets requires explicit action',async ({page})=>{
  await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('');
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
  await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('100');
+});
+
+const readSnapshot=page=>page.evaluate(()=>new Promise((ok,no)=>{const q=indexedDB.open('gym-tracker',1);q.onerror=()=>no(q.error);q.onsuccess=()=>{const db=q.result,r=db.transaction('snapshots','readonly').objectStore('snapshots').get('primary');r.onsuccess=()=>{db.close();ok(r.result)};r.onerror=()=>no(r.error);};}));
+const setWeight=(page,set)=>page.getByLabel(new RegExp(`^Barbell row set ${set} weight in `));
+const setReps=(page,set)=>page.getByLabel(`Barbell row set ${set} reps`,{exact:true});
+
+test('an unticked set is left out by default',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await logSet(page,'Barbell row',1,{w:60,r:8});
+ await setWeight(page,2).fill('60');await setReps(page,2).fill('6');
+ await page.getByRole('button',{name:'Finish workout',exact:true}).click();
+ const review=page.locator('.session-review');
+ await expect(review).toContainText("1 set has reps but isn't ticked.");
+ await expect(review).toContainText('13 empty sets will be left out.');
+ const include=page.getByRole('checkbox',{name:'Include them'});
+ await expect(include).not.toBeChecked();await expect(include).toBeEnabled();
+ await expect(review.locator('.stat').first()).toContainText('1');
+ await page.getByRole('button',{name:'Save session',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Workout complete',exact:true})).toBeVisible();
+ const data=await readSnapshot(page);
+ expect(data.sessions[0].exercises[0].sets.map(s=>[s.w,s.r])).toEqual([[60,8]]);
+});
+
+test('the review checkbox includes sets that have reps but no tick',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await logSet(page,'Barbell row',1,{w:60,r:8});
+ await setWeight(page,2).fill('60');await setReps(page,2).fill('6');
+ await page.getByRole('button',{name:'Finish workout',exact:true}).click();
+ await page.getByLabel('How did it feel? (optional)').fill('Felt strong');
+ const include=page.getByRole('checkbox',{name:'Include them'});
+ await include.check();
+ await expect(include).toBeChecked();await expect(include).toBeFocused();
+ await expect(page.locator('.session-review .stat').first()).toContainText('2');
+ await expect(page.locator('.session-review-list')).toContainText('60 × 8 · 60 × 6');
+ await expect(page.getByLabel('How did it feel? (optional)')).toHaveValue('Felt strong');
+ await include.uncheck();await expect(page.locator('.session-review-list')).not.toContainText('60 × 6');
+ await include.check();
+ await page.getByRole('button',{name:'Save session',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Workout complete',exact:true})).toBeVisible();
+ const data=await readSnapshot(page);
+ expect(data.sessions[0].exercises[0].sets.map(s=>[s.w,s.r,s.completed])).toEqual([[60,8,true],[60,6,true]]);
+ expect(data.sessions[0].notes).toBe('Felt strong');
+});
+
+test('with nothing ticked the review includes the sets that have reps',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await setReps(page,1).fill('8');
+ await page.getByRole('button',{name:'Finish workout',exact:true}).click();
+ await expect(page.locator('.session-review')).toContainText('Nothing is ticked');
+ const include=page.getByRole('checkbox',{name:'Include them'});
+ await expect(include).toBeChecked();await expect(include).toBeDisabled();
+ await page.getByRole('button',{name:'Save session',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Workout complete',exact:true})).toBeVisible();
+ expect((await readSnapshot(page)).sessions[0].exercises[0].sets.map(s=>s.r)).toEqual([8]);
+});
+
+test('an edited ticked set stays ticked and is saved',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await logSet(page,'Barbell row',1,{w:60,r:8});
+ await setWeight(page,1).fill('62.5');await setReps(page,1).fill('10');
+ const done=page.getByRole('button',{name:'Barbell row set 1 mark incomplete',exact:true});
+ await expect(done).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.reload();await enterSession(page);
+ await expect(done).toHaveAttribute('aria-pressed','true');
+ await setReps(page,1).fill('');
+ await expect(page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true})).toHaveAttribute('aria-pressed','false');
+ await setReps(page,1).fill('10');await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();
+ await saveSession(page);
+ const set=(await readSnapshot(page)).sessions[0].exercises[0].sets[0];
+ expect([set.w,set.r,set.completed]).toEqual([62.5,10,true]);
+});
+
+test('copy last sets keeps ticked sets and warm-up types',async({page})=>{
+ await page.goto('/gym-tracker/');await enterSession(page);
+ await openSetOptions(page,'Barbell row',1);
+ await page.getByRole('dialog').getByRole('button',{name:'Warm-up',exact:true}).click();
+ await closeSheet(page);
+ await logSet(page,'Barbell row',1,{w:40,r:10});
+ await logSet(page,'Barbell row',2,{w:80,r:8});
+ await logSet(page,'Barbell row',3,{w:80,r:7});
+ await saveSession(page);
+ await startTemplate(page,'Pull A');
+ await logSet(page,'Barbell row',2,{w:85,r:6});
+ await page.getByRole('button',{name:'Copy last sets'}).first().click();
+ await expect(page.locator('#toast')).toHaveText('Copied 2 sets from last time');
+ await expect(setWeight(page,1)).toHaveValue('40');await expect(setReps(page,1)).toHaveValue('10');
+ await expect(page.getByRole('group',{name:'Barbell row set 1',exact:true}).locator('.set-badge')).toHaveText('W');
+ await expect(setWeight(page,2)).toHaveValue('85');await expect(setReps(page,2)).toHaveValue('6');
+ await expect(page.getByRole('button',{name:'Barbell row set 2 mark incomplete',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(setWeight(page,3)).toHaveValue('80');await expect(setReps(page,3)).toHaveValue('7');
+ await expect(page.getByRole('button',{name:'Barbell row set 3 mark complete',exact:true})).toHaveAttribute('aria-pressed','false');
+ await page.getByRole('button',{name:'Copy last sets'}).first().click();
+ await expect(page.locator('#toast')).toHaveText('No empty sets to fill');
 });
 
 test('progression hints can be disabled without changing draft',async({page})=>{
@@ -463,7 +556,7 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await page.locator('[data-act=manageschedules]').click();
  await page.locator('[data-act=activateschedule][data-id=starter-ppl]').click();
  await enterSession(page);
- await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+ await logSet(page,'Barbell row',1,{r:8});
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  // Confirm the atomic IndexedDB snapshot, rather than assuming a toast also
@@ -532,7 +625,7 @@ test('service worker caches app shell and preserves draft on offline reload',asy
 test('edit completed workout atomically without advancing schedule or losing metadata',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
  await expect(page.locator('.session-toolbar')).toBeVisible();
- await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
+ await logSet(page,'Barbell row',1,{r:9});
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
@@ -573,7 +666,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
  try{
   const a=await context.newPage();
   await a.goto('/gym-tracker/');await enterSession(a);
-  await a.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+  await logSet(a,'Barbell row',1,{r:8});
   await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
   await saveSession(a);
   await expect(a.getByText('Session saved')).toBeVisible();
@@ -684,7 +777,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
 test('known exercises carry semantic IDs while custom names remain valid after reload',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
  await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
- await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+ await logSet(page,'Barbell row',1,{r:8});
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();

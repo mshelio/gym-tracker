@@ -1,4 +1,4 @@
-const {enterSession,saveSession}=require('./flow-helpers.cjs');
+const {enterSession,saveSession,logSet}=require('./flow-helpers.cjs');
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path');
 const workerSource=fs.readFileSync(path.join(__dirname,'../../sw.js'),'utf8');
@@ -31,10 +31,10 @@ test('offline logging, draft persistence and session completion survive reload',
  await context.setOffline(true);
  await page.reload();
  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
- await enterSession(page);await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
+ await enterSession(page);await logSet(page,'Barbell row',1,{r:9});
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.reload();
- await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');await expect(page.getByRole('button',{name:'Barbell row set 1 mark incomplete',exact:true})).toHaveAttribute('aria-pressed','true');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  await page.reload();

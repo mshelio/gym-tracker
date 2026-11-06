@@ -1,5 +1,5 @@
 const {test,expect}=require('@playwright/test');
-const {enterSession,library,startTemplate,openNested,closeSheet}=require('./flow-helpers.cjs');
+const {enterSession,library,startTemplate,openNested,closeSheet,logSet}=require('./flow-helpers.cjs');
 const elapsed=page=>page.locator('[data-timer="workout"]');
 const rest=page=>page.locator('[data-timer="rest"]');
 const sessionOptions=async page=>{await page.getByRole('button',{name:'Session options',exact:true}).click();return page.getByRole('dialog');};
@@ -52,7 +52,7 @@ test('rest runs in the session bar and a minimized workout resumes from every ta
 
 test('a single workout can run at a time and finishing clears its timer after review', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
+ await logSet(page,'Barbell row',1,{r:8});
  await startTemplate(page,'Push A');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  const data=await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result)})});
@@ -61,7 +61,7 @@ test('a single workout can run at a time and finishing clears its timer after re
  await startTemplate(page,'Pull A');await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
  await page.getByRole('button',{name:'Finish workout',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Review session',exact:true})).toBeVisible();
- await expect(page.locator('.session-review')).toContainText('14 unlogged');
+ await expect(page.locator('.session-review')).toContainText('14 empty sets will be left out.');await expect(page.getByRole('checkbox',{name:'Include them'})).toHaveCount(0);
  await page.getByRole('button',{name:'Keep training'}).click();await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
  await page.getByRole('button',{name:'Finish workout',exact:true}).click();await page.getByRole('button',{name:'Save session',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Workout complete'})).toBeVisible();

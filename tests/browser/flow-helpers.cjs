@@ -38,6 +38,14 @@ async function saveSession(page){
  await expect(page.getByRole('heading',{name:'Workout complete',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'View history',exact:true}).click();
 }
+// Only ticked sets are saved: fill a set and tick its check button.
+const escapeRegExp=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+async function logSet(page,exercise,set,{w,r}={}){
+ if(w!=null)await page.getByLabel(new RegExp(`^${escapeRegExp(exercise)} set ${set} weight in `)).fill(String(w));
+ if(r!=null)await page.getByLabel(`${exercise} set ${set} reps`,{exact:true}).fill(String(r));
+ await page.getByRole('button',{name:`${exercise} set ${set} mark complete`,exact:true}).click();
+ await expect(page.getByRole('button',{name:`${exercise} set ${set} mark incomplete`,exact:true})).toHaveAttribute('aria-pressed','true');
+}
 async function openDetails(page,selector){const d=page.locator(selector);if(await d.getAttribute('open')===null)await d.locator(':scope > summary').click();}
 async function openNested(page,destination){
  await leaveSession(page);
@@ -63,4 +71,4 @@ async function closeSheet(page){
  await page.locator('.sheet [data-act="closesheet"]').click();
  await expect(page.locator('.sheet')).toHaveCount(0);
 }
-module.exports={enterSession,leaveSession,library,startTemplate,saveSession,openDetails,openNested,openExerciseOptions,openSetOptions,closeSheet};
+module.exports={enterSession,leaveSession,library,startTemplate,saveSession,logSet,openDetails,openNested,openExerciseOptions,openSetOptions,closeSheet};

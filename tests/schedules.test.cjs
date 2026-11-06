@@ -301,7 +301,30 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   a.S.tab='data';a.render();await a.exportJSON();assert(!node('#toast').textContent.includes('Cannot export'),node('#toast').textContent);const full=setup();await settle();full.node('#importText').value=node('#exportOut').value;await full.api.importJSON();assert.equal(full.api.S.sessions.length,2,full.node('#toast').textContent);assert.equal(full.api.S.body.length,1);assert.equal(full.api.S.custom.length,1);
   full.node('#importText').value=JSON.stringify({sessions:[{id:'bad',date:'2026-10-05',exercises:[{name:'Invalid',sets:null}]}],custom:[{id:'badc',name:'Invalid',ex:[null]}]});await full.api.importJSON();assert.equal(full.api.S.sessions.length,2);assert.equal(full.api.S.custom.length,1);assert(full.node('#toast').textContent.includes('Import cancelled'));
   full.node('#importText').value='null';await full.api.importJSON();assert(full.node('#toast').textContent.includes('tracker backup'));
-  const rotation=setup();await settle();await rotation.api.useSchedule('starter-ppl');for(const expected of canonical.rotation){assert.equal(rotation.api.nextDayId(),expected);rotation.api.S.dayId=expected;rotation.api.getDraft(expected).ex[0].sets[0]={w:'20',r:'8'};await rotation.api.saveSession({})}assert.equal(rotation.api.nextDayId(),'pullA');
+  const rotation=setup();await settle();await rotation.api.useSchedule('starter-ppl');for(const expected of canonical.rotation){assert.equal(rotation.api.nextDayId(),expected);rotation.api.S.dayId=expected;rotation.api.getDraft(expected).ex[0].sets[0]={w:'20',r:'8',completed:true};await rotation.api.saveSession({})}assert.equal(rotation.api.nextDayId(),'pullA');
+  // Only ticked sets are saved; the review offers the unticked sets that have reps behind an opt-in checkbox.
+  const ticks=setup();await settle();const tk=ticks.api,savedBtn=()=>({disabled:false,textContent:''}),includeBox=/<input type="checkbox" id="review-include-unticked"[^>]*>/;
+  tk.S.tab='log';tk.S.dayId='pullA';let tickDraft=tk.getDraft('pullA');tickDraft.ex[0].sets[0]={w:'50',r:'8',completed:true,completedAt:'2026-10-14T10:00:00Z'};tickDraft.ex[0].sets[1]={w:'50',r:'6'};
+  ticks.node('#app').listeners.input({target:{dataset:{f:'w',g:'',i:'0',j:'0'},value:'52.5',matches:()=>false,hasAttribute:()=>false}});
+  assert.equal(tickDraft.ex[0].sets[0].completed,true,'editing the weight of a ticked set keeps it ticked');
+  ticks.node('#app').listeners.input({target:{dataset:{f:'r',g:'',i:'0',j:'0'},value:'9',matches:()=>false,hasAttribute:()=>false}});
+  assert.equal(tickDraft.ex[0].sets[0].completed,true,'editing the reps of a ticked set keeps it ticked');
+  tickDraft.ex[0].sets[2]={w:'50',r:'5',completed:true,completedAt:'2026-10-14T10:05:00Z'};
+  ticks.node('#app').listeners.input({target:{dataset:{f:'r',g:'',i:'0',j:'2'},value:'',matches:()=>false,hasAttribute:()=>false}});
+  assert.equal(tickDraft.ex[0].sets[2].completed,false,'clearing the reps unticks the set');assert.equal(tickDraft.ex[0].sets[2].completedAt,undefined);
+  await tk.saveSession(null,{reviewOnly:true});assert.equal(tk.S.tab,'review');
+  let reviewHtml=ticks.node('#app').innerHTML;assert(reviewHtml.includes("1 set has reps but isn't ticked"),reviewHtml);assert(includeBox.test(reviewHtml));assert(!/checked|disabled/.test(reviewHtml.match(includeBox)[0]));
+  ticks.node('#review-workout-date').value=tickDraft.date;await tk.saveSession(savedBtn());
+  assert.equal(JSON.stringify(tk.S.sessions[0].exercises.map(e=>e.sets.map(s=>[s.w,s.r]))),'[[[52.5,9]]]');
+  tk.S.tab='log';tk.S.dayId='pullA';tickDraft=tk.getDraft('pullA');tickDraft.ex[0].sets[0]={w:'60',r:'8',completed:true};tickDraft.ex[0].sets[1]={w:'60',r:'7'};
+  await tk.saveSession(null,{reviewOnly:true});ticks.node('#review-notes').value='Included';
+  await ticks.node('#app').listeners.change({target:{dataset:{act:'reviewinclude'},checked:true}});
+  assert.equal(tk.S.tab,'review');assert(/checked/.test(ticks.node('#app').innerHTML.match(includeBox)[0]));
+  await tk.saveSession(savedBtn());const included=tk.S.sessions.find(s=>s.notes==='Included');
+  assert.equal(JSON.stringify(included.exercises[0].sets.map(s=>[s.w,s.r])),'[[60,8],[60,7]]');
+  tk.S.tab='log';tk.S.dayId='pullA';tickDraft=tk.getDraft('pullA');tickDraft.ex[0].sets[0]={w:'40',r:'5'};
+  await tk.saveSession(null,{reviewOnly:true});reviewHtml=ticks.node('#app').innerHTML;
+  assert.equal(tk.S.tab,'review','with nothing ticked the review still opens');assert(reviewHtml.includes('Nothing is ticked'));assert(/checked/.test(reviewHtml.match(includeBox)[0]));
   const offline=setup({fetchFail:true,storage:c.storage});await settle();assert.equal(offline.api.S.ready,true);assert(offline.api.viewData().includes('file unavailable'));
   const missing=setup({fetchFail:true});await settle();assert.equal(missing.api.S.ready,false);assert(missing.node('#app').innerHTML.includes('Choose program JSON'));
   await missing.api.useProgramFile({text:async()=>JSON.stringify(canonical)});assert.equal(missing.api.S.ready,true);
@@ -317,7 +340,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const duplicate=JSON.parse(backup);duplicate.sessions.push(duplicate.sessions[0]);assert.throws(()=>transfer.api.validateAppData(duplicate));
   const malicious=JSON.parse(JSON.stringify(complete));Object.defineProperty(malicious.drafts,'__proto__',{value:complete.drafts.pushA,enumerable:true});assert.throws(()=>transfer.api.validateAppData(malicious));
   const badDate=structuredClone(complete);badDate.drafts.pushA.date='2026-02-30';assert.throws(()=>transfer.api.validateAppData(badDate));
-  const failure=setup({rejectWrites:true});await settle();const fd=failure.api.getDraft('pullA');fd.ex[0].sets[0]={w:'50',r:'10'};await failure.api.saveSession({});assert.equal(failure.api.S.sessions.length,0);assert(failure.api.S.drafts.pullA);assert(failure.node('#toast').textContent.includes('storage'));
+  const failure=setup({rejectWrites:true});await settle();const fd=failure.api.getDraft('pullA');fd.ex[0].sets[0]={w:'50',r:'10',completed:true};await failure.api.saveSession({});assert.equal(failure.api.S.sessions.length,0);assert(failure.api.S.drafts.pullA);assert(failure.node('#toast').textContent.includes('storage'));
   assert.throws(()=>a.parseProgram({...canonical,rotation:['missing']}));assert.throws(()=>a.parseProgram({...canonical,workouts:[{...canonical.workouts[0],exercises:[{name:'Invalid',sets:0,repsMin:8,repsMax:12}]}]}));
   const changed=structuredClone(canonical);changed.defaultUnit='kg';changed.rotation.reverse();changed.workouts[0].exercises[0].sets=4;a.applyProgram(changed);assert.equal(a.getDay('pullA').ex[0].s,4);assert.equal(a.getDay('pullA').unit,'kg');assert.equal(a.nextDayId(),'pushA');
   // Flexible schedules, migrations, calendar plans and atomic persistence.
@@ -326,7 +349,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const cycle={id:'own',name:'My split',mode:'cycle',days:['upper',null,'pullA','upper'],cursor:0};
   await f.saveScheduleList([f.activeSchedule(),cycle],'own');assert.equal(f.nextSlot(),'upper');
   await f.putSession({id:'off',dayId:'pushA',date:'2026-10-06',createdAt:1,exercises:[]},true);assert.equal(f.activeSchedule().cursor,0);
-  f.S.dayId='upper';f.getDraft('upper').ex[0].sets[0]={w:'20',r:'8'};await f.saveSession({});assert.equal(f.nextSlot(),null);assert.equal(f.activeSchedule().cursor,1);
+  f.S.dayId='upper';f.getDraft('upper').ex[0].sets[0]={w:'20',r:'8',completed:true};await f.saveSession({});assert.equal(f.nextSlot(),null);assert.equal(f.activeSchedule().cursor,1);
   const count=f.S.sessions.length;await f.skipScheduleDay();assert.equal(f.nextSlot(),'pullA');assert.equal(f.S.sessions.length,count);
   await f.useSchedule('starter-ppl');await f.useSchedule('own');assert.equal(f.activeSchedule().cursor,2);
   const replay=setup({storage:flex.storage});await settle();assert.equal(replay.api.nextSlot(),'pullA');
