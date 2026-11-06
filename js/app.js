@@ -276,6 +276,8 @@ const clockState=clock=>({idle:"Ready",running:"Training",paused:"Paused",stoppe
 function draftProgress(d){const sets=[...d.ex,...d.extra].flatMap(e=>e.sets);return {done:sets.filter(s=>s.completed===true).length,total:sets.length};}
 // Only ticked sets are saved; the review can opt in sets that have reps but no tick.
 function loggedSet(s,includeUnticked){return s.completed===true||(!!includeUnticked&&num(s.r)>0&&s.completed!==false);}
+// Weight fields are text inputs so a decimal comma ("72,5") survives; accept only empty or plain decimals, so "7a" is not read as 7.
+function validWeightText(v){return /^\d*(?:[.,]\d+)?$/.test(String(v??"").trim());}
 function nextSetLabel(d){
  for(const e of [...d.ex,...d.extra]){const j=e.sets.findIndex(s=>s.completed!==true);if(j>=0)return `${e.name||"Extra exercise"}, set ${j+1}`;}
  return "All sets done";
@@ -562,7 +564,7 @@ function setRows(i, prefix, name, sets, last, lo, hi, unit){
     const ph = last && last.sets[j] ? { w: tidy(conv(last.sets[j].w ?? 0, last.unit, unit), unit), r: last.sets[j].r } : null;
     const badge = SET_TYPE_BADGE[s.type] || (s.toFailure ? "F" : "");
     return `<div class="setrow workout-set-row ${s.completed===true?"is-complete":""}" role="group" aria-label="${esc(name)} set ${j+1}"><span class="setrow__label">${j+1}${badge?`<small class="set-badge" title="${esc(s.type||"to failure")}">${badge}</small>`:""}</span>
-      <input type="number" inputmode="decimal" step="any" min="0" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
+      <input type="text" inputmode="decimal" autocomplete="off" aria-label="${esc(name)} set ${j+1} weight in ${unit === "kg" ? "kilograms" : "pounds"}" data-f="w" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}w-${i}-${j}" value="${esc(s.w)}" placeholder="${ph ? esc(ph.w) : unit}">
       <input type="number" inputmode="numeric" step="1" min="0" aria-label="${esc(name)} set ${j+1} reps" data-f="r" data-g="${prefix}" data-i="${i}" data-j="${j}" data-key="${prefix}r-${i}-${j}" value="${esc(s.r)}" placeholder="${ph ? esc(ph.r ?? "") : (lo ? lo+"–"+hi : "reps")}">
       <button type="button" class="set-complete" data-act="completeset" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} ${s.completed===true ? "mark incomplete" : "mark complete"}" aria-pressed="${s.completed===true}" title="${s.completed===true?"Mark set incomplete":"Complete set and start rest timer"}">${icon('check')}</button>
       <button type="button" class="set-more" data-act="opensheet" data-sheet="set" data-g="${prefix}" data-i="${i}" data-j="${j}" aria-label="${esc(name)} set ${j+1} options">${icon('moreV')}</button>
@@ -643,8 +645,8 @@ function swapSheet(){
 }
 function weightSheet(){
  const last=sortBody(S.body).filter(b=>num(b.weight)>0).at(-1),unit=S.bodyUnit||last?.unit||"kg";
- return `${sheetHead("Quick log","Body weight",last?`Last ${esc(last.weight)} ${esc(last.unit||DEFAULT_UNIT)} · ${esc(fmtDate(last.date))}`:"")}<div class="weight-entry"><label class="sr-only" for="bWeight">Weight</label><input type="number" inputmode="decimal" step="any" id="bWeight" data-autofocus placeholder="${unit==="kg"?"80":"175"}"><select id="bUnit" aria-label="Body weight unit">${["kg","lb"].map(u=>`<option ${u===unit?"selected":""}>${u}</option>`).join("")}</select></div>
- <div class="sheet-grid"><label class="field-label">Date<input type="date" id="bDate" value="${today()}"></label><label class="field-label">Waist cm (optional)<input type="number" inputmode="decimal" step="0.5" id="bWaist" placeholder="—"></label></div>
+ return `${sheetHead("Quick log","Body weight",last?`Last ${esc(last.weight)} ${esc(last.unit||DEFAULT_UNIT)} · ${esc(fmtDate(last.date))}`:"")}<div class="weight-entry"><label class="sr-only" for="bWeight">Weight</label><input type="text" inputmode="decimal" autocomplete="off" id="bWeight" data-autofocus placeholder="${unit==="kg"?"80":"175"}"><select id="bUnit" aria-label="Body weight unit">${["kg","lb"].map(u=>`<option ${u===unit?"selected":""}>${u}</option>`).join("")}</select></div>
+ <div class="sheet-grid"><label class="field-label">Date<input type="date" id="bDate" value="${today()}"></label><label class="field-label">Waist cm (optional)<input type="text" inputmode="decimal" autocomplete="off" id="bWaist" placeholder="—"></label></div>
  <div class="sheet-actions"><button class="btn primary" data-act="addbody">Add entry</button></div><button class="link-btn" data-destination="body">See your trend in Progress →</button>`;
 }
 function sessionSheet(){
@@ -773,7 +775,7 @@ function viewSavedSessionEdit(){
  <label class="field-label">Date <input aria-label="Saved session date" type="date" data-history-field="date" value="${esc(s.date)}"></label>
  <label class="field-label">Notes <textarea aria-label="Saved session notes" data-history-field="notes">${esc(s.notes||"")}</textarea></label>
  ${s.exercises.map((ex,i)=>`<fieldset><legend>${esc(ex.name)} (${esc(ex.unit||s.unit||DEFAULT_UNIT)})</legend>
- ${(ex.sets||[]).map((set,j)=>`<div class="edit-set-row"><label class="field-label">Weight <input aria-label="${esc(ex.name)} set ${j+1} weight" type="number" min="0" step="any" data-history-set="w" data-i="${i}" data-j="${j}" value="${esc(set.w??0)}"></label>
+ ${(ex.sets||[]).map((set,j)=>`<div class="edit-set-row"><label class="field-label">Weight <input aria-label="${esc(ex.name)} set ${j+1} weight" type="text" inputmode="decimal" autocomplete="off" data-history-set="w" data-i="${i}" data-j="${j}" value="${esc(set.w??0)}"></label>
  <label class="field-label">Reps <input aria-label="${esc(ex.name)} set ${j+1} reps" type="number" min="1" step="1" data-history-set="r" data-i="${i}" data-j="${j}" value="${esc(set.r??0)}"></label>
  <button class="btn small ghost" data-act="historyrmset" data-i="${i}" data-j="${j}">Remove set ${j+1}</button></div>`).join("")}
  <button class="btn small" data-act="historyaddset" data-i="${i}">Add set to ${esc(ex.name)}</button></fieldset>`).join("")}
@@ -969,8 +971,8 @@ function viewBody(){
   return `<section id="progress-body" class="section progress-body" aria-labelledby="body-heading"><h2 id="body-heading" class="section-title">Log a measurement</h2>
       <div class="form-row">
         <label class="field-label">Date<input type="date" id="bDate" value="${today()}"></label>
-        <label class="field-label"><span>Weight <select id="bUnit" aria-label="Body weight unit" class="inline-select">${["kg","lb"].map(u=>`<option ${u===(S.bodyUnit||bu)?"selected":""}>${u}</option>`).join("")}</select></span><input type="number" inputmode="decimal" step="any" id="bWeight" placeholder="${(S.bodyUnit||bu)==="kg"?"87":"192"}"></label>
-        <label class="field-label">Waist (cm)<input type="number" inputmode="decimal" step="0.5" id="bWaist" placeholder="optional"></label>
+        <label class="field-label"><span>Weight <select id="bUnit" aria-label="Body weight unit" class="inline-select">${["kg","lb"].map(u=>`<option ${u===(S.bodyUnit||bu)?"selected":""}>${u}</option>`).join("")}</select></span><input type="text" inputmode="decimal" autocomplete="off" id="bWeight" placeholder="${(S.bodyUnit||bu)==="kg"?"87":"192"}"></label>
+        <label class="field-label">Waist (cm)<input type="text" inputmode="decimal" autocomplete="off" id="bWaist" placeholder="optional"></label>
       </div>
       <div class="row-actions"><button class="btn primary" data-act="addbody">Add entry</button></div>
       <p class="muted">Weigh in a few mornings a week. The trend matters more than any single day.</p></section>
@@ -1291,11 +1293,11 @@ d.restTimer=seconds>0?timerTools.start(seconds):null;}saveDrafts();render();retu
     if(savedSessionEditPending)return;
     const corrected=structuredClone(savedSessionEdit);
     if(!validDataDate(corrected.date)){toast("Enter a valid session date.");return;}
-    if(!corrected.exercises.length||corrected.exercises.some(ex=>!ex.sets?.length||ex.sets.some(set=>!Number.isFinite(Number(set.w))||Number(set.w)<0||!Number.isInteger(Number(set.r))||Number(set.r)<1))){
+    if(!corrected.exercises.length||corrected.exercises.some(ex=>!ex.sets?.length||ex.sets.some(set=>!validWeightText(set.w)||!Number.isInteger(Number(set.r))||Number(set.r)<1))){
       toast("Each exercise needs a set with non-negative weight and positive whole-number reps.");return;
     }
     corrected.notes=(corrected.notes||"").trim();
-    for(const ex of corrected.exercises)for(const set of ex.sets){set.w=Number(set.w);set.r=Number(set.r);}
+    for(const ex of corrected.exercises)for(const set of ex.sets){set.w=num(set.w)??0;set.r=Number(set.r);}
     if(!S.sessions.some(x=>x.id===corrected.id)){toast("Session no longer exists. Reload.");return;}
     savedSessionEditPending=true;b.disabled=true;
     try{
@@ -1350,7 +1352,7 @@ async function saveSession(btn,{reviewOnly=false,includeUnticked}={}){
   if(!reviewOnly&&sessionReview&&reviewDate){if(!validDataDate(reviewDate.value)){reportSessionValidation("Pick a valid workout date.",reviewDate);return;}d.date=reviewDate.value;}
   const reviewNotes=document.querySelector("#review-notes");
   if(!reviewOnly&&sessionReview&&typeof reviewNotes?.value==="string")d.notes=reviewNotes.value;
-  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>(String(x.w).trim() && (num(x.w)==null || num(x.w)<0)) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
+  if([...d.ex,...d.extra].some(e=>e.sets.some(x=>!validWeightText(x.w) || (String(x.r).trim() && (num(x.r)==null || !Number.isInteger(num(x.r)) || num(x.r)<0))))){reportSessionValidation("Use non-negative weights and whole-number reps.",document.querySelector("#app [data-f=w],#app [data-f=r]"));return;}
   const named=[...d.ex, ...d.extra.filter(x => x.name.trim())];
   let include=includeUnticked ?? (!reviewOnly&&sessionReview?.includeUnticked===true),forcedInclude=false;
   const pending=named.reduce((n,e)=>n+e.sets.filter(s=>loggedSet(s,true)&&!loggedSet(s,false)).length,0);
@@ -1402,6 +1404,7 @@ async function saveWorkout(btn){
 }
 
 async function addBody(){
+  if (!validWeightText($("#bWeight").value) || !validWeightText($("#bWaist").value)) { toast("Enter numbers only, like 72.5 or 72,5."); return; }
   const date = $("#bDate").value, weight = num($("#bWeight").value), waist = num($("#bWaist").value), unit = $("#bUnit").value === "lb" ? "lb" : "kg"; S.bodyUnit = unit;
   if (!validDataDate(date) || (weight!=null && weight<=0) || (waist!=null && waist<=0) || (!weight && !waist)) { toast("Add a weight or waist measurement."); return; }
   const b = { id: "b" + date, date, weight: weight ?? null, waist: waist ?? null, unit, createdAt: Date.now() };

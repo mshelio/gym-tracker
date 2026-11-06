@@ -68,7 +68,7 @@ test('malformed localStorage prevents automatic migration rather than overwritin
 
 test('set completion survives reload and retains metadata when saved', async ({page})=>{
   await page.goto('/gym-tracker/');await enterSession(page);
-  const weight=page.getByRole('spinbutton',{name:/Barbell row set 1 weight/}).first();
+  const weight=page.getByRole('textbox',{name:/Barbell row set 1 weight/}).first();
   const reps=page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).first();
   await weight.fill('70');await reps.fill('10');
   const done=page.getByRole('button',{name:/Barbell row set 1 mark complete/});
@@ -242,9 +242,9 @@ test('copying previous sets requires explicit action',async ({page})=>{
  await page.locator('nav.tabs [data-tab=home]').click();
  await library(page);
  await startTemplate(page,'Pull A');
- await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('');
+ await expect(page.getByRole('textbox',{name:/Barbell row set 1 weight/})).toHaveValue('');
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
- await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('100');
+ await expect(page.getByRole('textbox',{name:/Barbell row set 1 weight/})).toHaveValue('100');
 });
 
 const readSnapshot=page=>page.evaluate(()=>new Promise((ok,no)=>{const q=indexedDB.open('gym-tracker',1);q.onerror=()=>no(q.error);q.onsuccess=()=>{const db=q.result,r=db.transaction('snapshots','readonly').objectStore('snapshots').get('primary');r.onsuccess=()=>{db.close();ok(r.result)};r.onerror=()=>no(r.error);};}));

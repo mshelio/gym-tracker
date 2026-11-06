@@ -95,7 +95,7 @@ test('swapping from Today lists every workout without starting a draft', { tag: 
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Choose a workout',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByLabel('Default weight unit').selectOption('kg');await expect(page.locator('#toast')).toHaveText('Preference saved');
  await page.getByLabel('Default rest time').selectOption('120');await expect(page.locator('#toast')).toHaveText('Preference saved');
- await page.reload();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 weight in kilograms',exact:true})).toBeVisible();
+ await page.reload();await enterSession(page);await expect(page.getByRole('textbox',{name:'Barbell row set 1 weight in kilograms',exact:true})).toBeVisible();
  await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();await expect(rest(page)).toHaveText('02:00');
 });
 

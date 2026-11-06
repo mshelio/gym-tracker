@@ -20,12 +20,12 @@ test('superset alternates exercises, rests after a round, and backs up failure t
 });
 test('drop and reverse drop sequences suggest different weights without recording reps',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:'Barbell row set 1 weight in pounds',exact:true}).fill('100');
+ await page.getByRole('textbox',{name:'Barbell row set 1 weight in pounds',exact:true}).fill('100');
  await openSetOptions(page,'Barbell row',1);await page.locator('[data-act=chainset][data-kind=drop][data-i="0"][data-j="0"]').click();await closeSheet(page);
- await expect(page.getByRole('spinbutton',{name:'Barbell row set 2 weight in pounds',exact:true})).toHaveValue('80');
+ await expect(page.getByRole('textbox',{name:'Barbell row set 2 weight in pounds',exact:true})).toHaveValue('80');
  await expect(page.getByRole('spinbutton',{name:'Barbell row set 2 reps',exact:true})).toHaveValue('');
  await openSetOptions(page,'Barbell row',1);await page.locator('[data-act=chainset][data-kind=reverse-drop][data-i="0"][data-j="0"]').click();await closeSheet(page);
- await expect(page.getByRole('spinbutton',{name:'Barbell row set 2 weight in pounds',exact:true})).toHaveValue('110');
+ await expect(page.getByRole('textbox',{name:'Barbell row set 2 weight in pounds',exact:true})).toHaveValue('110');
  await openNested(page,'data');await page.locator('[data-act=export]').click();const b=JSON.parse(await page.locator('#exportOut').inputValue());
  expect(b.drafts.pullA.ex[0].sets[1].type).toBe('reverse-drop');expect(b.drafts.pullA.ex[0].sets[0].restSeconds).toBe(0);
 });
