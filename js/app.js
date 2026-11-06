@@ -230,6 +230,19 @@ async function scheduleAction(b){
   }catch(err){toast(err.message);}
 }
 
+function matchDraftDefinition(day,entry,index){
+  if(!day?.ex||!entry)return null;
+  const savedId=resolveExerciseIdentity(entry.name,entry.exerciseId);
+  if(savedId){
+    const byId=day.ex.find(def=>resolveExerciseIdentity(def.n,def.exerciseId)===savedId);
+    if(byId)return byId;
+  }
+  // When legacy custom exercises share a name, their original position is the
+  // only unambiguous identity until the saved draft has an explicit ID.
+  const positional=day.ex[index];
+  if(positional&&(entry.name===positional.n||(positional.alt||[]).includes(entry.name)))return positional;
+  return day.ex.find(def=>entry.name===def.n||(def.alt||[]).includes(entry.name))||null;
+}
 function getDraft(dayId){
   let d=S.drafts[dayId];
   const day=getDay(dayId);
@@ -267,7 +280,9 @@ function getDraft(dayId){
       }
     }
     if(!entry.unit)entry.unit=extra?(S.defaultUnit||day.unit||DEFAULT_UNIT):unitFor(entry.name,day);
+    const definition=extra?null:matchDraftDefinition(day,entry,index);
     if(entry.exerciseId)entry.exerciseId=resolveExerciseIdentity(entry.name,entry.exerciseId);
+    else if(definition?.exerciseId)entry.exerciseId=definition.exerciseId;
     else if(entry.name)entry.exerciseId=resolveExerciseIdentity(entry.name)||undefined;
     if(entry.restSeconds==null)entry.restSeconds=settingFor(entry,index,extra?"x":"",dayId)?.restSeconds;
     return entry;
@@ -717,10 +732,7 @@ function sessionSheet(){
 }
 function exerciseSheet(g,i){
  const d=getDraft(S.dayId),e=(g==="x"?d.extra:d.ex)[i];if(!e)return "";
- const definition=g==="x"?null:getDay(S.dayId)?.ex.find(def=>{
-    const savedId=resolveExerciseIdentity(e.name,e.exerciseId),currentId=resolveExerciseIdentity(def.n,def.exerciseId);
-    return (savedId&&currentId===savedId)||e.name===def.n||(def.alt||[]).includes(e.name);
-  }),options=definition?.alt?.length?[definition.n,...definition.alt]:null;
+ const definition=g==="x"?null:matchDraftDefinition(getDay(S.dayId),e,i),options=definition?.alt?.length?[definition.n,...definition.alt]:null;
  return `${sheetHead("Exercise options",esc(e.name||"Extra exercise"))}
  ${options?`<label class="field-label exercise-substitution">Swap exercise<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${options.map(o=>`<option ${o===e.name?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`:""}
  <div class="sheet-group"><p class="eyebrow">Weight unit</p>${unitSeg(g,i,e.unit)}</div>
@@ -779,14 +791,7 @@ function viewLog(){
   const isOpen=(id,i)=>workoutExpanded.size?workoutExpanded.has(id):id==="base-"+firstOpen;
   const startAction=clock.state==="running"?"clockpause":"clockstart";
   const clockLabel=clock.state==="running"?"Pause workout":clock.state==="paused"?"Resume workout":clock.state==="stopped"?"Restart workout timer":"Start workout timer";
-  const definitionFor=de=>{
-    const savedId=resolveExerciseIdentity(de.name,de.exerciseId);
-    return day.ex.find(def=>{
-      const currentId=resolveExerciseIdentity(def.n,def.exerciseId);
-      return (savedId&&currentId===savedId)||de.name===def.n||(def.alt||[]).includes(de.name);
-    })||null;
-  };
-  const cards=d.ex.map((de,i)=>exerciseCard(d,definitionFor(de),i,isOpen("base-"+i,i))).join("")+d.extra.map((x,i)=>exerciseCard(d,null,i,workoutExpanded.has("extra-"+i),"extra")).join("");
+  const cards=d.ex.map((de,i)=>exerciseCard(d,matchDraftDefinition(day,de,i),i,isOpen("base-"+i,i))).join("")+d.extra.map((x,i)=>exerciseCard(d,null,i,workoutExpanded.has("extra-"+i),"extra")).join("");
   const totalExercises=d.ex.length+d.extra.length;
   const position=Math.min(totalExercises,firstOpen+1);
   return `<header class="session-bar session-toolbar" aria-label="Session controls">
