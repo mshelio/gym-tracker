@@ -4,6 +4,39 @@ const elapsed=page=>page.locator('[data-timer="workout"]');
 const rest=page=>page.locator('[data-timer="rest"]');
 const sessionOptions=async page=>{await page.getByRole('button',{name:'Session options',exact:true}).click();return page.getByRole('dialog');};
 
+test('resuming a draft after its workout template changes preserves the original session', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
+ const program=await (await page.request.get('/gym-tracker/ppl-default-workouts.json')).json();
+ const workout=program.workouts.find(x=>x.id==='pushB'),savedExercises=workout.exercises.slice(1);
+ await page.addInitScript(({workout,savedExercises})=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({
+  sessions:[],body:[],custom:[],preferences:{},schedules:[],
+  drafts:{[workout.id]:{
+   sig:savedExercises.map(e=>e.name).join('|'),date:'2026-11-05',notes:'Keep this in-progress session',
+   startedAt:Date.now()-320*60*1000,
+   ex:savedExercises.map((e,i)=>({name:e.name,unit:'lb',sets:Array.from({length:e.sets},(_,j)=>({w:i===0&&j===0?'45':'',r:i===0&&j===0?'8':''}))})),
+   extra:[]
+  }}
+ })),{workout,savedExercises});
+ await page.goto('/gym-tracker/');
+ await expect(page.locator('.today-workout.is-active')).toContainText('Push B');
+ await expect(page.locator('.hero-progress')).toContainText('Incline barbell press, set 1');
+ await expect(page.locator('.hero-progress')).toContainText('0 / 15');
+ await page.getByRole('button',{name:'Resume workout',exact:true}).click();
+ await expect(page.locator('.session-toolbar')).toBeVisible();
+ await expect(page.locator('.focused-exercise')).toHaveCount(5);
+ await expect(page.getByRole('spinbutton',{name:'Incline barbell press set 1 reps',exact:true})).toHaveValue('8');
+ await expect(page.locator('.workout-layout')).toContainText('Your saved draft may be from an earlier program. Export a backup before editing.');
+ await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ const snapshot=await page.evaluate(async()=>{
+  const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});
+  return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result)});
+ });
+ expect(snapshot.drafts.pushB.ex).toHaveLength(5);
+ expect(snapshot.drafts.pushB.ex[0].sets[0].r).toBe('8');
+ await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
+ await expect(page.locator('nav.tabs')).toBeVisible();
+ await expect(page.locator('.today-workout.is-active')).toContainText('0 / 15');
+});
+
 test('browsing does not start a timer; explicit pause, resume, stop and reset survive reload', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
  // Only control wall time: workout clocks use Date.now(), while real browser
  // timers keep reload/service-worker lifecycle independent of fake animation frames.
