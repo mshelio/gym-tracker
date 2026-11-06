@@ -68,15 +68,15 @@ test('malformed localStorage prevents automatic migration rather than overwritin
 
 test('set completion survives reload and retains metadata when saved', async ({page})=>{
   await page.goto('/gym-tracker/');await enterSession(page);
-  const weight=page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).first();
-  const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first();
+  const weight=page.getByRole('spinbutton',{name:/Barbell row set 1 weight/}).first();
+  const reps=page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).first();
   await weight.fill('70');await reps.fill('10');
-  const done=page.getByRole('button',{name:/Lat pulldown set 1 mark complete/});
+  const done=page.getByRole('button',{name:/Barbell row set 1 mark complete/});
   await done.click();
-  await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:/Barbell row set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
   await page.waitForTimeout(500); // Allow debounced draft write to commit before reload.
   await page.reload();await enterSession(page);
-  await expect(page.getByRole('button',{name:/Lat pulldown set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:/Barbell row set 1 mark incomplete/})).toHaveAttribute('aria-pressed','true');
   await saveSession(page);
   await expect(page.getByRole('heading',{name:'Workout history',exact:true})).toBeVisible();
   const data=await page.evaluate(async()=>{const q=indexedDB.open('gym-tracker',1);return await new Promise((ok,no)=>{q.onsuccess=()=>{const t=q.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');t.onsuccess=()=>ok(t.result);t.onerror=()=>no(t.error);};q.onerror=()=>no(q.error);});});
@@ -87,8 +87,8 @@ test('set completion survives reload and retains metadata when saved', async ({p
 
 test('rest and workout timers recover from reload and support controls',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).first().fill('8');
- await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).first().fill('8');
+ await page.getByRole('button',{name:/Barbell row set 1 mark complete/}).click();
  await expect(page.locator('[data-timer="rest"]')).toContainText(':');
  let dialog=await openRestTimer(page);
  await dialog.getByRole('button',{name:'Pause rest',exact:true}).click();
@@ -108,21 +108,21 @@ test('rest and workout timers recover from reload and support controls',async({p
 
 test('set types, RIR, and exercise rest survive autosave and session export',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await openSetOptions(page,'Lat pulldown',1);
+ await openSetOptions(page,'Barbell row',1);
  await page.getByRole('dialog').getByRole('button',{name:'Warm-up',exact:true}).click();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('3');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 RIR/}).fill('3');
  await closeSheet(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await openExerciseOptions(page,0);
  await page.locator('[data-f="exrest"]').first().fill('120');
  await closeSheet(page);
- await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await page.getByRole('button',{name:/Barbell row set 1 mark complete/}).click();
  await expect(page.locator('[data-timer="rest"]')).toContainText('02:');
  await page.waitForTimeout(500);
  await page.reload();await enterSession(page);
- await openSetOptions(page,'Lat pulldown',1);
+ await openSetOptions(page,'Barbell row',1);
  await expect(page.getByRole('dialog').getByRole('button',{name:'Warm-up',exact:true})).toHaveAttribute('aria-pressed','true');
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/})).toHaveValue('3');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 RIR/})).toHaveValue('3');
  await closeSheet(page);
  await saveSession(page);
  const data=await page.evaluate(async()=>new Promise((ok,no)=>{const req=indexedDB.open('gym-tracker',1);req.onsuccess=()=>{const get=req.result.transaction('snapshots','readonly').objectStore('snapshots').get('primary');get.onsuccess=()=>ok(get.result);get.onerror=()=>no(get.error);};req.onerror=()=>no(req.error);}));
@@ -143,10 +143,10 @@ test('exercise default survives reload and hard-set count excludes warmups', asy
  await expect(page.locator('[data-f="exrest"]').first()).toHaveValue('135');
  await expect(page.locator('[data-f="increment"]').first()).toHaveValue('2.5');
  await closeSheet(page);
- await openSetOptions(page,'Lat pulldown',1);
+ await openSetOptions(page,'Barbell row',1);
  await page.getByRole('dialog').getByRole('button',{name:'Warm-up',exact:true}).click();
  await closeSheet(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await saveSession(page);
  await expect(page.locator('#app')).toContainText('0 hard sets');
 });
@@ -226,26 +226,26 @@ test('exercise defaults stay isolated for same-name rows in a custom workout', a
 test('second tab refuses stale draft overwrite', async ({browser})=>{
  const context=await browser.newContext();const a=await context.newPage(),b=await context.newPage();
  await a.goto('/gym-tracker/');await enterSession(a);await b.goto('/gym-tracker/');await enterSession(b);
- await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await a.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await a.waitForTimeout(700);
- await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await b.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('12');
  await b.waitForTimeout(700);
  await expect(b.locator('#toast')).toContainText('Another tab');
  await a.reload();await enterSession(a);
- await expect(a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('8');
+ await expect(a.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('8');
  await context.close();
 });
 test('copying previous sets requires explicit action',async ({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/}).fill('100');
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 weight/}).fill('100');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await saveSession(page);
  await page.locator('nav.tabs [data-tab=home]').click();
  await library(page);
  await startTemplate(page,'Pull A');
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('');
  await page.getByRole('button',{name:'Copy last sets'}).first().click();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 weight/})).toHaveValue('100');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 weight/})).toHaveValue('100');
 });
 
 test('progression hints can be disabled without changing draft',async({page})=>{
@@ -285,11 +285,11 @@ test('v4 backup round trip preserves paused timer and exercise settings',async({
  await page.locator('[data-f="exrest"]').first().fill('125');
  await page.locator('[data-f="increment"]').first().fill('2.5');
  await closeSheet(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
- await openSetOptions(page,'Lat pulldown',1);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 RIR/}).fill('2');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
+ await openSetOptions(page,'Barbell row',1);
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 RIR/}).fill('2');
  await closeSheet(page);
- await page.getByRole('button',{name:/Lat pulldown set 1 mark complete/}).click();
+ await page.getByRole('button',{name:/Barbell row set 1 mark complete/}).click();
  const dialog=await openRestTimer(page);
  await dialog.locator('[data-act="timerpause"]').click();
  await page.getByRole('button',{name:'Close rest timer'}).click();
@@ -306,7 +306,7 @@ test('v4 import restores preferences, merge and replace obey defaults',async({pa
  await openNested(page,'data');
  await page.locator('[data-act="export"]').click();
  const original=JSON.parse(await page.locator('#exportOut').inputValue());
- original.preferences.exerciseDefaults={"name:lat pulldown":{restSeconds:145,loadIncrement:2.5,incrementUnit:"kg"}};
+ original.preferences.exerciseDefaults={"name:barbell row":{restSeconds:145,loadIncrement:2.5,incrementUnit:"kg"}};
  original.preferences.progressionEnabled=false;
  await page.locator('#importText').fill(JSON.stringify(original));
  await page.locator('#importMode').selectOption('replace');
@@ -347,9 +347,9 @@ test('autosave displays confirmed state and offers recovery on cross-tab conflic
  const context=await browser.newContext();
  const a=await context.newPage(), b=await context.newPage();
  await a.goto('/gym-tracker/');await enterSession(a);await b.goto('/gym-tracker/');await enterSession(b);
- await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await a.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
  await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
+ await b.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('10');
  await expect(b.locator('[data-save-status]')).toHaveAttribute('data-state','conflict');
  await expect(b.locator('[data-act="recoverbackup"]')).toBeVisible();
  await b.locator('[data-act="recoverbackup"]').click();
@@ -463,7 +463,7 @@ test('completed session, draft cleanup and cursor survive immediate reload atomi
  await page.locator('[data-act=manageschedules]').click();
  await page.locator('[data-act=activateschedule][data-id=starter-ppl]').click();
  await enterSession(page);
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  // Confirm the atomic IndexedDB snapshot, rather than assuming a toast also
@@ -518,12 +518,12 @@ test('service worker caches app shell and preserves draft on offline reload',asy
  await page.evaluate(()=>navigator.serviceWorker.ready);
  await page.reload();await enterSession(page);
  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await context.setOffline(true);
  await page.reload();await enterSession(page);
  await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');
  await expect(page.locator('#pwa-status')).toContainText(/offline/i);
  await context.setOffline(false);
 });
@@ -532,7 +532,7 @@ test('service worker caches app shell and preserves draft on offline reload',asy
 test('edit completed workout atomically without advancing schedule or losing metadata',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
  await expect(page.locator('.session-toolbar')).toBeVisible();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
@@ -542,12 +542,12 @@ test('edit completed workout atomically without advancing schedule or losing met
  });
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('12');
  await page.getByRole('button',{name:'Cancel'}).click();
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('12');
  await page.getByRole('textbox',{name:'Saved session notes'}).fill('Corrected session');
  await page.getByRole('button',{name:'Save changes'}).click();
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
@@ -556,7 +556,7 @@ test('edit completed workout atomically without advancing schedule or losing met
  await openNested(page,'history');
  await page.locator('details.hist').first().evaluate(el=>el.open=true);
  await page.getByRole('button',{name:'Edit session'}).click();
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('12');
  const after=await page.evaluate(async()=>{
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>resolve(r.result)});
   return await new Promise(resolve=>{const tx=db.transaction('snapshots');const r=tx.objectStore('snapshots').get('primary');r.onsuccess=()=>resolve(r.result)});
@@ -573,7 +573,7 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
  try{
   const a=await context.newPage();
   await a.goto('/gym-tracker/');await enterSession(a);
-  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+  await a.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
   await expect(a.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
   await saveSession(a);
   await expect(a.getByText('Session saved')).toBeVisible();
@@ -582,10 +582,10 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await openNested(b,'history');
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
  await b.getByRole('button',{name:'Edit session'}).click();
-  await b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
+  await b.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('10');
   await a.locator('details.hist').first().evaluate(el=>el.open=true);
  await a.getByRole('button',{name:'Edit session'}).click();
-  await a.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('12');
+  await a.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('12');
   await a.getByRole('button',{name:'Save changes'}).click();
   await expect(a.getByText('Session updated')).toBeVisible();
   await b.getByRole('button',{name:'Save changes'}).click();
@@ -614,13 +614,13 @@ test('concurrent saved-session edits reject stale commits without data loss',asy
   await expect(b.locator('details.hist')).toHaveCount(1);
   await b.locator('details.hist').first().evaluate(el=>el.open=true);
   await b.getByRole('button',{name:'Edit session'}).click();
-  await expect(b.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('12');
+  await expect(b.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('12');
  }finally{await context.close();}
 });
 
 
 test('exercise search filters default workouts without modifying saved drafts',async({page})=>{
- await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');await library(page);await page.locator('.subnav [data-destination="exercises"]').click();await openDetails(page,'.exercise-library');
+ await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');await library(page);await page.locator('.subnav [data-destination="exercises"]').click();await openDetails(page,'.exercise-library');
  const search=page.getByRole('searchbox',{name:'Search exercises'});
  await search.fill('Lat pulldown');
  await expect(page.locator('[data-exercise-search-count]')).toContainText('1 of');
@@ -631,7 +631,7 @@ test('exercise search filters default workouts without modifying saved drafts',a
  await enterSession(page);
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.reload();await enterSession(page);
- await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');
 });
 test('workout editor supports searchable rows and exercise suggestions',async({page})=>{
  await page.goto('/gym-tracker/');
@@ -684,7 +684,7 @@ test('calendar month/week navigation, status labels and exact adherence survive 
 test('known exercises carry semantic IDs while custom names remain valid after reload',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
  await expect(page.getByRole('heading',{name:'Pull A',exact:true})).toBeVisible();
- await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('8');
+ await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('8');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
@@ -697,11 +697,11 @@ test('known exercises carry semantic IDs while custom names remain valid after r
   };
  }));
  const before=await snapshot();
- expect(before.sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
+ expect(before.sessions[0].exercises[0].exerciseId).toBe('catalog:barbell-row');
  await page.reload();await enterSession(page);
  await openNested(page,'history');
  await expect(page.locator('details.hist')).toHaveCount(1);
- expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:lat-pulldown');
+ expect((await snapshot()).sessions[0].exercises[0].exerciseId).toBe('catalog:barbell-row');
 });
 
 test('muscle analytics updates after session corrections and excludes warmups',async({page})=>{

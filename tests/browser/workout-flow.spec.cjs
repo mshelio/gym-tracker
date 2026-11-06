@@ -15,7 +15,7 @@ test('browsing does not start a timer; explicit pause, resume, stop and reset su
  await advance(60000);await library(page);await expect(page.locator('.resume-bar')).toHaveCount(0);
  await startTemplate(page,'Pull A');await advance(12000);
  await expect(elapsed(page)).toHaveText('00:12');
- await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');
+ await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
  await page.getByRole('button',{name:'Pause workout',exact:true}).click();
  await page.waitForTimeout(500);const paused=await elapsed(page).textContent();
  await advance(60000);await expect(elapsed(page)).toHaveText(paused);
@@ -26,13 +26,13 @@ test('browsing does not start a timer; explicit pause, resume, stop and reset su
  await page.reload();await expect(page.locator('.today-workout [data-clock-state]')).toHaveText('Stopped');await expect(elapsed(page)).toHaveText(stopped);
  await enterSession(page);options=await sessionOptions(page);await options.getByRole('button',{name:'Reset timer',exact:true}).click();await closeSheet(page);await page.waitForTimeout(500);
  await expect(elapsed(page)).toHaveText('00:00');
- await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('8');
+ await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
 });
 
 test('rest runs in the session bar and a minimized workout resumes from every tab',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.clock.install();await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');
- await page.getByRole('button',{name:'Lat pulldown set 1 mark complete',exact:true}).click();
+ await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
+ await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();
  await expect(rest(page)).toHaveText('01:30');await expect(page.locator('nav.tabs')).toBeHidden();
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await expect(page.locator('.today-workout.is-active')).toContainText('Pull A');
@@ -52,17 +52,17 @@ test('rest runs in the session bar and a minimized workout resumes from every ta
 
 test('a single workout can run at a time and finishing clears its timer after review',async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
- await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');
+ await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
  await startTemplate(page,'Push A');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  const data=await page.evaluate(async()=>{const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result)})});
  await expect.poll(async()=>page.locator('[data-save-status]').getAttribute('data-state')).toBe('saved');
  // Switching keeps the first draft rather than overwriting it.
- await startTemplate(page,'Pull A');await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('8');
+ await startTemplate(page,'Pull A');await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
  await page.getByRole('button',{name:'Finish workout',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Review session',exact:true})).toBeVisible();
  await expect(page.locator('.session-review')).toContainText('14 unlogged');
- await page.getByRole('button',{name:'Keep training'}).click();await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('8');
+ await page.getByRole('button',{name:'Keep training'}).click();await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
  await page.getByRole('button',{name:'Finish workout',exact:true}).click();await page.getByRole('button',{name:'Save session',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Workout complete'})).toBeVisible();
  await page.getByRole('button',{name:'Back to Today'}).click();await expect(page.locator('.today-last')).toContainText('Pull A');
@@ -95,12 +95,12 @@ test('swapping from Today lists every workout without starting a draft',async({p
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Choose a workout',exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByLabel('Default weight unit').selectOption('kg');await expect(page.locator('#toast')).toHaveText('Preference saved');
  await page.getByLabel('Default rest time').selectOption('120');await expect(page.locator('#toast')).toHaveText('Preference saved');
- await page.reload();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 weight in kilograms',exact:true})).toBeVisible();
- await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');await page.getByRole('button',{name:'Lat pulldown set 1 mark complete',exact:true}).click();await expect(rest(page)).toHaveText('02:00');
+ await page.reload();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 weight in kilograms',exact:true})).toBeVisible();
+ await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();await expect(rest(page)).toHaveText('02:00');
 });
 
 test('a minimized workout resumes from Progress and abandoned reviews cannot be saved',async({page})=>{
- await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('9');
+ await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('9');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();await page.locator('nav.tabs [data-tab=progress]').click();
  await page.locator('.resume-bar').click();await page.getByRole('button',{name:'Finish workout',exact:true}).click();await expect(page.locator('.session-review')).toContainText('Pull A');
  await page.goBack();await expect(page.locator('.session-toolbar')).toBeVisible();
@@ -108,6 +108,6 @@ test('a minimized workout resumes from Progress and abandoned reviews cannot be 
 });
 
 test('editing a template with an active session protects its draft by making a copy',async({page})=>{
- await page.goto('/gym-tracker/');await library(page);await page.locator('.template-card').filter({hasText:'Pull A'}).click();await page.getByRole('button',{name:'Customize a copy'}).click();await page.locator('[data-ed=name]').fill('My session');await page.getByRole('button',{name:'Save workout',exact:true}).click();await page.getByRole('button',{name:'Start this workout'}).click();await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('9');await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
- await library(page);await page.locator('.template-card').filter({has:page.getByText('My session',{exact:true})}).click();await page.getByRole('button',{name:'Edit template',exact:true}).click();await expect(page.locator('[data-ed=name]')).toHaveValue('My session copy');await page.getByLabel('Exercise 1 name').fill('Different exercise');await page.getByRole('button',{name:'Save workout',exact:true}).click();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toHaveValue('9');
+ await page.goto('/gym-tracker/');await library(page);await page.locator('.template-card').filter({hasText:'Pull A'}).click();await page.getByRole('button',{name:'Customize a copy'}).click();await page.locator('[data-ed=name]').fill('My session');await page.getByRole('button',{name:'Save workout',exact:true}).click();await page.getByRole('button',{name:'Start this workout'}).click();await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('9');await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await library(page);await page.locator('.template-card').filter({has:page.getByText('My session',{exact:true})}).click();await page.getByRole('button',{name:'Edit template',exact:true}).click();await expect(page.locator('[data-ed=name]')).toHaveValue('My session copy');await page.getByLabel('Exercise 1 name').fill('Different exercise');await page.getByRole('button',{name:'Save workout',exact:true}).click();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('9');
 });

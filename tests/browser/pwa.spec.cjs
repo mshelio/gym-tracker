@@ -31,10 +31,10 @@ test('offline logging, draft persistence and session completion survive reload',
  await context.setOffline(true);
  await page.reload();
  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
- await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.reload();
- await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('9');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('9');
  await saveSession(page);
  await expect(page.getByText('Session saved')).toBeVisible();
  await page.reload();
@@ -49,11 +49,11 @@ test('program fetch failure does not discard cached workout configuration',async
  await page.reload();
  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
  await enterSession(page);
- await expect(page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true})).toBeVisible();
+ await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toBeVisible();
 });
 test('old worker remains active until an explicit update and drafts survive',async({page})=>{
  await controlled(page);
- await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('7');
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('7');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  const before=await page.evaluate(()=>navigator.serviceWorker.controller.scriptURL);
  const reg=await page.evaluate(()=>navigator.serviceWorker.getRegistration());
@@ -62,7 +62,7 @@ test('old worker remains active until an explicit update and drafts survive',asy
  const preserved=await page.evaluate(async(currentShell)=>{const cache=await caches.open(currentShell);return !!(await cache.match(new URL('./js/app.js',location.href).href))},currentShell);
  expect(preserved).toBe(true);
  await page.reload();
- await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('7');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('7');
 });
 test('mobile PWA viewport and offline startup',async({page,context,isMobile})=>{
  test.skip(!isMobile,'Mobile profile only');
@@ -76,7 +76,7 @@ test('mobile PWA viewport and offline startup',async({page,context,isMobile})=>{
 
 test('service-worker upgrade waits for approval and removes stale shell caches',async({page})=>{
  await controlled(page);
- await enterSession(page);await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('11');
+ await enterSession(page);await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('11');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.evaluate(async()=>{
   const stale=await caches.open('gt-shell-stale');
@@ -94,12 +94,12 @@ test('service-worker upgrade waits for approval and removes stale shell caches',
  expect(before.oldCache).toBe(true);
  await page.locator('#pwa-status .pwa-status-action').click();
  await expect.poll(async()=>{try{return await page.evaluate(async()=>!(await caches.has('gt-shell-stale')))}catch{return false}},{timeout:15000}).toBe(true);
- await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/})).toHaveValue('11');
+ await enterSession(page);await expect(page.getByRole('spinbutton',{name:/Barbell row set 1 reps/})).toHaveValue('11');
 });
 
 test('v4 backup restores saved draft into a separate browser profile',async({page,browser})=>{
  await page.goto('/gym-tracker/');
- await enterSession(page);const reps=page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/});
+ await enterSession(page);const reps=page.getByRole('spinbutton',{name:/Barbell row set 1 reps/});
  await reps.fill('13');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();

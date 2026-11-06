@@ -44,7 +44,7 @@ Existing users receive a PPL starter sequence positioned after their latest logg
 
 The app loads `./ppl-default-workouts.json` on startup. Change that JSON to edit the starter workout library, then use **Data → Reload program**. Its rotation contains every default workout ID once and defines the initial starter order; user schedules can reorder, repeat or omit workouts.
 
-The supplied starter order is Pull A → Push A → Legs A → Pull B → Push B → Legs B, with lb as the default unit. If the file cannot be fetched, the app uses its last successfully loaded program. With no cached program, it shows a file picker and retry button. Opening the HTML directly may require selecting the JSON manually. Changing workout IDs can invalidate saved schedules; the app then falls back to the starter schedule while retaining history.
+The supplied starter order is Pull A → Push A → Legs A → Pull B → Push B → Legs B, with lb as the default unit. Each day opens with one heavy main lift for strength (barbell row, bench press, back squat, assisted pull-ups, standing overhead press and Romanian deadlift, 3 × 5–8 or 6–8), followed by the higher-rep accessories. Assisted pull-ups log the machine's counterweight, so progression suggestions lower it as you get stronger. If the file cannot be fetched, the app uses its last successfully loaded program. With no cached program, it shows a file picker and retry button. Opening the HTML directly may require selecting the JSON manually. Changing workout IDs can invalidate saved schedules; the app then falls back to the starter schedule while retaining history.
 
 ## Saving and JSON backups
 

@@ -29,9 +29,9 @@ test('session progress counts completed sets and progress shows real activity',a
  await page.goto('/gym-tracker/');await enterSession(page);
  const meter=page.getByRole('progressbar',{name:'Completed sets'});
  await expect(meter).toHaveAttribute('value','0');
- await page.getByRole('spinbutton',{name:'Lat pulldown set 1 reps',exact:true}).fill('8');
+ await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
  await expect(meter).toHaveAttribute('value','0');
- await page.getByRole('button',{name:'Lat pulldown set 1 mark complete',exact:true}).click();
+ await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();
  await expect(meter).toHaveAttribute('value','1');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await page.locator('nav.tabs [data-tab=progress]').click();

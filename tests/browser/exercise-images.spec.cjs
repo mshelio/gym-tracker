@@ -8,9 +8,10 @@ test('exercise photos follow substitutions and remain available offline',async({
  await expect(thumb).toBeVisible();
  await expect.poll(()=>thumb.evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
  await enterSession(page);
- const first=page.locator('[data-exercise-id="base-0"]');
+ // Lat pulldown is Pull A's second exercise, after the barbell row main lift.
+ const first=page.locator('[data-exercise-id="base-1"]');
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/Wide-Grip_Lat_Pulldown/);
- await openExerciseOptions(page,0);
+ await openExerciseOptions(page,1);
  await page.getByRole('dialog').getByLabel('Exercise or alternative').selectOption({label:'Neutral-grip pulldown'});
  await closeSheet(page);
  await expect(first.locator('.exercise-thumbnail')).toHaveAttribute('src',/V-Bar_Pulldown/);

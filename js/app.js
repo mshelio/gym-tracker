@@ -575,12 +575,13 @@ function exerciseDefaultControls(e,i,group,d){
 }
 function suggestionFor(e,definition){
  const settings=S.exerciseDefaults?.[exerciseKey(e.name,e.exerciseId)]||{};
- return recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false});
+ return recommendProgression({sessions:S.sessions,exerciseName:e.name,exerciseId:e.exerciseId,minimum:definition?.lo||6,maximum:definition?.hi||12,unit:e.unit||"lb",increment:settings.loadIncrement||2.5,incrementUnit:settings.incrementUnit||e.unit||"lb",enabled:S.progressionEnabled!==false,assisted:isAssisted(e.name)});
 }
+const isAssisted=name=>resolveExerciseMetadata(name)?.equipment==="assisted";
 // The single weight suggestion per exercise; it never edits the draft unless the user taps Fill.
 function progressionHint(e,definition,group="",i=0){
  const result=suggestionFor(e,definition);
- const title=result.weight==null?"No load suggestion":(result.kind==="increase"?"Try ":"Stay at ")+result.weight+" "+result.unit;
+ const title=result.weight==null?"No load suggestion":(result.kind==="increase"?"Try ":"Stay at ")+result.weight+" "+result.unit+(isAssisted(e.name)?" assistance":"");
  const fillable=result.weight!=null&&e.sets.some(s=>s.completed!==true&&String(s.w??"").trim()==="");
  return `<div class="progression-hint suggestion kind-${esc(result.kind)}" role="status">${icon('trend')}<span><strong>${esc(title)}</strong><small>${esc(result.reason)}</small></span>${fillable?`<button type="button" class="btn small" data-act="applysuggestion" data-g="${group}" data-i="${i}" aria-label="Fill ${esc(result.weight+" "+result.unit)} into empty ${esc(e.name)} sets">Fill</button>`:""}</div>`;
 }
@@ -1307,6 +1308,7 @@ function newRecords(before,session){
  const found=[];
  try{
   for(const e of session.exercises){
+   if(isAssisted(e.name))continue;
    const old=calculateRecords(before,e.name,e.unit),now=calculateRecords(S.sessions,e.name,e.unit);
    if(old.heaviest&&now.heaviest&&now.heaviest.value>old.heaviest.value+1e-9)found.push({name:e.name,value:now.heaviest.value,unit:e.unit,label:"heaviest"});
    else if(old.estimated1RM&&now.estimated1RM&&now.estimated1RM.value>old.estimated1RM.value+1e-9)found.push({name:e.name,value:now.estimated1RM.value,unit:e.unit,label:"est. 1RM"});

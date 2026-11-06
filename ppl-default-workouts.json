@@ -10,6 +10,9 @@
   ],
   "defaultUnit": "lb",
   "notes": [
+    "Each day opens with one heavy main lift for 5–8 reps; the exercises after it are accessories for muscle",
+    "Main lift: do it first while fresh, rest about 3 minutes between sets, and add weight whenever every set reaches the top of the range",
+    "Assisted pull-ups: log the counterweight and lower it as you get stronger, until you can do Pull-ups unassisted",
     "Repeat the rotation; take a rest day after Legs A and/or Legs B",
     "Double progression: when every set hits the top of the rep range, add the smallest weight jump and restart at the bottom",
     "Leave 1–3 reps in reserve on compound lifts; rest 2–3 min on compounds, 60–90 s on isolation",
@@ -22,6 +25,16 @@
       "type": "pull",
       "exercises": [
         {
+          "name": "Barbell row",
+          "sets": 3,
+          "repsMin": 6,
+          "repsMax": 8,
+          "alternatives": [
+            "T-bar row",
+            "Chest-supported row"
+          ]
+        },
+        {
           "name": "Lat pulldown",
           "sets": 3,
           "repsMin": 6,
@@ -30,16 +43,6 @@
             "Pull-ups",
             "Assisted pull-up machine",
             "Neutral-grip pulldown"
-          ]
-        },
-        {
-          "name": "Barbell row",
-          "sets": 3,
-          "repsMin": 6,
-          "repsMax": 8,
-          "alternatives": [
-            "T-bar row",
-            "Chest-supported row"
           ]
         },
         {
@@ -82,7 +85,7 @@
         {
           "name": "Barbell bench press",
           "sets": 3,
-          "repsMin": 6,
+          "repsMin": 5,
           "repsMax": 8,
           "alternatives": [
             "Dumbbell bench press",
@@ -139,7 +142,7 @@
         {
           "name": "Back squat",
           "sets": 3,
-          "repsMin": 6,
+          "repsMin": 5,
           "repsMax": 8,
           "alternatives": [
             "Hack squat",
@@ -203,6 +206,16 @@
       "name": "Pull B",
       "type": "pull",
       "exercises": [
+        {
+          "name": "Assisted pull-up machine",
+          "sets": 3,
+          "repsMin": 5,
+          "repsMax": 8,
+          "alternatives": [
+            "Pull-ups",
+            "Band-assisted pull-up"
+          ]
+        },
         {
           "name": "Chest-supported dumbbell row",
           "sets": 3,
@@ -273,6 +286,16 @@
       "type": "push",
       "exercises": [
         {
+          "name": "Standing overhead press",
+          "sets": 3,
+          "repsMin": 5,
+          "repsMax": 8,
+          "alternatives": [
+            "Seated dumbbell shoulder press",
+            "Machine shoulder press"
+          ]
+        },
+        {
           "name": "Incline barbell press",
           "sets": 3,
           "repsMin": 8,
@@ -333,8 +356,8 @@
         {
           "name": "Romanian deadlift",
           "sets": 3,
-          "repsMin": 8,
-          "repsMax": 10,
+          "repsMin": 6,
+          "repsMax": 8,
           "alternatives": [
             "Dumbbell RDL",
             "45° back extension"

@@ -78,25 +78,25 @@ async function verify(){
    if(await start.count())await start.click();
    else{await page.getByRole('button',{name:'Choose a workout',exact:true}).click();await page.getByRole('dialog').locator('.pick',{hasText:'Pull A'}).click();}
   }
-  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('9');
+  await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('9');
   await page.locator('[data-save-status][data-state="saved"]').waitFor({timeout:12000});
   // Offline browser profile is disposable: this never touches a user's data.
   await context.setOffline(true);
   await page.reload();
   await page.getByRole('heading',{name:taskFlow?'Today':/^(Train|Make every rep count\.)$/,exact:true}).waitFor({timeout:15000});
   if(taskFlow)await page.getByRole('button',{name:'Resume workout',exact:true}).click();
-  if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='9')
+  if(await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).inputValue()!=='9')
    throw Error('Draft lost during production offline reload');
-  await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).fill('10');
+  await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).fill('10');
   await page.locator('[data-save-status][data-state="saved"]').waitFor({timeout:12000});
   await page.reload();
   if(taskFlow)await page.getByRole('button',{name:'Resume workout',exact:true}).click();
-  if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
+  if(await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).inputValue()!=='10')
    throw Error('Edited offline draft was not durable');
   await context.setOffline(false);
   // Normal update() must never discard a saved draft or force a reload.
   await page.evaluate(async()=>{const reg=await navigator.serviceWorker.getRegistration();await reg.update();});
-  if(await page.getByRole('spinbutton',{name:/Lat pulldown set 1 reps/}).inputValue()!=='10')
+  if(await page.getByRole('spinbutton',{name:/Barbell row set 1 reps/}).inputValue()!=='10')
    throw Error('Service-worker update check discarded an active draft');
   console.log('PASS deployed PWA: scope, cache revision, offline startup, IndexedDB draft and update check');
   // History is nested under Progress in the three-tab navigation; the full-screen session hides the tabs.

@@ -239,6 +239,11 @@ export const exerciseImages = {
     "id": "Pullups",
     "name": "Pullups"
   },
+  "assisted pull-up machine": {
+    "id": "Pullups",
+    "name": "Pullups",
+    "note": "Related movement: pull-up. The machine's counterweight supports part of your bodyweight; lower it as you get stronger."
+  },
   "reverse crunch": {
     "id": "Reverse_Crunch",
     "name": "Reverse Crunch"

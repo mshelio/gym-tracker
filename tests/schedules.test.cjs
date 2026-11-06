@@ -54,7 +54,17 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.resolveExerciseIdentity("Barbell bench press","ex-custom-1"),"ex-custom-1");
   assert.equal(a.resolveExerciseMetadata("Machine chest press")?.primaryMuscle,"chest");
   assert.notEqual(a.resolveExerciseMetadata("Leg press")?.exerciseId,a.resolveExerciseMetadata("Barbell bench press")?.exerciseId);
-  assert.equal(a.parseProgram(canonical).workouts.find(w=>w.id==="pullA").ex[0].exerciseId,"catalog:lat-pulldown");
+  // Each day opens with its heavy main lift; Pull A's barbell row now precedes the pulldown.
+  assert.deepEqual(a.parseProgram(canonical).workouts.find(w=>w.id==="pullA").ex.slice(0,2).map(e=>e.exerciseId),["catalog:barbell-row","catalog:lat-pulldown"]);
+  assert.deepEqual(a.parseProgram(canonical).workouts.map(w=>[w.id,w.ex[0].n,w.ex[0].lo,w.ex[0].hi]),[["pullA","Barbell row",6,8],["pushA","Barbell bench press",5,8],["legsA","Back squat",5,8],["pullB","Assisted pull-up machine",5,8],["pushB","Standing overhead press",5,8],["legsB","Romanian deadlift",6,8]]);
+  // A barbell press must not borrow dumbbell history, and assisted pull-ups are not bodyweight pull-ups.
+  assert.equal(a.resolveExerciseMetadata("Standing overhead press").exerciseId,"catalog:overhead-press");
+  assert.notEqual(a.resolveExerciseMetadata("Seated dumbbell shoulder press").exerciseId,"catalog:overhead-press");
+  assert.equal(a.resolveExerciseMetadata("Assisted pull-up machine").equipment,"assisted");
+  assert.notEqual(a.resolveExerciseMetadata("Pull-ups").exerciseId,a.resolveExerciseMetadata("Assisted pull-up machine").exerciseId);
+  const assistedHistory=[{date:"2026-10-01",exercises:[{name:"Assisted pull-up machine",unit:"kg",sets:[{w:30,r:8},{w:30,r:8},{w:30,r:8}]}]}];
+  assert.equal(a.recommendProgression({sessions:assistedHistory,exerciseName:"Assisted pull-up machine",minimum:5,maximum:8,unit:"kg",increment:5,assisted:true}).weight,25);
+  assert.equal(a.recommendProgression({sessions:assistedHistory,exerciseName:"Assisted pull-up machine",minimum:5,maximum:8,unit:"kg",increment:5}).weight,35);
   for(const workout of canonical.workouts)for(const exercise of workout.exercises)assert(a.resolveExerciseMetadata(exercise.name),`Missing catalog metadata: ${exercise.name}`);
   const muscleSessions=[{date:"2026-03-29",dayId:"pushA",exercises:[
    {name:"Barbell bench press",unit:"kg",sets:[{w:100,r:10,type:"working",completed:true},{w:40,r:10,type:"warmup",completed:true},{w:60,r:10,type:"drop",completed:true},{w:100,r:9,completed:false}]},
@@ -283,7 +293,7 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   const restored=setup();await settle();restored.node('#importText').value=backup;await restored.api.importJSON();assert.equal(restored.api.S.sessions.length,1);await restored.api.importJSON();assert.equal(restored.api.S.sessions.length,1);
   a.S.editing={id:'custom1',name:'Home workout',type:'other',unit:'kg',ex:[{n:'Goblet squat',s:3,lo:8,hi:12}]};await a.saveWorkout({});assert.equal(a.S.custom.length,1);assert.equal(a.nextDayId(),'pushA');assert.equal(a.S.dayId,'pushA');
   a.S.tab='progress';node('#bDate').value='2026-10-05';node('#bWeight').value='80';node('#bWaist').value='90';node('#bUnit').value='kg';await a.addBody();assert.equal(a.S.body.length,1);assert(a.viewBody().includes('80 kg'));
-  await a.putSession({id:'test-second',dayId:'pullA',dayName:'Pull A',date:'2026-10-06',createdAt:2,exercises:[{name:'Lat pulldown',unit:'kg',sets:[{w:50,r:8}]}]});a.S.progressEx='Lat pulldown';assert(a.viewLifts().includes('Trend chart'));assert(a.viewProgress().includes('Training analytics'));assert(a.viewHistory().includes('Pull A'));
+  await a.putSession({id:'test-second',dayId:'pullA',dayName:'Pull A',date:'2026-10-06',createdAt:2,exercises:[{name:'Barbell row',unit:'kg',sets:[{w:50,r:8}]}]});a.S.progressEx='Barbell row';assert(a.viewLifts().includes('Trend chart'));assert(a.viewProgress().includes('Training analytics'));assert(a.viewHistory().includes('Pull A'));
   const reload=setup({storage:c.storage});await settle();assert.equal(reload.api.S.sessions.length,2);assert.equal(reload.api.S.custom.length,1);assert.equal(reload.api.S.body.length,1);
   a.S.tab='data';a.render();await a.exportJSON();assert(!node('#toast').textContent.includes('Cannot export'),node('#toast').textContent);const full=setup();await settle();full.node('#importText').value=node('#exportOut').value;await full.api.importJSON();assert.equal(full.api.S.sessions.length,2,full.node('#toast').textContent);assert.equal(full.api.S.body.length,1);assert.equal(full.api.S.custom.length,1);
   full.node('#importText').value=JSON.stringify({sessions:[{id:'bad',date:'2026-10-05',exercises:[{name:'Invalid',sets:null}]}],custom:[{id:'badc',name:'Invalid',ex:[null]}]});await full.api.importJSON();assert.equal(full.api.S.sessions.length,2);assert.equal(full.api.S.custom.length,1);assert(full.node('#toast').textContent.includes('Import cancelled'));
