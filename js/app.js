@@ -72,6 +72,8 @@ async function loadProgram(){
 }
 function allDays(){ return [...PROGRAM, ...S.custom]; }
 function getDay(id){ return BASE_DAY[id] || S.custom.find(c => c.id === id) || null; }
+// Re-derive stored catalog IDs in memory only; a later save writes them back.
+const withCurrentIds=list=>list.map(c=>Array.isArray(c?.ex)?{...c,ex:c.ex.map(e=>e?.exerciseId?{...e,exerciseId:resolveExerciseIdentity(e.n,e.exerciseId)}:e)}:c);
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 let toastTimer;
@@ -112,7 +114,7 @@ window.addEventListener("pagehide",()=>{void flushDrafts();});
 function setStatus(t){ $("#status").textContent = t; }
 async function initStore(){
   S.mode = "local";
-  const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = l.custom.filter(c => !BASE_DAY[c.id]); S.ready = true;
+  const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = withCurrentIds(l.custom.filter(c => !BASE_DAY[c.id])); S.ready = true;
   S.defaultUnit=l.preferences.defaultUnit;S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId();
   const migratedClocks=Object.keys(S.drafts).filter(id=>getDay(id)&&!S.drafts[id].workoutTimer);
   Object.keys(S.drafts).filter(id=>getDay(id)).forEach(id=>getDraft(id));
@@ -242,7 +244,7 @@ function getDraft(dayId){
       : timerTools.idleWorkout();
   }
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=S.globalRestSeconds||90;
-  d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"",dayId)?.restSeconds; });
+  d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if(e.exerciseId)e.exerciseId=resolveExerciseIdentity(e.name,e.exerciseId); if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"",dayId)?.restSeconds; });
   d.extra.forEach((e,i) => { if (!e.unit) e.unit = S.defaultUnit || day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"x",dayId)?.restSeconds; });
   return d;
 }
@@ -1519,7 +1521,7 @@ async function importJSON(){
     S.sessions=sortSessions(replace ? incoming.sessions : merge(S.sessions,incoming.sessions));
     S.body=sortBody(replace ? incoming.body : merge(S.body,incoming.body));
     S.calendarEvents=validateCalendarEvents(replace ? (incoming.calendarEvents||[]) : merge(S.calendarEvents,incoming.calendarEvents||[]));
-    S.custom=replace ? incoming.custom : merge(S.custom,incoming.custom);
+    S.custom=withCurrentIds(replace ? incoming.custom : merge(S.custom,incoming.custom));
     S.schedules=replace ? incoming.schedules : legacy ? S.schedules : merge(S.schedules,incoming.schedules);
     validateSchedules(S.schedules,S.custom);
     S.activeScheduleId=legacy && !replace ? S.activeScheduleId : incoming.preferences.activeScheduleId ?? null;

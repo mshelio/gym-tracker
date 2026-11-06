@@ -9,6 +9,10 @@
 - Made detailed analytics and the calendar optional disclosures; kept the floating timer contextual to active sessions and clear of offline notifications.
 - Added optional v4 `preferences.defaultUnit` while preserving older backup imports.
 
+### Fixed
+- Separate lifts no longer share an exercise ID. Dumbbell bench, machine chest press, straight-arm and close-grip pulldowns, seated leg curl and the other variants that were catalog aliases now have their own IDs, so their history and load suggestions stay apart. Only true synonyms (such as "Bench press" or "Neutral-grip pulldown") remain aliases. Older sessions, drafts and custom workouts that stored a shared ID are re-read by name; no data is migrated.
+- Saved exercise defaults are not migrated: a default saved under a shared ID stays with the main lift, and a newly separated lift falls back to its name-keyed default, then to the global default.
+
 ### Added
 - Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#90).
 - Exercise-specific primary/secondary anatomical previews, selected-muscle contributing-exercise drilldowns, and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.

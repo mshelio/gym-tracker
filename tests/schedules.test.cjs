@@ -69,6 +69,29 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   assert.equal(a.recommendProgression({sessions:assistedHistory,exerciseName:"Assisted pull-up machine",minimum:5,maximum:8,unit:"kg",increment:5,assisted:true}).weight,25);
   assert.equal(a.recommendProgression({sessions:assistedHistory,exerciseName:"Assisted pull-up machine",minimum:5,maximum:8,unit:"kg",increment:5}).weight,35);
   for(const workout of canonical.workouts)for(const exercise of workout.exercises)assert(a.resolveExerciseMetadata(exercise.name),`Missing catalog metadata: ${exercise.name}`);
+  // Different implements or movements are separate lifts; true synonyms share an id.
+  assert.notEqual(a.resolveExerciseMetadata("Dumbbell bench press").exerciseId,a.resolveExerciseMetadata("Barbell bench press").exerciseId);
+  assert.notEqual(a.resolveExerciseMetadata("Straight-arm cable pulldown").exerciseId,a.resolveExerciseMetadata("Lat pulldown").exerciseId);
+  assert.equal(a.resolveExerciseMetadata("Neutral-grip pulldown").exerciseId,"catalog:lat-pulldown");
+  assert.equal(a.resolveExerciseMetadata("Seated machine row").exerciseId,a.resolveExerciseMetadata("Machine row").exerciseId);
+  assert.equal(a.resolveExerciseMetadata("Dumbbell RDL").exerciseId,a.resolveExerciseMetadata("Dumbbell Romanian deadlift").exerciseId);
+  assert.notEqual(a.resolveExerciseMetadata("Dumbbell RDL").exerciseId,"catalog:rdl");
+  assert.equal(a.resolveExerciseMetadata("Band-assisted pull-up").equipment,"bodyweight");
+  assert.equal(a.resolveExerciseMetadata("Assisted chin-up").equipment,"assisted");
+  assert.equal(a.resolveExerciseMetadata("Face pull").exerciseId,"catalog:face-pull");
+  // Old records that stored a shared catalog id re-derive it from the name.
+  assert.equal(a.resolveExerciseIdentity("Dumbbell bench press","catalog:bench-press"),"catalog:dumbbell-bench-press");
+  assert.equal(a.resolveExerciseIdentity("Dumbbell bench press","ex-custom-2"),"ex-custom-2");
+  assert.equal(a.resolveExerciseIdentity("My paused bench","catalog:bench-press"),"catalog:bench-press");
+  // A newer straight-arm session stored under the old shared id must not steer the pulldown suggestion.
+  const pulldownHistory=[
+   {date:"2026-10-01",exercises:[{name:"Lat pulldown",exerciseId:"catalog:lat-pulldown",unit:"lb",sets:[{w:140,r:10,completed:true},{w:140,r:10,completed:true},{w:140,r:10,completed:true}]}]},
+   {date:"2026-10-05",exercises:[{name:"Straight-arm cable pulldown",exerciseId:"catalog:lat-pulldown",unit:"lb",sets:[{w:30,r:12,completed:true},{w:30,r:12,completed:true}]}]}
+  ];
+  const pulldownSuggestion=a.recommendProgression({sessions:pulldownHistory,exerciseName:"Lat pulldown",exerciseId:"catalog:lat-pulldown",minimum:8,maximum:12,unit:"lb",increment:5});
+  assert.equal(pulldownSuggestion.kind,"hold");
+  assert.equal(pulldownSuggestion.weight,140);
+  assert.equal(a.recommendProgression({sessions:pulldownHistory,exerciseName:"Straight-arm cable pulldown",exerciseId:"catalog:straight-arm-pulldown",minimum:8,maximum:12,unit:"lb",increment:5}).weight,35);
   const muscleSessions=[{date:"2026-03-29",dayId:"pushA",exercises:[
    {name:"Barbell bench press",unit:"kg",sets:[{w:100,r:10,type:"working",completed:true},{w:40,r:10,type:"warmup",completed:true},{w:60,r:10,type:"drop",completed:true},{w:100,r:9,completed:false}]},
    {name:"Mystery lift",unit:"kg",sets:[{w:30,r:10,type:"working",completed:true}]}
@@ -256,6 +279,17 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   delete identityDraft.ex[1].exerciseId; // Older v4 draft: recover ID from unchanged definition.
   assert.equal(a.getDraft('identity-test').ex[1].exerciseId,'unique-row-2');
   a.S.custom.pop();a.S.exerciseDefaults={};delete a.S.drafts['identity-test'];
+  // A draft saved while dumbbell bench shared the barbell id gets its own id back.
+  const priorPushB=a.S.drafts.pushB;assert.equal(priorPushB,undefined);
+  a.S.drafts.pushB={...a.getDraft('pushB')};a.S.drafts.pushB.ex=a.S.drafts.pushB.ex.map(e=>e.name==='Dumbbell bench press'?{...e,exerciseId:'catalog:bench-press'}:e);
+  assert.equal(a.getDraft('pushB').ex.find(e=>e.name==='Dumbbell bench press').exerciseId,'catalog:dumbbell-bench-press');
+  delete a.S.drafts.pushB;
+  // Custom workouts saved with the old shared id are re-derived when loaded.
+  const sharedIdBackup=a.buildAppData();sharedIdBackup.custom=[{id:'shared-id-day',name:'Shared id day',type:'push',unit:'kg',ex:[{n:'Dumbbell bench press',exerciseId:'catalog:bench-press',s:3,lo:8,hi:12,alt:[]},{n:'Custom press',exerciseId:'ex-custom-9',s:3,lo:8,hi:12,alt:[]}]}];
+  const sharedIdRestore=setup();await settle();sharedIdRestore.node('#importMode').value='replace';sharedIdRestore.node('#importText').value=JSON.stringify(sharedIdBackup);await sharedIdRestore.api.importJSON();
+  assert.deepEqual([...sharedIdRestore.api.getDay('shared-id-day').ex.map(e=>e.exerciseId)],['catalog:dumbbell-bench-press','ex-custom-9'],sharedIdRestore.node('#toast').textContent);
+  const sharedIdReload=setup({storage:sharedIdRestore.storage});await settle();
+  assert.equal(sharedIdReload.api.getDay('shared-id-day').ex[0].exerciseId,'catalog:dumbbell-bench-press');
   assert(a.viewLog().includes('data-sheet="exercise"'));
   assert(a.sheetMarkup({kind:'exercise',g:'',i:0}).includes('data-act="savedefault"'));
   assert.equal(a.hardSetCount([{exercises:[{sets:[{r:8,type:"working",completed:true},{r:10,type:"warmup",completed:true},{r:9,type:"drop",completed:true},{r:6}]}]}]),2);

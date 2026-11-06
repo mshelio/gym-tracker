@@ -1,3 +1,4 @@
+import { resolveExerciseIdentity } from "./exercise-catalog.js";
 // Pure, explainable double-progression: history is never modified.
 const eligible = s => s && s.type !== "warmup" && s.type !== "drop" && s.type !== "reverse-drop" && s.completed !== false && Number.isInteger(Number(s.r)) && Number(s.r)>0 && Number.isFinite(Number(s.w)) && Number(s.w)>=0;
 // Assisted exercises log the counterweight, so progress means removing weight.
@@ -6,8 +7,11 @@ export function recommendProgression({sessions=[],exerciseName,exerciseId,minimu
  if(!exerciseName || !Number.isInteger(minimum)||!Number.isInteger(maximum)||minimum<1||maximum<minimum||!Number.isFinite(increment)||increment<=0)return {kind:"unavailable",reason:"Valid exercise, rep range and load increment are required."};
  const convert=(n,from,to)=>from===to?n:to==="kg"?n*0.45359237:n/0.45359237;
  const history=sessions.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+ // Older records may carry a shared catalog ID, so compare resolved identities.
+ const target=resolveExerciseIdentity(exerciseName,exerciseId);
+ const same=e=>{const id=resolveExerciseIdentity(e.name,e.exerciseId);return target&&id?id===target:e.name===exerciseName;};
  for(const session of history){
-  const exercise=(session.exercises||[]).find(e=>exerciseId&&e.exerciseId?e.exerciseId===exerciseId:e.name===exerciseName);
+  const exercise=(session.exercises||[]).find(same);
   if(!exercise)continue;
   const sets=(exercise.sets||[]).filter(eligible);
   if(!sets.length)continue;
