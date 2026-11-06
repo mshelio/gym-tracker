@@ -234,15 +234,16 @@ function getDraft(dayId){
   let d=S.drafts[dayId];
   const day=getDay(dayId);
   const sig=day.ex.map(e=>e.n).join("|");
-  if(!d||typeof d!=="object"||Array.isArray(d)){
+  const existingDraft=!!d&&typeof d==="object"&&!Array.isArray(d);
+  if(!existingDraft){
     d={sig,date:today(),notes:"",extra:[],ex:[]};
     S.drafts[dayId]=d;
   }
   if(!Array.isArray(d.ex)||!d.ex.length){
-    if(d.ex!==undefined)d.recoveryWarning=true;
+    if(existingDraft)d.recoveryWarning=true;
     d.ex=day.ex.map(e=>({name:e.n,...(e.exerciseId?{exerciseId:e.exerciseId}:{}),sets:Array.from({length:e.s},()=>({w:"",r:""}))}));
   }
-  if(!Array.isArray(d.extra)){d.extra=[];d.recoveryWarning=true;}
+  if(!Array.isArray(d.extra)){d.extra=[];if(existingDraft)d.recoveryWarning=true;}
   // A draft is a snapshot of the workout the user started. A template can
   // change later, so keep the saved exercise order and set counts intact.
   if(d.sig!==sig||d.ex.length!==day.ex.length)d.recoveryWarning=true;
@@ -254,9 +255,16 @@ function getDraft(dayId){
     if(typeof entry.name!=="string"){entry.name=extra?"":"Saved exercise";d.recoveryWarning=true;}
     if(!Array.isArray(entry.sets)){entry.sets=[];d.recoveryWarning=true;}
     else{
-      const valid=entry.sets.filter(set=>set&&typeof set==="object"&&!Array.isArray(set));
-      if(valid.length!==entry.sets.length)d.recoveryWarning=true;
-      entry.sets=valid.map(set=>({...set,w:set.w??"",r:set.r??""}));
+      for(let i=0;i<entry.sets.length;i++){
+        const set=entry.sets[i];
+        if(!set||typeof set!=="object"||Array.isArray(set)){
+          entry.sets[i]={w:"",r:""};
+          d.recoveryWarning=true;
+        }else{
+          if(set.w==null)set.w="";
+          if(set.r==null)set.r="";
+        }
+      }
     }
     if(!entry.unit)entry.unit=extra?(S.defaultUnit||day.unit||DEFAULT_UNIT):unitFor(entry.name,day);
     if(entry.exerciseId)entry.exerciseId=resolveExerciseIdentity(entry.name,entry.exerciseId);
@@ -264,8 +272,8 @@ function getDraft(dayId){
     if(entry.restSeconds==null)entry.restSeconds=settingFor(entry,index,extra?"x":"",dayId)?.restSeconds;
     return entry;
   };
-  d.ex=d.ex.map((entry,index)=>normalizeExercise(entry,index));
-  d.extra=d.extra.map((entry,index)=>normalizeExercise(entry,index,true));
+  for(let i=0;i<d.ex.length;i++)d.ex[i]=normalizeExercise(d.ex[i],i);
+  for(let i=0;i<d.extra.length;i++)d.extra[i]=normalizeExercise(d.extra[i],i,true);
   if(!d.workoutTimer){
     // Legacy drafts started timing merely by being opened. Freeze those clocks.
     d.workoutTimer=Number.isFinite(d.startedAt)&&draftHasData(d)
