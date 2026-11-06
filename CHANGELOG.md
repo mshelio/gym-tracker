@@ -10,10 +10,16 @@
 - Added optional v4 `preferences.defaultUnit` while preserving older backup imports.
 
 ### Fixed
+- Only sets ticked ✓ are saved. Editing a ticked set's weight or reps keeps it ticked. If some sets have reps but no tick, the review before saving says how many and offers an **Include them** checkbox (off by default); if nothing is ticked, the review includes them so the workout can still be saved.
+- **Copy last sets** no longer overwrites anything: it fills only empty, unticked sets, adds rows only when last time had more sets, and keeps warm-ups as warm-ups.
+- Weights typed with a decimal comma, such as "72,5", are saved as 72.5. Weights that are not numbers, such as "7a", are rejected instead of being read as 7.
+- Exporting a backup is never blocked by an in-progress workout. An invalid draft date, RIR or completion time is repaired or dropped in the export, and a draft that still can't be validated is left out with a note ("1 in-progress workout couldn't be included"). The recovery export benefits too.
 - Separate lifts no longer share an exercise ID. Dumbbell bench, machine chest press, straight-arm and close-grip pulldowns, seated leg curl and the other variants that were catalog aliases now have their own IDs, so their history and load suggestions stay apart. Only true synonyms (such as "Bench press" or "Neutral-grip pulldown") remain aliases. Older sessions, drafts and custom workouts that stored a shared ID are re-read by name; no data is migrated.
 - Saved exercise defaults are not migrated: a default saved under a shared ID stays with the main lift, and a newly separated lift falls back to its name-keyed default, then to the global default.
+- Regression and browser CI now run what they claim: all six Node suites and a syntax check of every module, tag-based WebKit/Firefox subsets that cover the redesigned session, and a guard that fails when a tag selects too few tests. The Node harness also passes on Windows checkouts, and `node_modules/` is no longer tracked.
 
 ### Added
+- The app asks the browser to keep its storage, at startup and after the first saved workout. Settings and Data & Backups show whether the log is protected from automatic clearing; when it isn't, the backup reminder appears after 14 days instead of 30. No new stored fields.
 - Interactive detailed front/back anatomical SVG muscle maps and relative heatmaps, selectable with mouse, touch or keyboard (#81, PRs #83–#90).
 - Exercise-specific primary/secondary anatomical previews, selected-muscle contributing-exercise drilldowns, and exact muscle-value table fallback; unknown exercises remain explicitly unclassified.
 - Anatomical path geometry adapted from `vulovix/body-muscles` under Apache-2.0 with bundled license and attribution.
