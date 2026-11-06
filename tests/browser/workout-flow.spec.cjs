@@ -4,7 +4,7 @@ const elapsed=page=>page.locator('[data-timer="workout"]');
 const rest=page=>page.locator('[data-timer="rest"]');
 const sessionOptions=async page=>{await page.getByRole('button',{name:'Session options',exact:true}).click();return page.getByRole('dialog');};
 
-test('browsing does not start a timer; explicit pause, resume, stop and reset survive reload',async({page})=>{
+test('browsing does not start a timer; explicit pause, resume, stop and reset survive reload', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
  // Only control wall time: workout clocks use Date.now(), while real browser
  // timers keep reload/service-worker lifecycle independent of fake animation frames.
  let now=Date.now();await page.clock.setFixedTime(now);
@@ -29,7 +29,7 @@ test('browsing does not start a timer; explicit pause, resume, stop and reset su
  await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('8');
 });
 
-test('rest runs in the session bar and a minimized workout resumes from every tab',async({page})=>{
+test('rest runs in the session bar and a minimized workout resumes from every tab', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.clock.install();await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
  await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();
@@ -50,7 +50,7 @@ test('rest runs in the session bar and a minimized workout resumes from every ta
  await expect(dialog).toHaveCount(0);await expect(page.locator('.rest-bar')).toHaveCount(0);
 });
 
-test('a single workout can run at a time and finishing clears its timer after review',async({page})=>{
+test('a single workout can run at a time and finishing clears its timer after review', { tag: ['@mobile-webkit','@cross-engine'] },async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);
  await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');
  await startTemplate(page,'Push A');
@@ -70,7 +70,7 @@ test('a single workout can run at a time and finishing clears its timer after re
  expect(data.drafts.pullA.ex[0].sets[0].r).toBe('8');expect(data.drafts.pullA.workoutTimer.state).toBe('paused');expect(data.drafts.pushA.workoutTimer.state).toBe('running');expect(Object.values(data.drafts).filter(d=>d.workoutTimer?.state==='running')).toHaveLength(1);
 });
 
-test('legacy auto-started drafts reopen paused and their backup retains the new clock state',async({page})=>{
+test('legacy auto-started drafts reopen paused and their backup retains the new clock state', { tag: ['@mobile-webkit'] },async({page})=>{
  // Use a complete old-format draft matching the default program.
  const program=await (await page.request.get('/gym-tracker/ppl-default-workouts.json')).json();
  await page.addInitScript(program=>localStorage.setItem('ppl-tracker-v1',JSON.stringify({sessions:[],body:[],custom:[],preferences:{},schedules:[],drafts:{pullA:{sig:program.workouts[0].exercises.map(e=>e.name).join('|'),date:'2026-10-14',notes:'Legacy',startedAt:Date.now()-90000,ex:program.workouts[0].exercises.map((e,i)=>({name:e.name,unit:'lb',sets:[{w:i?'':'50',r:i?'':'8'}]})),extra:[]}}})),program);
@@ -78,7 +78,7 @@ test('legacy auto-started drafts reopen paused and their backup retains the new 
  await openNested(page,'data');await page.locator('[data-act="export"]').click();const backup=JSON.parse(await page.locator('#exportOut').inputValue());expect(backup.drafts.pullA.workoutTimer.state).toBe('paused');
 });
 
-test('setup stays optional and schedule management belongs to Plan',async({page})=>{
+test('setup stays optional and schedule management belongs to Plan', { tag: ['@mobile-webkit'] },async({page})=>{
  await page.goto('/gym-tracker/');await expect(page.locator('nav.tabs button')).toHaveText(['Today','Plan','Progress']);
  await expect(page.locator('.plan-overview')).toHaveCount(0);await expect(page.locator('.focused-exercise')).toHaveCount(0);
  await page.locator('nav.tabs [data-tab="plan"]').click();await page.getByRole('button',{name:/Manage schedules/}).first().click();
@@ -89,7 +89,7 @@ test('setup stays optional and schedule management belongs to Plan',async({page}
  await page.getByRole('button',{name:'Start this workout'}).click();await expect(page.locator('.page-intro h1')).toHaveText('My pull');
 });
 
-test('swapping from Today lists every workout without starting a draft',async({page})=>{
+test('swapping from Today lists every workout without starting a draft', { tag: ['@mobile-webkit'] },async({page})=>{
  await page.goto('/gym-tracker/');await page.getByRole('button',{name:'Choose a workout',exact:true}).click();
  const sheet=page.getByRole('dialog');await expect(sheet.locator('.pick-list li')).toHaveCount(6);await expect(page.locator('.resume-bar,.session-toolbar')).toHaveCount(0);
  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:'Choose a workout',exact:true})).toBeFocused();
@@ -99,7 +99,7 @@ test('swapping from Today lists every workout without starting a draft',async({p
  await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('8');await page.getByRole('button',{name:'Barbell row set 1 mark complete',exact:true}).click();await expect(rest(page)).toHaveText('02:00');
 });
 
-test('a minimized workout resumes from Progress and abandoned reviews cannot be saved',async({page})=>{
+test('a minimized workout resumes from Progress and abandoned reviews cannot be saved', { tag: ['@mobile-webkit'] },async({page})=>{
  await page.goto('/gym-tracker/');await enterSession(page);await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('9');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();await page.locator('nav.tabs [data-tab=progress]').click();
  await page.locator('.resume-bar').click();await page.getByRole('button',{name:'Finish workout',exact:true}).click();await expect(page.locator('.session-review')).toContainText('Pull A');
@@ -107,7 +107,7 @@ test('a minimized workout resumes from Progress and abandoned reviews cannot be 
  await page.goForward();await expect(page.getByRole('button',{name:'Save session',exact:true})).toHaveCount(0);await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
 });
 
-test('editing a template with an active session protects its draft by making a copy',async({page})=>{
+test('editing a template with an active session protects its draft by making a copy', { tag: ['@mobile-webkit'] },async({page})=>{
  await page.goto('/gym-tracker/');await library(page);await page.locator('.template-card').filter({hasText:'Pull A'}).click();await page.getByRole('button',{name:'Customize a copy'}).click();await page.locator('[data-ed=name]').fill('My session');await page.getByRole('button',{name:'Save workout',exact:true}).click();await page.getByRole('button',{name:'Start this workout'}).click();await page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true}).fill('9');await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
  await library(page);await page.locator('.template-card').filter({has:page.getByText('My session',{exact:true})}).click();await page.getByRole('button',{name:'Edit template',exact:true}).click();await expect(page.locator('[data-ed=name]')).toHaveValue('My session copy');await page.getByLabel('Exercise 1 name').fill('Different exercise');await page.getByRole('button',{name:'Save workout',exact:true}).click();await enterSession(page);await expect(page.getByRole('spinbutton',{name:'Barbell row set 1 reps',exact:true})).toHaveValue('9');
 });

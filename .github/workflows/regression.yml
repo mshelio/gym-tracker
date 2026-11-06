@@ -1,7 +1,7 @@
 name: Regression tests
 on:
   push:
-    branches: [main, refactor/gt-01-extract-modules]
+    branches: [main]
   pull_request:
 jobs:
   unit:
@@ -11,13 +11,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Syntax check
-        run: node --check tests/schedules.test.cjs
+      - name: Syntax check app modules
+        run: for f in js/*.js tests/*.cjs; do node --check "$f" || exit 1; done
       - name: Verify deployed service worker revision
         run: node tests/version-sw.cjs --check
       - name: Test release revision upgrade
         run: node tests/version-sw.test.cjs
-      - name: Regression suite
-        run: node tests/schedules.test.cjs
+      - name: Regression suites
+        run: npm run test:regression
       - name: Release readiness consistency
         run: node tests/release-readiness.cjs

@@ -20,13 +20,20 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps ${{ contains(matrix.project, 'webkit') && 'webkit' || contains(matrix.project, 'firefox') && 'firefox' || 'chromium' }}
       - run: node tests/version-sw.cjs --check
-      - run: npm run test:regression
+      # Subsets are chosen by test tags, not titles, so renaming a test cannot silently drop coverage.
+      - name: Check tagged subset size
+        if: ${{ contains(matrix.project, 'webkit') || matrix.project == 'firefox' }}
+        run: |
+          if [ "${{ matrix.project }}" = "mobile-webkit" ]; then tag='@mobile-webkit'; min=16; else tag='@cross-engine'; min=7; fi
+          count=$(npx playwright test --list --project=${{ matrix.project }} --grep "$tag" | grep -oE 'Total: [0-9]+' | grep -oE '[0-9]+')
+          echo "$tag selects ${count:-0} tests (minimum $min)"
+          [ "${count:-0}" -ge "$min" ]
       - name: Browser tests (${{ matrix.project }})
         run: |
           if [ "${{ matrix.project }}" = "mobile-webkit" ]; then
-            npm run test:browser -- --project=mobile-webkit --grep 'mobile viewport, touch navigation|mobile session completion|training dashboard action and three-tab navigation|nested history and backups|mobile rest countdown|rest timer dialog traps keyboard focus|workout save validation announces|keyboard skip link bypasses navigation|browsing does not start|floating timer stays|single workout|legacy auto-started|setup stays optional|finish from the floating|editing a template|choosing another workout' --timeout=20000 --workers=1 --retries=1 --reporter=line
+            npm run test:browser -- --project=mobile-webkit --grep '@mobile-webkit' --timeout=20000 --workers=1 --retries=1 --reporter=line
           elif [ "${{ matrix.project }}" = "firefox" ] || [ "${{ matrix.project }}" = "webkit" ]; then
-            npm run test:browser -- --project=${{ matrix.project }} --grep 'System, Light and Dark appearance|floating mobile navigation|reduced motion preserves|200-percent-equivalent desktop viewport|browsing does not start|floating timer stays' --workers=1 --retries=1 --reporter=line
+            npm run test:browser -- --project=${{ matrix.project }} --grep '@cross-engine' --workers=1 --retries=1 --reporter=line
           else
             npm run test:browser -- --project=${{ matrix.project }} --reporter=line
           fi
