@@ -116,9 +116,11 @@ async function initStore(){
   S.mode = "local";
   const l = await initialize(); loadDrafts(l); S.sessions = sortSessions(l.sessions); S.calendarEvents=validateCalendarEvents(l.calendarEvents||[]); S.body = sortBody(l.body); S.custom = withCurrentIds(l.custom.filter(c => !BASE_DAY[c.id])); S.ready = true;
   S.defaultUnit=l.preferences.defaultUnit;S.schedules=l.schedules;S.activeScheduleId=l.preferences.activeScheduleId;ensureSchedules();S.bodyUnit=l.preferences.bodyUnit=== "lb" ? "lb":"kg";S.progressEx=l.preferences.progressExercise || null;S.exerciseDefaults=l.preferences.exerciseDefaults||{};S.progressionEnabled=l.preferences.progressionEnabled!==false;S.globalRestSeconds=Number.isInteger(l.preferences.globalRestSeconds)&&l.preferences.globalRestSeconds>=15&&l.preferences.globalRestSeconds<=600?l.preferences.globalRestSeconds:90;setStatus(getMode()==="idb" ? "Saved to IndexedDB" : "Saved on this device"); S.dayId = getDay(l.preferences.selectedWorkoutId)?.id || nextDayId();
+  const draftsBefore=JSON.stringify(S.drafts);
   const migratedClocks=Object.keys(S.drafts).filter(id=>getDay(id)&&!S.drafts[id].workoutTimer);
   Object.keys(S.drafts).filter(id=>getDay(id)).forEach(id=>getDraft(id));
-  if(migratedClocks.length&&!await writeLocal())setSaveStatus("error");
+  const draftsChanged=JSON.stringify(S.drafts)!==draftsBefore;
+  if((migratedClocks.length||draftsChanged)&&!await writeLocal())setSaveStatus("error");
   render();
   requestPersistentStorage();
 }
@@ -229,15 +231,41 @@ async function scheduleAction(b){
 }
 
 function getDraft(dayId){
-  let d = S.drafts[dayId];
-  const day = getDay(dayId);
-  const sig = day.ex.map(e => e.n).join("|");
-  if (!d || !Array.isArray(d.ex)) {
-    d = { sig, date: today(), notes:"", extra:[], ex: day.ex.map(e => ({ name:e.n, ...(e.exerciseId ? {exerciseId:e.exerciseId} : {}), sets: Array.from({length:e.s}, () => ({w:"",r:""})) })) };
-    S.drafts[dayId] = d;
+  let d=S.drafts[dayId];
+  const day=getDay(dayId);
+  const sig=day.ex.map(e=>e.n).join("|");
+  if(!d||typeof d!=="object"||Array.isArray(d)){
+    d={sig,date:today(),notes:"",extra:[],ex:[]};
+    S.drafts[dayId]=d;
   }
-  if (!Array.isArray(d.extra)) d.extra = [];
-  if(d.sig!==sig || d.ex.length!==day.ex.length)d.recoveryWarning=true;
+  if(!Array.isArray(d.ex)||!d.ex.length){
+    if(d.ex!==undefined)d.recoveryWarning=true;
+    d.ex=day.ex.map(e=>({name:e.n,...(e.exerciseId?{exerciseId:e.exerciseId}:{}),sets:Array.from({length:e.s},()=>({w:"",r:""}))}));
+  }
+  if(!Array.isArray(d.extra)){d.extra=[];d.recoveryWarning=true;}
+  // A draft is a snapshot of the workout the user started. A template can
+  // change later, so keep the saved exercise order and set counts intact.
+  if(d.sig!==sig||d.ex.length!==day.ex.length)d.recoveryWarning=true;
+  const normalizeExercise=(entry,index,extra=false)=>{
+    if(!entry||typeof entry!=="object"||Array.isArray(entry)){
+      d.recoveryWarning=true;
+      return {name:extra?"":"Saved exercise",unit:S.defaultUnit||day.unit||DEFAULT_UNIT,sets:[]};
+    }
+    if(typeof entry.name!=="string"){entry.name=extra?"":"Saved exercise";d.recoveryWarning=true;}
+    if(!Array.isArray(entry.sets)){entry.sets=[];d.recoveryWarning=true;}
+    else{
+      const valid=entry.sets.filter(set=>set&&typeof set==="object"&&!Array.isArray(set));
+      if(valid.length!==entry.sets.length)d.recoveryWarning=true;
+      entry.sets=valid.map(set=>({...set,w:set.w??"",r:set.r??""}));
+    }
+    if(!entry.unit)entry.unit=extra?(S.defaultUnit||day.unit||DEFAULT_UNIT):unitFor(entry.name,day);
+    if(entry.exerciseId)entry.exerciseId=resolveExerciseIdentity(entry.name,entry.exerciseId);
+    else if(entry.name)entry.exerciseId=resolveExerciseIdentity(entry.name)||undefined;
+    if(entry.restSeconds==null)entry.restSeconds=settingFor(entry,index,extra?"x":"",dayId)?.restSeconds;
+    return entry;
+  };
+  d.ex=d.ex.map((entry,index)=>normalizeExercise(entry,index));
+  d.extra=d.extra.map((entry,index)=>normalizeExercise(entry,index,true));
   if(!d.workoutTimer){
     // Legacy drafts started timing merely by being opened. Freeze those clocks.
     d.workoutTimer=Number.isFinite(d.startedAt)&&draftHasData(d)
@@ -245,8 +273,6 @@ function getDraft(dayId){
       : timerTools.idleWorkout();
   }
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=S.globalRestSeconds||90;
-  d.ex.forEach((e,i) => { const definition=day.ex[i]; if(!e.exerciseId && definition?.exerciseId && e.name===definition.n)e.exerciseId=definition.exerciseId; if(e.exerciseId)e.exerciseId=resolveExerciseIdentity(e.name,e.exerciseId); if (!e.unit) e.unit = unitFor(e.name, day); if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"",dayId)?.restSeconds; });
-  d.extra.forEach((e,i) => { if (!e.unit) e.unit = S.defaultUnit || day.unit || DEFAULT_UNIT; if(e.restSeconds==null)e.restSeconds=settingFor(e,i,"x",dayId)?.restSeconds; });
   return d;
 }
 function lastFor(name){
@@ -466,11 +492,13 @@ function render(){
   const app = $("#app");
   if (!S.ready) { app.innerHTML = `<div class="empty">Loading your log…</div>`; return; }
   const modal=!!(sheet||restOverlayOpen),root=document.documentElement;
-  if(root){root.dataset.view=S.tab;if(modal)root.dataset.modal="true";else delete root.dataset.modal;}
-  document.querySelector("header.top")?.toggleAttribute?.("inert",modal);
   const intro=["log","review","summary"].includes(S.tab)?"":`<div class="page-intro"><div>${S.tab==="home"?`<p class="eyebrow">${esc(new Date().toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}))}</p>`:""}<h1>${esc(TITLES[S.tab]||"Today")}</h1></div></div>`;
   const restDraft=restOverlayOpen?timerContext().draft:null;
+  // Build the complete view before applying full-screen navigation styles. If
+  // a render fails, the previous screen and its navigation remain available.
   app.innerHTML=`<div class="view view-${S.tab}"${modal?' inert aria-hidden="true"':''}>${intro}${viewFor(S.tab)}${resumeBar()}</div>${sheetMarkup()}${restDraft?restOverlayMarkup(restDraft):""}`;
+  if(root){root.dataset.view=S.tab;if(modal)root.dataset.modal="true";else delete root.dataset.modal;}
+  document.querySelector("header.top")?.toggleAttribute?.("inert",modal);
   updateSessionMeter();
   applyExerciseFilter();
   if (key) { const el = app.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) { el.focus({preventScroll:true}); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -681,7 +709,10 @@ function sessionSheet(){
 }
 function exerciseSheet(g,i){
  const d=getDraft(S.dayId),e=(g==="x"?d.extra:d.ex)[i];if(!e)return "";
- const definition=g==="x"?null:getDay(S.dayId).ex[i],options=definition?.alt?.length?[definition.n,...definition.alt]:null;
+ const definition=g==="x"?null:getDay(S.dayId)?.ex.find(def=>{
+    const savedId=resolveExerciseIdentity(e.name,e.exerciseId),currentId=resolveExerciseIdentity(def.n,def.exerciseId);
+    return (savedId&&currentId===savedId)||e.name===def.n||(def.alt||[]).includes(e.name);
+  }),options=definition?.alt?.length?[definition.n,...definition.alt]:null;
  return `${sheetHead("Exercise options",esc(e.name||"Extra exercise"))}
  ${options?`<label class="field-label exercise-substitution">Swap exercise<select aria-label="Exercise or alternative" data-act="variant" data-i="${i}">${options.map(o=>`<option ${o===e.name?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`:""}
  <div class="sheet-group"><p class="eyebrow">Weight unit</p>${unitSeg(g,i,e.unit)}</div>
@@ -712,24 +743,25 @@ function sheetMarkup(s=sheet){
  return `<div class="sheet-layer" data-sheet-layer><button type="button" class="sheet-backdrop" data-act="closesheet" tabindex="-1" aria-label="Close"></button><section class="sheet sheet-${esc(s.kind)}" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><span class="sheet-grabber" aria-hidden="true"></span>${body}</section></div>`;
 }
 
-function exerciseCard(d,day,i,isOpen){
- const e=day?day.ex[i]:null,de=e?d.ex[i]:d.extra[i],g=e?"":"x",id=(e?"base-":"extra-")+i;
- const name=de.name||"",lb=lastBlock(name.trim(),e,de.unit),done=de.sets.filter(z=>z.completed===true).length,allDone=done===de.sets.length;
- const superset=e&&(de.supersetNext||d.ex[i-1]?.supersetNext)?" · Superset":"";
- const muscles=name.trim()?muscleSummary(name):"";
- const next=e&&i<day.ex.length-1?d.ex[i+1]:null;
- return `<details class="ex active-exercise focused-exercise ${allDone?"is-done":""}" data-exercise-id="${id}" ${isOpen?"open":""} data-exercise-search-item="${esc([name,...(e?[e.n,...(e.alt||[])]:[])].join(" "))}">
-  <summary class="focused-exercise-summary">${exerciseThumbnail(name)}<span class="focused-exercise-summary-title">${esc(name||"Extra exercise")}<small>${done}/${de.sets.length} sets${e?` · ${e.lo}–${e.hi} reps`:""}${superset}</small></span>${allDone?`<span class="done-badge" role="img" aria-label="All sets done">${icon('check')}</span>`:`<span class="set-count" aria-hidden="true">${done}/${de.sets.length}</span>`}</summary>
-  <div class="focused-exercise-body">
-   <div class="exercise-head">${e?`<p class="target">Target <b>${e.s} × ${e.lo}–${e.hi}</b>${muscles?` · ${esc(muscles)}`:""}</p>`:`<input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(name)}">`}<button type="button" class="icon-btn" data-act="opensheet" data-sheet="exercise" data-g="${g}" data-i="${i}" aria-label="Exercise options for ${esc(name||"extra exercise")}">${icon('more')}</button></div>
-   ${name.trim()?lb.html+progressionHint(de,e,g,i):""}
-   <div class="colhead workout-set-heading" aria-hidden="true"><span>Set</span><span>${esc(de.unit)}</span><span>Reps</span><span>Done</span><span></span></div>
-   <div class="sets">${setRows(i, g, name||"Extra exercise", de.sets, lb.last, e?.lo, e?.hi, de.unit)}</div>
-   <div class="row-actions two"><button class="btn small" data-act="addset" ${g?'data-g="x" ':''}data-i="${i}">${icon('plus')} Add set</button><button class="btn small" data-act="copyforward" ${g?'data-g="x" ':''}data-i="${i}">Copy last sets</button></div>
-   ${next?`<button class="btn ghost next-exercise" data-act="nextexercise" data-i="${i+1}"><span><span class="muted">Next ·</span> ${esc(next.name)}</span>${icon('arrow')}</button>`:""}
-   ${name.trim()?`<div class="exercise-media">${exercisePhotoDetail(name,true)}</div>`:""}
-  </div></details>`;
+function exerciseCard(d,e,i,isOpen,group="base"){
+  const isExtra=group==="extra",de=isExtra?d.extra[i]:d.ex[i],g=isExtra?"x":"",id=(isExtra?"extra-":"base-")+i;
+  const name=de.name||"",lb=lastBlock(name.trim(),e,de.unit),done=de.sets.filter(z=>z.completed===true).length,allDone=done===de.sets.length;
+  const superset=!isExtra&&(de.supersetNext||d.ex[i-1]?.supersetNext)?" · Superset":"";
+  const muscles=name.trim()?muscleSummary(name):"";
+  const next=!isExtra&&i<d.ex.length-1?d.ex[i+1]:null;
+  return `<details class="ex active-exercise focused-exercise ${allDone?"is-done":""}" data-exercise-id="${id}" ${isOpen?"open":""} data-exercise-search-item="${esc([name,...(e?[e.n,...(e.alt||[])]:[])].join(" "))}">
+   <summary class="focused-exercise-summary">${exerciseThumbnail(name)}<span class="focused-exercise-summary-title">${esc(name||"Extra exercise")}<small>${done}/${de.sets.length} sets${e?` · ${e.lo}–${e.hi} reps`:""}${superset}</small></span>${allDone?`<span class="done-badge" role="img" aria-label="All sets done">${icon('check')}</span>`:`<span class="set-count" aria-hidden="true">${done}/${de.sets.length}</span>`}</summary>
+   <div class="focused-exercise-body">
+    <div class="exercise-head">${e?`<p class="target">Target <b>${e.s} × ${e.lo}–${e.hi}</b>${muscles?` · ${esc(muscles)}`:""}</p>`:isExtra?`<input type="text" class="ex-name" list="exercise-name-suggestions" aria-label="Extra exercise name" placeholder="Exercise name" data-f="xname" data-i="${i}" data-key="xname-${i}" value="${esc(name)}">`:`<p class="target">Saved exercise · not in the current template</p>`}<button type="button" class="icon-btn" data-act="opensheet" data-sheet="exercise" data-g="${g}" data-i="${i}" aria-label="Exercise options for ${esc(name||"extra exercise")}">${icon('more')}</button></div>
+    ${name.trim()?lb.html+progressionHint(de,e,g,i):""}
+    <div class="colhead workout-set-heading" aria-hidden="true"><span>Set</span><span>${esc(de.unit)}</span><span>Reps</span><span>Done</span><span></span></div>
+    <div class="sets">${setRows(i, g, name||"Extra exercise", de.sets, lb.last, e?.lo, e?.hi, de.unit)}</div>
+    <div class="row-actions two"><button class="btn small" data-act="addset" ${g?'data-g="x" ':''}data-i="${i}">${icon('plus')} Add set</button><button class="btn small" data-act="copyforward" ${g?'data-g="x" ':''}data-i="${i}">Copy last sets</button></div>
+    ${next?`<button class="btn ghost next-exercise" data-act="nextexercise" data-i="${i+1}"><span><span class="muted">Next ·</span> ${esc(next.name)}</span>${icon('arrow')}</button>`:""}
+    ${name.trim()?`<div class="exercise-media">${exercisePhotoDetail(name,true)}</div>`:""}
+   </div></details>`;
 }
+
 function viewLog(){
   if (S.editing) return viewEditor();
   const day = getDay(S.dayId) || getDay(nextDayId());
@@ -739,14 +771,22 @@ function viewLog(){
   const isOpen=(id,i)=>workoutExpanded.size?workoutExpanded.has(id):id==="base-"+firstOpen;
   const startAction=clock.state==="running"?"clockpause":"clockstart";
   const clockLabel=clock.state==="running"?"Pause workout":clock.state==="paused"?"Resume workout":clock.state==="stopped"?"Restart workout timer":"Start workout timer";
-  const cards=day.ex.map((e,i)=>exerciseCard(d,day,i,isOpen("base-"+i,i))).join("")+d.extra.map((x,i)=>exerciseCard(d,null,i,workoutExpanded.has("extra-"+i))).join("");
-  const position=Math.min(day.ex.length+d.extra.length,firstOpen+1);
+  const definitionFor=de=>{
+    const savedId=resolveExerciseIdentity(de.name,de.exerciseId);
+    return day.ex.find(def=>{
+      const currentId=resolveExerciseIdentity(def.n,def.exerciseId);
+      return (savedId&&currentId===savedId)||de.name===def.n||(def.alt||[]).includes(de.name);
+    })||null;
+  };
+  const cards=d.ex.map((de,i)=>exerciseCard(d,definitionFor(de),i,isOpen("base-"+i,i))).join("")+d.extra.map((x,i)=>exerciseCard(d,null,i,workoutExpanded.has("extra-"+i),"extra")).join("");
+  const totalExercises=d.ex.length+d.extra.length;
+  const position=Math.min(totalExercises,firstOpen+1);
   return `<header class="session-bar session-toolbar" aria-label="Session controls">
     <button type="button" class="icon-btn" data-act="minimize" aria-label="Minimize workout">${icon('down')}</button>
     <div class="page-intro session-title"><h1>${esc(day.name)}</h1><button type="button" class="session-clock state-${clock.state}" data-act="${startAction}" aria-label="${clockLabel}"><span class="clock-dot" aria-hidden="true"></span><strong data-timer="workout">${timerLabel(timerTools.workoutElapsed(clock))}</strong><span class="sr-only" data-clock-state>${clockState(clock)}</span></button></div>
     <button type="button" class="icon-btn" data-act="opensheet" data-sheet="session" aria-label="Session options">${icon('more')}</button>
     <button type="button" class="btn primary finish-btn" data-act="reviewworkout" aria-label="Finish workout">Finish</button>
-    <div class="session-progress"><div><span>Exercise ${position} of ${day.ex.length+d.extra.length}</span><span><b id="loggedSets">${done}</b> / ${total} sets done</span></div><progress aria-label="Completed sets" max="${total||1}" value="${done}" data-session-meter></progress></div>
+    <div class="session-progress"><div><span>Exercise ${position} of ${totalExercises}</span><span><b id="loggedSets">${done}</b> / ${total} sets done</span></div><progress aria-label="Completed sets" max="${total||1}" value="${done}" data-session-meter></progress></div>
   </header>
   <p id="session-validation" class="notice warn" role="alert" hidden></p>
   <div class="workout-layout" id="workout-editor" tabindex="-1">
