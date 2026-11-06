@@ -120,6 +120,7 @@ async function initStore(){
   Object.keys(S.drafts).filter(id=>getDay(id)).forEach(id=>getDraft(id));
   if(migratedClocks.length&&!await writeLocal())setSaveStatus("error");
   render();
+  requestPersistentStorage();
 }
 async function persist(field, value){
   const previous = S[field]; S[field] = value;
@@ -293,19 +294,37 @@ function activityOverview(){
  const total=[...counts.values()].reduce((a,b)=>a+b,0);
  return `<section class="section activity-overview"><div class="section-heading"><h2>Consistency</h2><span class="muted">${total} sessions · last 12 weeks</span></div><div class="activity-grid" role="img" aria-label="${total} sessions across ${counts.size} training days in the last 12 weeks">${Array.from({length:84},(_,i)=>{const date=dateOffset(start,i),count=counts.get(date)||0;return `<span class="activity-cell ${count?'trained':''}" title="${date}: ${count} sessions" aria-hidden="true"></span>`;}).join("")}</div><div class="axis-row"><span>${esc(fmtDate(start))}</span><span>Today</span></div></section>`;
 }
+// Whether the browser promised not to clear this site's data: true, false, or null when it has no Storage API or hasn't answered yet.
+let storagePersisted=null,persistAskedAfterSave=false;
+function requestPersistentStorage(){
+ let storage;
+ try{storage=globalThis.navigator?.storage;}catch{return;}
+ if(!storage||typeof storage.persist!=="function")return;
+ (async()=>{
+  try{
+   let kept=typeof storage.persisted==="function"?await storage.persisted():false;
+   if(kept!==true)kept=await storage.persist();
+   kept=kept===true;
+   if(kept!==storagePersisted){storagePersisted=kept;if(S.ready&&["home","more","data"].includes(S.tab))render();}
+  }catch{}
+ })();
+}
 function backupInfo(){
  let exported=0,snoozed=0;
  try{exported=Number(localStorage.getItem("gt-last-export"))||0;snoozed=Number(localStorage.getItem("gt-backup-snooze"))||0;}catch{}
  const now=Date.now();if(exported<0||exported>now||!Number.isFinite(exported))exported=0;
- return {exported,due:(S.sessions.length+S.body.length+S.custom.length>0)&&now>=snoozed&&(!exported||now-exported>=30*86400000)};
+ // Storage the browser may clear on its own gets a shorter reminder.
+ const days=storagePersisted===false?14:30;
+ return {exported,days,due:(S.sessions.length+S.body.length+S.custom.length>0)&&now>=snoozed&&(!exported||now-exported>=days*86400000)};
 }
 function backupStatus(){
  const {exported}=backupInfo();
- return `<p class="muted backup-export-status">${exported?'Last export started: '+esc(new Date(exported).toLocaleString()):'No export recorded on this device.'} Check that the downloaded file is saved somewhere safe.</p>`;
+ const storageLine=storagePersisted===true?'Storage: protected from automatic clearing.':storagePersisted===false?'Your browser may clear this data. Export backups regularly.':'';
+ return `<p class="muted backup-export-status">${exported?'Last export started: '+esc(new Date(exported).toLocaleString()):'No export recorded on this device.'} Check that the downloaded file is saved somewhere safe.</p>${storageLine?`<p class="muted storage-status">${storageLine}</p>`:''}`;
 }
 function backupReminder(){
- if(!backupInfo().due)return "";
- return `<aside class="backup-reminder" aria-label="Backup reminder">${icon('download')}<div><h2>Keep a copy of your training</h2><p class="muted">${backupInfo().exported?'It has been at least 30 days since your last export.':'Your log lives only on this device and has never been exported.'}</p></div><div class="row-actions"><button class="btn small" data-destination="data">Back up my data</button><button class="btn small ghost" data-act="snoozebackup">Remind me in a week</button></div></aside>`;
+ const info=backupInfo();if(!info.due)return "";
+ return `<aside class="backup-reminder" aria-label="Backup reminder">${icon('download')}<div><h2>Keep a copy of your training</h2><p class="muted">${info.exported?`It has been at least ${info.days} days since your last export.`:'Your log lives only on this device and has never been exported.'}</p></div><div class="row-actions"><button class="btn small" data-destination="data">Back up my data</button><button class="btn small ghost" data-act="snoozebackup">Remind me in a week</button></div></aside>`;
 }
 function weekOverview(week,count){
  return `<section class="section week-overview" aria-label="Weekly training overview"><div class="week-heading"><button class="icon-btn" data-act="homeweek" data-delta="-1" aria-label="Previous week">${icon('back')}</button><div><h2>${homeWeekOffset===0?'This week':esc(fmtDate(week[0].date))+' – '+esc(fmtDate(week[6].date))}</h2>${homeWeekOffset===0?`<p class="muted"><b>${count}</b> session${count===1?'':'s'} · Mon–Sun</p>`:'<button class="week-reset" data-act="homeweekreset">Back to this week</button>'}</div><button class="icon-btn" data-act="homeweek" data-delta="1" aria-label="Next week">${icon('next')}</button></div>
@@ -1393,6 +1412,8 @@ async function saveSession(btn,{reviewOnly=false,includeUnticked}={}){
     savedSummaryMeta={elapsed,records:newRecords(before,s),next:activeSchedule()?{schedule:activeSchedule().name,label:nextScheduleLabel()}:null};
     savedSummary=s;sessionReview=null;timerWorkoutId=null;navigateView("summary");
     toast("Session saved");
+    // Browsers are likelier to grant persistence once the site holds real data, so ask again after the first save.
+    if(!persistAskedAfterSave&&storagePersisted!==true){persistAskedAfterSave=true;requestPersistentStorage();}
   } catch { btn.disabled = false; btn.textContent = "Save session"; toast("Couldn't save. Browser storage is full or unavailable. Download a backup."); } finally { sessionSavePending=false; }
 }
 
