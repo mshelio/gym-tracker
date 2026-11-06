@@ -360,6 +360,32 @@ async function settle(){for(let i=0;i<10;i++) await Promise.resolve()}
   tk.S.tab='log';tk.S.dayId='pullA';tickDraft=tk.getDraft('pullA');tickDraft.ex[0].sets[0]={w:'40',r:'5'};
   await tk.saveSession(null,{reviewOnly:true});reviewHtml=ticks.node('#app').innerHTML;
   assert.equal(tk.S.tab,'review','with nothing ticked the review still opens');assert(reviewHtml.includes('Nothing is ticked'));assert(/checked/.test(reviewHtml.match(includeBox)[0]));
+  // A half-typed workout never blocks a backup: a cleared date, a fractional RIR and a bad tick time are repaired in the export.
+  const exp=setup();await settle();const ex=exp.api,inputTarget=(dataset,value)=>({target:{dataset,value,matches:()=>false,hasAttribute:()=>false}});
+  ex.S.tab='log';ex.S.dayId='pullA';const expDraft=ex.getDraft('pullA');const keptDate=expDraft.date;expDraft.ex[0].sets[0]={w:'60',r:'8',completed:true,completedAt:'not a time'};
+  exp.node('#app').listeners.input(inputTarget({f:'date'},''));assert.equal(expDraft.date,keptDate,'clearing the date keeps the previous one');
+  exp.node('#app').listeners.input(inputTarget({f:'date'},'2026-02-30'));assert.equal(expDraft.date,keptDate,'an impossible date is ignored');
+  exp.node('#app').listeners.input(inputTarget({f:'rir',g:'',i:'0',j:'0'},'1.5'));assert.equal(expDraft.ex[0].sets[0].rir,2,'RIR is rounded');
+  exp.node('#app').listeners.input(inputTarget({f:'rir',g:'',i:'0',j:'0'},'14'));assert.equal(expDraft.ex[0].sets[0].rir,10,'RIR is capped at 10');
+  exp.node('#app').listeners.input(inputTarget({f:'rir',g:'',i:'0',j:'0'},''));assert.equal(expDraft.ex[0].sets[0].rir,null,'an empty RIR stays unrecorded');
+  const rirBox={dataset:{f:'rir',g:'',i:'0',j:'0'},value:'1.5'};expDraft.ex[0].sets[0].rir=2;exp.node('#app').listeners.focusout({target:rirBox});assert.equal(rirBox.value,2,'the RIR field shows the kept value');
+  const dateBox={dataset:{f:'date'},value:''};exp.node('#app').listeners.focusout({target:dateBox});assert.equal(dateBox.value,keptDate,'the date field shows the kept date');
+  expDraft.date='';expDraft.ex[0].sets[0].rir=1.5;
+  ex.S.tab='data';ex.render();await ex.exportJSON();
+  assert.equal(exp.node('#toast').textContent,'App data export started');
+  const repaired=JSON.parse(exp.node('#exportOut').value);ex.validateAppData(repaired);
+  assert.match(repaired.drafts.pullA.date,/^\d{4}-\d{2}-\d{2}$/);assert.equal(repaired.drafts.pullA.ex[0].sets[0].rir,undefined);assert.equal(repaired.drafts.pullA.ex[0].sets[0].completedAt,undefined);
+  assert.equal(expDraft.date,'','the export repairs a copy, not the live draft');assert.equal(expDraft.ex[0].sets[0].rir,1.5);
+  const expBack=setup();await settle();expBack.node('#importText').value=exp.node('#exportOut').value;await expBack.api.importJSON();
+  assert(!expBack.node('#toast').textContent.includes('Import cancelled'),expBack.node('#toast').textContent);assert.equal(expBack.api.S.drafts.pullA.ex[0].sets[0].w,'60');
+  // A draft that can't be repaired is left out, and the rest of the backup still exports.
+  ex.S.dayId='pushA';ex.getDraft('pushA').ex[0].sets[0]={w:'40',r:'8',type:'bogus'};
+  await ex.exportJSON();assert.equal(exp.node('#toast').textContent,"Exported. 1 in-progress workout couldn't be included.");
+  const partial=JSON.parse(exp.node('#exportOut').value);ex.validateAppData(partial);assert(partial.drafts.pullA);assert.equal(partial.drafts.pushA,undefined);
+  ex.S.dayId='legsA';ex.getDraft('legsA').workoutTimer={state:'paused',elapsedMs:0,startedAt:5};
+  await ex.exportJSON();assert.equal(exp.node('#toast').textContent,"Exported. 2 in-progress workouts couldn't be included.");
+  const partialBack=setup();await settle();partialBack.node('#importText').value=exp.node('#exportOut').value;await partialBack.api.importJSON();
+  assert(!partialBack.node('#toast').textContent.includes('Import cancelled'),partialBack.node('#toast').textContent);assert(partialBack.api.S.drafts.pullA);assert.equal(partialBack.api.S.drafts.legsA,undefined);
   const offline=setup({fetchFail:true,storage:c.storage});await settle();assert.equal(offline.api.S.ready,true);assert(offline.api.viewData().includes('file unavailable'));
   const missing=setup({fetchFail:true});await settle();assert.equal(missing.api.S.ready,false);assert(missing.node('#app').innerHTML.includes('Choose program JSON'));
   await missing.api.useProgramFile({text:async()=>JSON.stringify(canonical)});assert.equal(missing.api.S.ready,true);

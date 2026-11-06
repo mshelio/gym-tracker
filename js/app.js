@@ -1089,13 +1089,28 @@ $("#app").addEventListener("input", e => {
    if(f==='setrest')(t.dataset.g==='x'?d.extra:d.ex)[+t.dataset.i].sets[+t.dataset.j].restSeconds=n;else d[f]=n;
   }
   else if (f === "exrest") { const n=Number(t.value);if(Number.isInteger(n)&&n>=15&&n<=600)(t.dataset.g==="x"?d.extra:d.ex)[+t.dataset.i].restSeconds=n;else toast("Rest interval must be 15–600 seconds."); }
-   else if (f === "w" || f === "r" || f==="rir") {const set=(t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j];set[f]=f==="rir"?(t.value===""?null:Number(t.value)):t.value;
+   else if (f === "w" || f === "r" || f==="rir") {const set=(t.dataset.g === "x" ? d.extra : d.ex)[+t.dataset.i].sets[+t.dataset.j];set[f]=f==="rir"?cleanRir(t.value):t.value;
     // Correcting a ticked set keeps it ticked; it only unticks once it has no reps, as completeset requires them.
     if(set.completed===true && f==="r" && !(num(set.r)>0)){set.completed=false;delete set.completedAt;const row=t.closest?.(".setrow"),tick=row?.querySelector(".set-complete");row?.classList.remove("is-complete");if(tick){tick.setAttribute("aria-pressed","false");tick.setAttribute("aria-label",tick.getAttribute("aria-label").replace(/mark incomplete$/,"mark complete"));tick.title="Complete set and start rest timer";}}}
   else if (f === "xname") d.extra[+t.dataset.i].name = t.value;
   else if (f === "notes") d.notes = t.value;
-  else if (f === "date") d.date = t.value;
+  else if (f === "date") {if(!validDataDate(t.value))return;d.date = t.value;}
   saveDrafts(); updateSessionMeter();
+});
+// RIR is a whole number from 0 to 10; an empty field means not recorded.
+function cleanRir(value){
+  if(value==="")return null;
+  const n=Number(value);
+  return Number.isFinite(n)?Math.min(10,Math.max(0,Math.round(n))):null;
+}
+// When a field loses focus, show the value that was actually kept: the previous date for a cleared one, the rounded RIR.
+$("#app").addEventListener("focusout", e => {
+  const t=e.target,f=t.dataset?.f;
+  if(S.tab!=="log" || f!=="date" && f!=="rir")return;
+  const d=S.drafts[S.dayId];if(!d)return;
+  if(f==="date"){if(!validDataDate(t.value) && validDataDate(d.date))t.value=d.date;return;}
+  const set=(t.dataset.g==="x"?d.extra:d.ex)?.[+t.dataset.i]?.sets?.[+t.dataset.j];
+  if(set && t.value!==String(set.rir??""))t.value=set.rir??"";
 });
 
 $("#app").addEventListener("change", async e => {
@@ -1416,6 +1431,9 @@ const DATA_SCHEMA = {"$schema":"https://json-schema.org/draft/2020-12/schema","t
 function validDataDate(date){
   return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date+"T12:00:00Z")) && new Date(date+"T12:00:00Z").toISOString().slice(0,10) === date;
 }
+function validDataDateTime(v){
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v) && validDataDate(v.slice(0,10)) && /(Z|[+-]\d{2}:\d{2})$/.test(v) && !isNaN(Date.parse(v));
+}
 function validateAppData(value){
   function check(v, schema, path){
     if (schema.$ref) return check(v, DATA_SCHEMA.$defs[schema.$ref.split("/").pop()], path);
@@ -1436,7 +1454,7 @@ function validateAppData(value){
       if (schema.minLength != null && v.length < schema.minLength) fail("must not be empty");
       if (schema.pattern && !new RegExp(schema.pattern).test(v)) fail("invalid format");
       if (schema.format === "date" && !validDataDate(v)) fail("expected a valid YYYY-MM-DD date");
-      if (schema.format === "date-time" && (!/^\d{4}-\d{2}-\d{2}T/.test(v) || !validDataDate(v.slice(0,10)) || !/(Z|[+-]\d{2}:\d{2})$/.test(v) || isNaN(Date.parse(v)))) fail("expected an ISO date and time with timezone");
+      if (schema.format === "date-time" && !validDataDateTime(v)) fail("expected an ISO date and time with timezone");
     }
     if (typeof v === "number") {
       if (schema.minimum != null && v<schema.minimum || schema.maximum != null && v>schema.maximum || schema.exclusiveMinimum != null && v<=schema.exclusiveMinimum) fail("number is outside the allowed range");
@@ -1483,10 +1501,35 @@ function migrateLegacy(j){
     custom:(j.custom || []).map(c=>({id:c.id,name:c.name,type:c.type || "other",unit:normalizeUnit(c.unit),ex:(c.ex || []).map(e=>({n:e.n,s:e.s,lo:e.lo,hi:e.hi,alt:e.alt || [],...(e.exerciseId ? {exerciseId:e.exerciseId} : {})}))})),
     drafts:normalizeDrafts(j.drafts),schedules:j.schedules || [starterSchedule(j.sessions || [])],preferences:{...preferences(),...(j.preferences || {}),activeScheduleId:Object.hasOwn(j.preferences||{},"activeScheduleId")?j.preferences.activeScheduleId:(j.schedules?.[0]?.id || "starter-ppl")}};
 }
-function buildAppData(){
+// Repairs the draft fields that a half-typed workout can leave invalid, so they don't block a backup.
+function sanitizeDraftsForExport(drafts){
+  const copy=JSON.parse(JSON.stringify(drafts||{}));
+  for(const d of Object.values(copy)){
+    if(!d || typeof d!=="object")continue;
+    if(!validDataDate(d.date))d.date=today();
+    for(const e of [...(Array.isArray(d.ex)?d.ex:[]),...(Array.isArray(d.extra)?d.extra:[])]){
+      for(const s of Array.isArray(e?.sets)?e.sets:[]){
+        if(!s || typeof s!=="object")continue;
+        if(s.rir!==undefined && s.rir!==null && !(Number.isInteger(s.rir) && s.rir>=0 && s.rir<=10))delete s.rir;
+        if(s.completedAt!==undefined && !validDataDateTime(s.completedAt))delete s.completedAt;
+      }
+    }
+  }
+  return copy;
+}
+// skippedDrafts collects the ids of in-progress workouts that still don't validate and were left out.
+function buildAppData(skippedDrafts=[]){
   const normalized=migrateLegacy({exportedAt:new Date().toISOString(),sessions:S.sessions,body:S.body,custom:S.custom,drafts:{},schedules:S.schedules,preferences:preferences()});
-  normalized.drafts=JSON.parse(JSON.stringify(S.drafts));
   normalized.calendarEvents=JSON.parse(JSON.stringify(S.calendarEvents));
+  const drafts=sanitizeDraftsForExport(S.drafts);
+  normalized.drafts=drafts;
+  try {return validateAppData(normalized);} catch {}
+  // Something still fails: check the rest of the data alone, then keep only the drafts that pass on their own.
+  normalized.drafts={};validateAppData(normalized);
+  const shell={...normalized,sessions:[],body:[],calendarEvents:[]};
+  for(const [id,d] of Object.entries(drafts)){
+    try {validateAppData({...shell,drafts:{[id]:d}});normalized.drafts[id]=d;} catch {skippedDrafts.push(id);}
+  }
   return validateAppData(normalized);
 }
 function importFeedback(message, failed=false){
@@ -1494,8 +1537,9 @@ function importFeedback(message, failed=false){
   toast(message);
 }
 async function exportJSON(){
-  let json;
-  try {json = JSON.stringify(buildAppData(),null,2);} catch(err){toast("Cannot export: "+err.message);return;}
+  let json;const skipped=[];
+  try {json = JSON.stringify(buildAppData(skipped),null,2);} catch(err){toast("Cannot export: "+err.message);return;}
+  const leftOut=skipped.length?`${skipped.length} in-progress workout${skipped.length===1?"":"s"} couldn't be included.`:"";
   const ta = $("#exportOut"); ta.hidden=false;ta.value=json;$("#copyBtn").hidden=false;
   try {
     const url = URL.createObjectURL(new Blob([json],{type:"application/json"}));
@@ -1503,8 +1547,8 @@ async function exportJSON(){
     setTimeout(()=>URL.revokeObjectURL(url),60000);
     try{localStorage.setItem("gt-last-export",String(Date.now()));localStorage.removeItem("gt-backup-snooze");}catch{}
     document.querySelectorAll(".backup-export-status").forEach(el=>{el.textContent="Last export started: "+new Date().toLocaleString()+". Check that the downloaded file is saved somewhere safe.";});
-    toast("App data export started");
-  } catch {toast("Download unavailable. Copy the JSON below.");}
+    toast(leftOut?"Exported. "+leftOut:"App data export started");
+  } catch {toast("Download unavailable. Copy the JSON below."+(leftOut?" "+leftOut:""));}
 }
 async function importJSON(){
   let incoming,legacy=false,importedPreferenceKeys=[];
