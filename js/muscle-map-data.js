@@ -11,7 +11,8 @@ export const MUSCLE_REGIONS = Object.freeze({
  hamstrings: ["back-hamstrings-left", "back-hamstrings-right"],
  glutes: ["back-glutes-left", "back-glutes-right"],
  calves: ["back-calves-left", "back-calves-right"],
- core: ["front-core"]
+ core: ["front-core"],
+ adductors: ["front-adductors-left", "front-adductors-right"]
 });
 export const MUSCLE_IDS = Object.freeze(Object.keys(MUSCLE_REGIONS));
 const isFiniteNonnegative = x => typeof x === "number" && Number.isFinite(x) && x >= 0;
