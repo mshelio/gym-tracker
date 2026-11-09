@@ -38,6 +38,7 @@ test('resuming a draft after its workout template changes preserves the original
  });
  expect(snapshot.drafts.pushB.ex).toHaveLength(6);
  expect(snapshot.drafts.pushB.ex[0].sets[0].r).toBe('8');
+ expect(snapshot.drafts.pushB.notes).toBe('Keep this in-progress session');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await expect(page.locator('nav.tabs')).toBeVisible();
  await expect(page.locator('.today-workout.is-active')).toContainText('0 / 15');
