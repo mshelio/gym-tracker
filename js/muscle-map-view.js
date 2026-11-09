@@ -12,6 +12,7 @@ const anatomyGroup = id => {
  if (/^triceps-/.test(id)) return "triceps";
  if (/^forearm-/.test(id)) return "forearms";
  if (/^quads-/.test(id)) return "quadriceps";
+ if (/^adductors-/.test(id)) return "adductors";
  if (/^hamstrings-/.test(id)) return "hamstrings";
  if (/^gluteus-/.test(id)) return "glutes";
  if (/^calves-/.test(id)) return "calves";

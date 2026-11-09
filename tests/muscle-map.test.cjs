@@ -4,7 +4,9 @@ const path=require("node:path");
 (async()=>{
  const source=fs.readFileSync(path.join(__dirname,"../js/muscle-map-data.js"),"utf8");
  const {MUSCLE_IDS,MUSCLE_REGIONS,muscleMapData}=await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64"));
- assert.equal(MUSCLE_IDS.length,11);
+ assert.equal(MUSCLE_IDS.length,12);
+ assert.ok(MUSCLE_IDS.includes('adductors'));
+ assert.ok(MUSCLE_REGIONS.adductors.length>0);
  assert.equal(new Set(MUSCLE_IDS).size,MUSCLE_IDS.length);
  assert.equal(new Set(Object.values(MUSCLE_REGIONS).flat()).size,Object.values(MUSCLE_REGIONS).flat().length);
  const summary={unit:"kg",secondaryCredit:0.5,primary:[{muscle:"chest",hardSets:4,volume:2000},{muscle:"back",hardSets:2,volume:1000}],
