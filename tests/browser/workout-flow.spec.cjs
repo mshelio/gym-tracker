@@ -26,12 +26,19 @@ test('resuming a draft after its workout template changes preserves the original
  await expect(page.getByRole('spinbutton',{name:'Incline barbell press set 1 reps',exact:true})).toHaveValue('8');
  await expect(page.locator('.workout-layout')).toContainText('Your saved draft may be from an earlier program. Export a backup before editing.');
  await expect(page.locator('[data-save-status]')).toHaveAttribute('data-state','saved');
+ await page.getByRole('button',{name:'Update to current template',exact:true}).click();
+ await expect(page.locator('.focused-exercise')).toHaveCount(6);
+ await expect(page.locator('.workout-layout')).not.toContainText('earlier version of this workout');
+ await expect(page.getByRole('spinbutton',{name:'Incline barbell press set 1 reps',exact:true})).toHaveValue('8');
+ await expect(page.locator('.workout-layout')).toContainText('Standing overhead press');
+ await expect(page.locator('.session-progress')).toContainText('0 / 18 sets done');
  const snapshot=await page.evaluate(async()=>{
   const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});
   return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result)});
  });
- expect(snapshot.drafts.pushB.ex).toHaveLength(5);
+ expect(snapshot.drafts.pushB.ex).toHaveLength(6);
  expect(snapshot.drafts.pushB.ex[0].sets[0].r).toBe('8');
+ expect(snapshot.drafts.pushB.notes).toBe('Keep this in-progress session');
  await page.getByRole('button',{name:'Minimize workout',exact:true}).click();
  await expect(page.locator('nav.tabs')).toBeVisible();
  await expect(page.locator('.today-workout.is-active')).toContainText('0 / 15');
