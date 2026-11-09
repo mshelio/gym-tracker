@@ -288,6 +288,10 @@ button.tile:hover{border-color:var(--line-strong)}
 .exercise-photo-row:last-child{border-bottom:0}
 .exercise-photo-row>div{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
 .exercise-photo-row .muted{font-size:13px}
+.exercise-targets{display:flex;flex-wrap:wrap;gap:5px 10px;font-size:12px;color:var(--muted)}
+.exercise-target-primary{color:var(--accent-text);font-weight:700}
+.exercise-equipment{width:100%;font-size:11px;letter-spacing:.02em}
+.exercise-library-intro{margin:0 0 12px}
 
 /* ---------- session ---------- */
 .session-bar{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px;margin:0 -16px;padding:calc(12px + var(--safe-t)) 16px 12px;background:color-mix(in srgb,var(--bg) 96%,transparent);border-bottom:1px solid var(--line);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
