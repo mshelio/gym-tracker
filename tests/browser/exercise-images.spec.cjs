@@ -48,3 +48,23 @@ test('template preview photographs load for every default exercise',async({page}
   await page.locator('[data-act="closetemplate"]').click();
  }
 });
+
+test('exercise encyclopedia searches by name, target muscle, and equipment',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/gym-tracker/');
+ await library(page);
+ await page.getByRole('button',{name:'Exercises',exact:true}).click();
+ await expect(page.getByText(/Exercise encyclopedia · 200/)).toBeVisible();
+ const rows=page.locator('[data-exercise-search-item]');
+ await expect(rows).toHaveCount(await rows.count());
+ const bench=rows.filter({has:page.getByText('Barbell bench press',{exact:true})});
+ await expect(bench).toContainText('Primary: Chest');
+ await expect(bench).toContainText('Secondary: Triceps, Shoulders');
+ await page.locator('[data-exercise-search]').fill('hamstrings');
+ await expect(page.locator('[data-exercise-search-count]')).toContainText('exercises shown');
+ await expect(rows.first()).toBeVisible();
+ await expect(page.locator('[data-exercise-search-empty]')).toBeHidden();
+ await page.locator('[data-exercise-search]').fill('kettlebell');
+ await expect(rows.first()).toBeVisible();
+ await expect(rows.first()).toContainText('Equipment: Kettlebell');
+});
