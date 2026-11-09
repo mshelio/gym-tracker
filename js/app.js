@@ -14,7 +14,7 @@ import { muscleMapData } from "./muscle-map-data.js";
 import { renderMuscleMap,renderExerciseMusclePreview } from "./muscle-map-view.js";
 import { exerciseKey,hardSetCount,normalizeExerciseSetting,convertIncrement,resolveRestSeconds } from "./exercise-settings.js";
 import { createTimers } from "./timers.js";
-import { resolveExerciseMetadata,resolveExerciseIdentity } from "./exercise-catalog.js";
+import { resolveExerciseMetadata,resolveExerciseIdentity,getExerciseCatalog } from "./exercise-catalog.js";
 import { validateCalendarEvents,upsertCalendarEvent,removeCalendarEvent,shiftCalendarMonth,calendarPeriod,calendarDays,calendarAdherence } from "./calendar.js";
 
 (() => {
@@ -447,8 +447,16 @@ function viewLibrary(){
  return `<section aria-label="Workout templates"><div class="section-heading"><h2>Your workouts</h2><button class="btn small accent" data-act="newworkout">${icon('plus')} New workout</button></div><div class="template-grid">${allDays().map(day=>`<button class="template-card type-${esc(day.type)}" data-act="opentemplate" data-id="${esc(day.id)}"><span class="eyebrow">${esc(TYPE_LABEL[day.type]||"Other")}</span><strong>${esc(day.name)}</strong><span class="muted">${day.ex.length} exercises · ${day.ex.reduce((n,e)=>n+e.s,0)} sets${BASE_DAY[day.id]?'':' · custom'}</span></button>`).join("")}</div></section>${starterChoices()}`;
 }
 function viewExercises(){
- const names=[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].sort((a,b)=>a.localeCompare(b));
- return `${exerciseSearchBox()}<details class="section exercise-library" open><summary>All exercises · ${names.length}</summary><ul>${names.map(n=>`<li class="exercise-photo-row" data-exercise-search-item="${esc(n)}">${exerciseThumbnail(n)}<div><strong>${esc(n)}</strong>${exercisePhotoDetail(n)}</div></li>`).join("")}</ul></details>`;
+ const catalog=getExerciseCatalog().sort((a,b)=>a.name.localeCompare(b.name));
+ const extras=[...new Set(allDays().flatMap(d=>d.ex.flatMap(e=>[e.n,...(e.alt||[])])))].filter(name=>!catalog.some(e=>e.name.toLowerCase()===name.toLowerCase())).map(name=>({name,primaryMuscle:resolveExerciseMetadata(name)?.primaryMuscle||null,secondaryMuscles:resolveExerciseMetadata(name)?.secondaryMuscles||[],equipment:resolveExerciseMetadata(name)?.equipment||'other'}));
+ const entries=[...catalog,...extras].sort((a,b)=>a.name.localeCompare(b.name));
+ const rows=entries.map(e=>{
+  const muscles=[e.primaryMuscle,...e.secondaryMuscles].filter(Boolean);
+  const search=[e.name,...muscles,e.equipment].join(' ').toLowerCase();
+  const targets=muscles.length?`<span class="exercise-target-primary">Primary: ${esc(capitalize(e.primaryMuscle))}</span>${e.secondaryMuscles.length?`<span>Secondary: ${esc(e.secondaryMuscles.map(capitalize).join(', '))}</span>`:''}`:'<span class="muted">Muscle targets not classified yet</span>';
+  return `<li class="exercise-photo-row" data-exercise-search-item="${esc(search)}">${exerciseThumbnail(e.name)}<div><strong>${esc(e.name)}</strong><span class="exercise-targets">${targets}<span class="exercise-equipment">Equipment: ${esc(capitalize(e.equipment||'other'))}</span></span>${exercisePhotoDetail(e.name)}</div></li>`;
+ }).join('');
+ return `${exerciseSearchBox()}<p class="muted exercise-library-intro">Browse ${entries.length} curated exercises. Search by exercise, muscle group, or equipment. Primary muscles are the main targets; secondary muscles assist the movement.</p><details class="section exercise-library" open><summary>Exercise encyclopedia · ${entries.length}</summary><ul>${rows}</ul></details>`;
 }
 function viewPlan(){
  if(S.scheduleEditing)return viewScheduleEditor();
