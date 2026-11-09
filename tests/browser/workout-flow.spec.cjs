@@ -31,7 +31,7 @@ test('resuming a draft after its workout template changes preserves the original
  await expect(page.locator('.workout-layout')).not.toContainText('earlier version of this workout');
  await expect(page.getByRole('spinbutton',{name:'Incline barbell press set 1 reps',exact:true})).toHaveValue('8');
  await expect(page.locator('.workout-layout')).toContainText('Standing overhead press');
- await expect(page.locator('.workout-layout')).toContainText('0 / 18');
+ await expect(page.locator('.session-progress')).toContainText('0 / 18 sets done');
  const snapshot=await page.evaluate(async()=>{
   const db=await new Promise(ok=>{const r=indexedDB.open('gym-tracker');r.onsuccess=()=>ok(r.result)});
   return new Promise(ok=>{const r=db.transaction('snapshots').objectStore('snapshots').get('primary');r.onsuccess=()=>ok(r.result)});
