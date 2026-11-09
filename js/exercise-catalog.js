@@ -210,7 +210,7 @@ const known=[
  ["band-pushdown","Resistance band triceps pushdown","triceps",[],"band",[]],
  ["battle-rope","Battle ropes","shoulders",["core"],"other",[]],
  ["sled-push","Sled push","quadriceps",["glutes","calves"],"other",[]],
- ["sled-pull","Sled pull","back",["biceps","legs"],"other",[]],
+ ["sled-pull","Sled pull","back",["biceps","hamstrings"],"other",[]],
  ["kettlebell-swing","Kettlebell swing","glutes",["hamstrings","core"],"kettlebell",[]],
  ["kettlebell-goblet-squat","Kettlebell goblet squat","quadriceps",["glutes"],"kettlebell",[]],
  ["kettlebell-clean","Kettlebell clean","shoulders",["glutes","hamstrings"],"kettlebell",[]],
@@ -242,7 +242,7 @@ export function resolveExerciseIdentity(name,existingId){
 }
 export function validateExerciseMetadata(value){
  if(!value||typeof value!=="object")return null;
- const muscles=["chest","back","shoulders","biceps","triceps","forearms","quadriceps","hamstrings","glutes","calves","core"];
+ const muscles=["chest","back","shoulders","biceps","triceps","forearms","quadriceps","hamstrings","glutes","calves","core","adductors"];
  if(!muscles.includes(value.primaryMuscle)||!Array.isArray(value.secondaryMuscles)||value.secondaryMuscles.some(m=>!muscles.includes(m)||m===value.primaryMuscle)||new Set(value.secondaryMuscles).size!==value.secondaryMuscles.length||typeof value.equipment!=="string")throw Error("Invalid exercise metadata");
  return value;
 }
