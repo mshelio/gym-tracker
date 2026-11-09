@@ -201,7 +201,6 @@ const known=[
  ["hanging-leg-raise","Hanging leg raise","core",[],"bodyweight",[]],
  ["captains-chair","Captain's chair leg raise","core",[],"machine",[]],
  ["ab-crunch-machine","Ab crunch machine","core",[],"machine",[]],
- ["reverse-hyperextension","Reverse hyperextension","glutes",["hamstrings","back"],"machine",[]],
  ["banded-squat","Banded squat","quadriceps",["glutes"],"band",[]],
  ["band-row","Resistance band row","back",["biceps"],"band",[]],
  ["band-chest-press","Resistance band chest press","chest",["triceps"],"band",[]],
