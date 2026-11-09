@@ -298,6 +298,28 @@ function getDraft(dayId){
   if(!Number.isInteger(d.restSeconds)||d.restSeconds<15||d.restSeconds>600)d.restSeconds=S.globalRestSeconds||90;
   return d;
 }
+function refreshDraftFromTemplate(dayId){
+ const day=getDay(dayId),d=S.drafts[dayId];
+ if(!day||!d||!Array.isArray(d.ex))throw new Error("No saved workout draft to update");
+ const previous=[...d.ex,...(Array.isArray(d.extra)?d.extra:[])];
+ const used=new Set();
+ const hasEntryData=e=>(e?.sets||[]).some(set=>set&&(set.completed===true||String(set.w??"").trim()!==""||String(set.r??"").trim()!==""));
+ const next=day.ex.map((definition,index)=>{
+  let matchIndex=previous.findIndex((entry,i)=>!used.has(i)&&resolveExerciseIdentity(entry?.name,entry?.exerciseId)&&resolveExerciseIdentity(entry?.name,entry?.exerciseId)===resolveExerciseIdentity(definition.n,definition.exerciseId));
+  if(matchIndex<0)matchIndex=previous.findIndex((entry,i)=>!used.has(i)&&(entry?.name===definition.n||(definition.alt||[]).includes(entry?.name)));
+  const saved=matchIndex>=0?previous[matchIndex]:null;
+  if(matchIndex>=0)used.add(matchIndex);
+  const oldSets=Array.isArray(saved?.sets)?saved.sets:[];
+  const sets=Array.from({length:Math.max(definition.s,oldSets.length)},(_,i)=>oldSets[i]?{...oldSets[i]}:{w:"",r:""});
+  return {name:definition.n,...(definition.exerciseId?{exerciseId:definition.exerciseId}:{}),unit:saved?.unit||unitFor(definition.n,day),sets,...(saved?.restSeconds!=null?{restSeconds:saved.restSeconds}:{})};
+ });
+ const retainedExtras=previous.filter((entry,i)=>!used.has(i)&&entry&&typeof entry.name==="string"&&entry.name.trim()&&entry.name!=="Extra exercise"&&hasEntryData(entry)).map(entry=>({...entry,sets:(entry.sets||[]).map(set=>({...set}))}));
+ d.ex=next;
+ d.extra=retainedExtras;
+ d.sig=day.ex.map(e=>e.n).join("|");
+ d.recoveryWarning=false;
+ saveDrafts();
+}
 function lastFor(name){
   for (const s of S.sessions) { const e = (s.exercises||[]).find(x => x.name === name); if (e && e.sets && e.sets.length) return { date:s.date, sets:e.sets, unit: exUnit(e, s) }; }
   return null;
@@ -804,7 +826,7 @@ function viewLog(){
   </header>
   <p id="session-validation" class="notice warn" role="alert" hidden></p>
   <div class="workout-layout" id="workout-editor" tabindex="-1">
-   ${Object.keys(S.drafts).some(k=>S.drafts[k]?.recoveryWarning)?`<p class="notice warn" role="status">Your saved draft may be from an earlier program. Export a backup before editing.</p>`:""}
+   ${S.drafts[S.dayId]?.recoveryWarning?`<div class="notice warn" role="status"><p>Your saved draft is from an earlier version of this workout. Update it to the current template; matching sets, notes, and timer state will be kept.</p><button class="btn small" type="button" data-act="refreshdraft">Update to current Push B template</button><p class="muted">Unmatched exercises with logged data are retained as extras. Completed workout history is not changed.</p></div>`:""}
    ${exerciseNameSuggestions()}${cards}
    <button class="btn add-exercise" data-act="addextra">${icon('plus')} Add an exercise</button>
    <div class="save-status"><p class="autosave-note" role="status" aria-live="polite" data-save-status data-state="${saveStatus}">${({pending:"Saving changes…",saved:"Draft saved on this device",error:"Not saved — storage failed",conflict:"Not saved — another tab changed data"})[saveStatus]}</p><div data-save-recovery ${saveStatus==="error"||saveStatus==="conflict"?"":"hidden"}><p class="muted">Your unsaved draft is still available in this tab. Export a backup before reloading.</p><div class="row-actions"><button class="btn small" data-act="recoverbackup">Export unsaved backup</button><button class="btn small ghost" data-act="reloadconflict">Reload stored data</button></div></div></div>
@@ -1248,6 +1270,12 @@ $("#app").addEventListener("click", async e => {
   if(act==="homeweekreset"){homeWeekOffset=0;render();return;}
   if(act==="homebody"){openSheet({kind:"weight"},b);return;}
 
+  if(act==="refreshdraft"){
+   if(saveStatus==="error"||saveStatus==="conflict"||!await flushDrafts()){toast("Draft could not be saved. Export a backup before updating.");return;}
+   try{refreshDraftFromTemplate(S.dayId);await flushDrafts();render();toast("Workout updated. Your saved sets were kept.");}
+   catch(err){toast(err.message||"Could not update this workout.");}
+   return;
+  }
   if(act==="workoutsettings"){navigateView("more");return;}
   if(act==="opentemplate"){templateId=b.dataset.id;render();window.scrollTo({top:0});return;}
   if(act==="closetemplate"){templateId=null;S.editing=null;render();return;}
