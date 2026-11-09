@@ -133,7 +133,7 @@ const known=[
  ["wrist-curl","Wrist curl","forearms",[],"barbell",[]],
  ["reverse-wrist-curl","Reverse wrist curl","forearms",[],"barbell",[]],
  ["wrist-roller","Wrist roller","forearms",[],"other",[]],
- ["farmer-carry","Farmer's carry","forearms",["traps","core"],"dumbbell",[]],
+ ["farmer-carry","Farmer's carry","forearms",["back","core"],"dumbbell",[]],
  ["dead-hang","Dead hang","forearms",["back"],"bodyweight",[]],
  ["triceps-dip","Triceps dip","triceps",["chest","shoulders"],"bodyweight",[]],
  ["bench-dip","Bench dip","triceps",["chest","shoulders"],"bodyweight",[]],
